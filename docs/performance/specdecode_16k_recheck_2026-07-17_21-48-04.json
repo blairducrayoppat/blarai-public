@@ -4,8 +4,8 @@
   "timestamp_utc": "2026-07-17T21:48:04.210058+00:00",
   "commit": "5d70fb50d37f4d9ef45a3347691fabc47896b209",
   "config": {
-    "target_model": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
-    "draft_model": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "target_model": "C:\\Users\\__USER__\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+    "draft_model": "C:\\Users\\__USER__\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
     "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
     "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
     "nat": 3,

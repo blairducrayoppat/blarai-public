@@ -107,7 +107,7 @@ Scratch directory (all probe scripts, raw outputs, ETL files): `C:\Users\mrbla\A
 ## Command log (verbatim, in order; outputs summarised faithfully — full text in the S files named)
 
 ```
-02:48:56 -04:00  Get-Date; [Environment]::OSVersion → 10.0.26200; DisplayVersion 25H2; UBR 9457; whoami → northstar100\mrbla; IsInRole(Administrator) → True; pwsh 7.6.6
+02:48:56 -04:00  Get-Date; [Environment]::OSVersion → 10.0.26200; DisplayVersion 25H2; UBR 9457; whoami → __HOST__\mrbla; IsInRole(Administrator) → True; pwsh 7.6.6
 02:49     auditpol /get /subcategory:"Process Creation"            → Detailed Tracking / Process Creation  No Auditing
           auditpol /get /category:"Object Access"                  → all 14 subcategories  No Auditing
           Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit → key exists, no values; reg query → (empty)

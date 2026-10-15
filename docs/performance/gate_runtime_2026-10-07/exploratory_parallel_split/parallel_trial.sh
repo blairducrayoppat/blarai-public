@@ -1,8 +1,8 @@
 #!/bin/bash
 # Exploratory: the standing selection split into two concurrent pytest processes. Not a recorded figure.
-cd /c/Users/mrbla/BlarAI-worktrees/gate-fixed-f407d2af || exit 1
-PY=/c/Users/mrbla/BlarAI/.venv/Scripts/python.exe
-OUT=/c/Users/mrbla/BlarAI-worktrees/_gatelogs/ptrial
+cd /c/Users/__USER__/BlarAI-worktrees/gate-fixed-f407d2af || exit 1
+PY=/c/Users/__USER__/BlarAI/.venv/Scripts/python.exe
+OUT=/c/Users/__USER__/BlarAI-worktrees/_gatelogs/ptrial
 mkdir -p "$OUT"
 GITFILES=$(ls tests/security/test_git_*.py tests/security/test_install_git_hooks_batching.py)
 IGN=""

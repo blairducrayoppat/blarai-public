@@ -1,0 +1,10 @@
+{
+  "version": 5,
+  "offline_username": "CodexSandboxOffline",
+  "online_username": "CodexSandboxOnline",
+  "created_at": "2026-04-16T17:26:44.028793900+00:00",
+  "proxy_ports": [],
+  "allow_local_binding": false,
+  "read_roots": [],
+  "write_roots": []
+}

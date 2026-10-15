@@ -2,8 +2,8 @@
   "probe": "draft_device_accept",
   "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
   "config": {
-    "target": "C:\\Users\\mrbla\\blarai\\models\\qwen3-8b\\openvino-int4-gpu",
-    "draft": "C:\\Users\\mrbla\\blarai\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "target": "C:\\Users\\__USER__\\blarai\\models\\qwen3-8b\\openvino-int4-gpu",
+    "draft": "C:\\Users\\__USER__\\blarai\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
     "draft_device": "GPU",
     "num_assistant_tokens": 3,
     "max_new_tokens": 256,

@@ -2,7 +2,7 @@
   "probe": "35b_thinking_control",
   "ticket": "#1611 S0c",
   "model": "qwen36-35b-a3b-int4-ov-OFFICIAL",
-  "model_dir": "C:\\Users\\mrbla\\models\\qwen36-35b-a3b-int4-ov-OFFICIAL",
+  "model_dir": "C:\\Users\\__USER__\\models\\qwen36-35b-a3b-int4-ov-OFFICIAL",
   "device": "GPU",
   "timestamp": "2026-09-22T00:55:51",
   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",

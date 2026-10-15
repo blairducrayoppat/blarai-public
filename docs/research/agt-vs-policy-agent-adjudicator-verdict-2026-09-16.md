@@ -12,6 +12,8 @@ But the question exposes something the LA should hear plainly first, because it 
 
 So the honest comparison is: a 150-line, dependency-free, test-locked function against a 112,000-line beta toolkit whose decision engine is a separate alpha Rust crate on its own release train. Put that way the answer is obvious. What follows is the evidence, and then the part that matters more: what the toolkit does *better*, which is small, specific, and copyable without importing anything.
 
+*Note as of 2026-10-11 (the original text above is kept as written 2026-09-16):* the checker `DeterministicPolicyChecker` in `services/policy_agent/src/gpu_inference.py` is not 150 lines. Counted on that date, the class spans lines 578 to 866 (about 289 lines) and its `check` method lines 712 to 866 (about 155 lines). Importing the module also loads `openvino`, `openvino_genai`, `numpy` and `pydantic` (observed in `sys.modules`), so "dependency-free" describes the decision logic, not the import.
+
 ## What AGT actually is, from its source
 
 The README says the toolkit intercepts every tool call in deterministic code so that denied actions are "structurally impossible". The source tells a more careful story, and the toolkit's own security-model document tells the same careful story.

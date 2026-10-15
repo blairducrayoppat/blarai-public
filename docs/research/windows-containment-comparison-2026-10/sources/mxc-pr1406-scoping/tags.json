@@ -1,0 +1,112 @@
+[
+  {
+    "name": "v1.0.0",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v1.0.0",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v1.0.0",
+    "commit": {
+      "sha": "7bf210247986cb73b1b314df60c2f1109c479c0b",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/7bf210247986cb73b1b314df60c2f1109c479c0b"
+    },
+    "node_id": "REF_kwDORKXRj7ByZWZzL3RhZ3MvdjEuMC4w"
+  },
+  {
+    "name": "v1.0.0-rc5",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v1.0.0-rc5",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v1.0.0-rc5",
+    "commit": {
+      "sha": "7bf210247986cb73b1b314df60c2f1109c479c0b",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/7bf210247986cb73b1b314df60c2f1109c479c0b"
+    },
+    "node_id": "REF_kwDORKXRj7RyZWZzL3RhZ3MvdjEuMC4wLXJjNQ"
+  },
+  {
+    "name": "v1.0.0-rc4",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v1.0.0-rc4",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v1.0.0-rc4",
+    "commit": {
+      "sha": "2f85ccdcfa9cc49488150f417c9b8a6ac8a7ebbb",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/2f85ccdcfa9cc49488150f417c9b8a6ac8a7ebbb"
+    },
+    "node_id": "REF_kwDORKXRj7RyZWZzL3RhZ3MvdjEuMC4wLXJjNA"
+  },
+  {
+    "name": "v1.0.0-rc3",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v1.0.0-rc3",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v1.0.0-rc3",
+    "commit": {
+      "sha": "a846837d827b496fc4a08dfe60554515758c6647",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/a846837d827b496fc4a08dfe60554515758c6647"
+    },
+    "node_id": "REF_kwDORKXRj7RyZWZzL3RhZ3MvdjEuMC4wLXJjMw"
+  },
+  {
+    "name": "v1.0.0-rc2",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v1.0.0-rc2",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v1.0.0-rc2",
+    "commit": {
+      "sha": "ae3dc7eaac04558c98b4145ef63af40e9f48edca",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/ae3dc7eaac04558c98b4145ef63af40e9f48edca"
+    },
+    "node_id": "REF_kwDORKXRj7RyZWZzL3RhZ3MvdjEuMC4wLXJjMg"
+  },
+  {
+    "name": "v1.0.0-rc1",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v1.0.0-rc1",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v1.0.0-rc1",
+    "commit": {
+      "sha": "3cddcbc2f4f6e9e963dc2c10e712d45ead9d83e0",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/3cddcbc2f4f6e9e963dc2c10e712d45ead9d83e0"
+    },
+    "node_id": "REF_kwDORKXRj7RyZWZzL3RhZ3MvdjEuMC4wLXJjMQ"
+  },
+  {
+    "name": "v0.9.0",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v0.9.0",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v0.9.0",
+    "commit": {
+      "sha": "86fb3d2abaf9c431556692037bff881830b543a5",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/86fb3d2abaf9c431556692037bff881830b543a5"
+    },
+    "node_id": "REF_kwDORKXRj7ByZWZzL3RhZ3MvdjAuOS4w"
+  },
+  {
+    "name": "v0.8.0",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v0.8.0",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v0.8.0",
+    "commit": {
+      "sha": "7dac1a952f0c9ad13f0a4cb089c4e0e8b3e0013a",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/7dac1a952f0c9ad13f0a4cb089c4e0e8b3e0013a"
+    },
+    "node_id": "REF_kwDORKXRj7ByZWZzL3RhZ3MvdjAuOC4w"
+  },
+  {
+    "name": "v0.7.0",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v0.7.0",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v0.7.0",
+    "commit": {
+      "sha": "34d7fe2b4b3226bd4d11dc4a32419b7ec198a88b",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/34d7fe2b4b3226bd4d11dc4a32419b7ec198a88b"
+    },
+    "node_id": "REF_kwDORKXRj7ByZWZzL3RhZ3MvdjAuNy4w"
+  },
+  {
+    "name": "v0.7.0-rc1",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v0.7.0-rc1",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v0.7.0-rc1",
+    "commit": {
+      "sha": "0e02a720e32416b151dbcb0a00e3d4ac2b891559",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/0e02a720e32416b151dbcb0a00e3d4ac2b891559"
+    },
+    "node_id": "REF_kwDORKXRj7RyZWZzL3RhZ3MvdjAuNy4wLXJjMQ"
+  },
+  {
+    "name": "v0.6.1",
+    "zipball_url": "https://api.github.com/repos/microsoft/mxc/zipball/refs/tags/v0.6.1",
+    "tarball_url": "https://api.github.com/repos/microsoft/mxc/tarball/refs/tags/v0.6.1",
+    "commit": {
+      "sha": "161598fd08a4fdd030f461de19af23ce4a310b41",
+      "url": "https://api.github.com/repos/microsoft/mxc/commits/161598fd08a4fdd030f461de19af23ce4a310b41"
+    },
+    "node_id": "REF_kwDORKXRj7ByZWZzL3RhZ3MvdjAuNi4x"
+  }
+]

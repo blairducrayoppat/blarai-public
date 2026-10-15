@@ -40,7 +40,7 @@
     "subject_detail": {
       "clean_cli": "synthetic, correct argparse CLI",
       "defective_module": "synthetic, no entry point; unhandled ZeroDivisionError / KeyError / TypeError",
-      "battery_quiz_engine_REAL30B": "REAL Qwen3-Coder-30B-A3B output, read-only from the live battery sandbox C:/Users/mrbla/projects/battery-b4-flashcards-cli (night of 2026-07-21/22)"
+      "battery_quiz_engine_REAL30B": "REAL Qwen3-Coder-30B-A3B output, read-only from the live battery sandbox C:/Users/__USER__/projects/battery-b4-flashcards-cli (night of 2026-07-21/22)"
     },
     "arms": {
       "A": "verbatim production rubric -> verdicts. Unconstrained free-text JSON. 2 runs/cell.",
@@ -228,7 +228,7 @@
   "raw_artifacts": {
     "arm_A_B_qwen14b": {
       "label": "qwen14b",
-      "model_dir": "C:/Users/mrbla/BlarAI/models/qwen3-14b/openvino-int4-gpu",
+      "model_dir": "C:/Users/__USER__/BlarAI/models/qwen3-14b/openvino-int4-gpu",
       "load_seconds": 13.98,
       "steady_delta_gb": 8.559,
       "deterministic": "0/9",
@@ -492,7 +492,7 @@
     "arm_C_qwen14b": {
       "arm": "C-grammar-constrained",
       "label": "qwen14b",
-      "model_dir": "C:/Users/mrbla/BlarAI/models/qwen3-14b/openvino-int4-gpu",
+      "model_dir": "C:/Users/__USER__/BlarAI/models/qwen3-14b/openvino-int4-gpu",
       "runs_per_cell": 3,
       "grammar_constrained": true,
       "load_seconds": 9.74,

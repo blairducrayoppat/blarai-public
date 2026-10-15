@@ -1,0 +1,160 @@
+{
+ "stage": "c",
+ "runs_per_variant": 3,
+ "started": "2026-10-11T11:09:30-04:00",
+ "variants": [
+  {
+   "variant": "C-real-toolchain",
+   "arm": "C",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "C",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-C-real-toolchain",
+    "--label",
+    "C-real-toolchain"
+   ],
+   "started": "2026-10-11T11:09:30-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "C-20261011T110930-r1 {\"exit_code\": 3221225781, \"timed_out\": false, \"wall_secs\": 0.061, \"listener_accepts\": 0}",
+    "C-20261011T110930-r2 {\"exit_code\": 3221225781, \"timed_out\": false, \"wall_secs\": 0.073, \"listener_accepts\": 0}",
+    "C-20261011T110930-r3 {\"exit_code\": 3221225781, \"timed_out\": false, \"wall_secs\": 0.069, \"listener_accepts\": 0}",
+    "cleanup {\"delete_profile_hr\": 0, \"profile_folder_gone\": true}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "C0-fixture-no-capabilities",
+   "arm": "C",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "C",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-C0-fixture-no-capabilities",
+    "--label",
+    "C0-fixture-no-capabilities",
+    "--toolchain",
+    "fixture"
+   ],
+   "started": "2026-10-11T11:09:30-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "C-20261011T110931-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.818, \"listener_accepts\": 0}",
+    "C-20261011T110940-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.696, \"listener_accepts\": 0}",
+    "C-20261011T110950-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.68, \"listener_accepts\": 0}",
+    "cleanup {\"delete_profile_hr\": 0, \"profile_folder_gone\": true}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "C1-fixture-loopback-exempt",
+   "arm": "C",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "C",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-C1-fixture-loopback-exempt",
+    "--label",
+    "C1-fixture-loopback-exempt",
+    "--toolchain",
+    "fixture",
+    "--loopback-exempt"
+   ],
+   "started": "2026-10-11T11:10:00-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "C-20261011T111000-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 6.984, \"listener_accepts\": 1}",
+    "C-20261011T111007-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 6.748, \"listener_accepts\": 1}",
+    "C-20261011T111014-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 6.632, \"listener_accepts\": 1}",
+    "cleanup {\"loopback_exempt_remove\": {\"action\": \"remove\", \"rc\": 0, \"listed_after\": false, \"ok\": true}, \"delete_profile_hr\": 0, \"profile_folder_gone\": true}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "C2-fixture-internetClient",
+   "arm": "C",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "C",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-C2-fixture-internetClient",
+    "--label",
+    "C2-fixture-internetClient",
+    "--toolchain",
+    "fixture",
+    "--capabilities",
+    "internetClient"
+   ],
+   "started": "2026-10-11T11:10:21-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "C-20261011T111021-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.729, \"listener_accepts\": 0}",
+    "C-20261011T111031-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.787, \"listener_accepts\": 0}",
+    "C-20261011T111041-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.856, \"listener_accepts\": 0}",
+    "cleanup {\"delete_profile_hr\": 0, \"profile_folder_gone\": true}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "C3-fixture-internetClient-fence-package",
+   "arm": "C",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "C",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-C3-fixture-internetClient-fence-package",
+    "--label",
+    "C3-fixture-internetClient-fence-package",
+    "--toolchain",
+    "fixture",
+    "--capabilities",
+    "internetClient",
+    "--loopback-exempt",
+    "--fence",
+    "package:auto"
+   ],
+   "started": "2026-10-11T11:10:50-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "C-20261011T111051-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 6.721, \"listener_accepts\": 1}",
+    "C-20261011T111101-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 6.622, \"listener_accepts\": 1}",
+    "C-20261011T111111-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 6.559, \"listener_accepts\": 1}",
+    "cleanup {\"loopback_exempt_remove\": {\"action\": \"remove\", \"rc\": 0, \"listed_after\": false, \"ok\": true}, \"delete_profile_hr\": 0, \"profile_folder_gone\": true}"
+   ],
+   "stderr_tail": []
+  }
+ ],
+ "finished": "2026-10-11T11:11:21-04:00",
+ "rc": 0
+}

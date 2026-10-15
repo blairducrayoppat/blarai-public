@@ -22,7 +22,7 @@
     "goal": "a 4-page pottery studio website: home, pieces list, per-piece page, contact form",
     "planned_tasks": 9,
     "stack": "node / JavaScript (language-pinned so the acceptance oracle grades what was built)",
-    "repo": "C:/Users/mrbla/projects/pottery-studio"
+    "repo": "C:/Users/__USER__/projects/pottery-studio"
   },
   "methodology": "Wall clock taken from the fleet journal's TASK-START/TASK-END pairs, which bracket the whole per-task cycle: decomposition handoff, candidate builds, gates, merge, and the post-merge visual-critique loop. n=1 per task; no task was repeated. The box was otherwise idle except for this session's own tooling. The #1337 guidance fix was applied to the LIVE AGENTS.md between task 1 and task 2, mid-run - so tasks 1 and 2+ differ in that one variable AND in their visual-fix counts, which is the confound named below.",
   "results": [

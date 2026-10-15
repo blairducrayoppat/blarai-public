@@ -15,7 +15,7 @@ variance. Future agents: run the one command in §3 to regenerate the whole data
 - **Elevated (Administrator) shell** — UT's socwatch/level-zero drivers require it.
   Check: `([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)`
 - **Intel UT tool** at the path in the **`INTEL_UT_HOME`** env var (set User-scope on this box),
-  default `C:\Users\mrbla\tools\intel-ut\ut-tool-ext-v0.2.0-beta1.1` (`ut.exe`,
+  default `C:\Users\__USER__\tools\intel-ut\ut-tool-ext-v0.2.0-beta1.1` (`ut.exe`,
   `bin2perfetto.exe`; collectors socwatch + level-zero). Lunar Lake + Arc driver required.
   (Original archive kept at `~\Downloads\ut-tool-ext-v0.2.0-beta1.1.zip`.)
 - **Models present** under `models/`: `qwen3-14b`, `qwen3-0.6b-pruned-6l`,

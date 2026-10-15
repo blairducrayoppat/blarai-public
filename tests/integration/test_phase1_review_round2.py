@@ -14,6 +14,9 @@ from typing import Any
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+# This machine's identity strings, read at run time; never literals (gate lock: tests/security/test_no_host_identity_in_tree.py).
+_HOST = __import__("os").environ.get("COMPUTERNAME") or __import__("platform").node()
+_USER = __import__("os").environ.get("USERNAME") or __import__("getpass").getuser()
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT))
@@ -345,7 +348,7 @@ def test_chunked_free_text_is_bounded_by_the_per_file_budget(tmp_path):
     assert _put(tmp_path / "ok", "a.json", json.dumps({"outs": [chunk] * 20})) == []
 
 
-@pytest.mark.parametrize("msg", ["contact someone@example.org", "token hf_" + "A" * 30, "by mrbla", "host NORTHSTAR100"])
+@pytest.mark.parametrize("msg", ["contact someone@example.org", "token hf_" + "A" * 30, pytest.param(f"by {_USER}", id="user"), pytest.param(f"host {_HOST}", id="host")])
 def test_commit_message_with_identity_or_credential_shapes_is_refused(msg):
     assert hf._validate_target("c1", "ok/data", msg) is not None
 

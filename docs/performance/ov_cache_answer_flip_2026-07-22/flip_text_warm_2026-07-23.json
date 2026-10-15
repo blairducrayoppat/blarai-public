@@ -1,7 +1,7 @@
 {
   "label": "warm",
   "model": "openvino-int4-gpu",
-  "cache_dir": "C:\\Users\\mrbla\\AppData\\Local\\Temp\\claude\\C--Users-mrbla-builds-genai-pr4139\\d78b5843-8694-4ce1-86dc-9520cca74719\\scratchpad\\flip_cache",
+  "cache_dir": "C:\\Users\\__USER__\\AppData\\Local\\Temp\\claude\\C--Users-__USER__-builds-genai-pr4139\\d78b5843-8694-4ce1-86dc-9520cca74719\\scratchpad\\flip_cache",
   "cache_gb_before": 7.906,
   "n_reps": 3,
   "genai_version": "2026.2.1.0-3123-7dea0459b2a",

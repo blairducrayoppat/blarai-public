@@ -1,0 +1,135 @@
+{
+ "ticket": "#1740",
+ "arm": "D (limited-equivalent token, unconfined control)",
+ "measured": "2026-10-10T22:11:54-04:00/22:12:41-04:00",
+ "runs": 7,
+ "hardware": "Intel Core Ultra 7 258V, 31.3 GB, Windows 11 Pro 10.0.26200",
+ "software": {
+  "python": "3.14.3",
+  "node": "v24.13.0",
+  "git": "2.55.0",
+  "opencode": "1.17.8"
+ },
+ "instrument": "tools/probes/containment_arms/run_arm.py + arm_payload.py; toolchain = real install",
+ "series": {
+  "launch_wall_s": {
+   "values": [
+    6.517,
+    6.52,
+    6.703,
+    6.819,
+    6.484,
+    6.549,
+    6.514
+   ],
+   "mean": 6.5866,
+   "sd": 0.1252,
+   "cv_pct": 1.9
+  },
+  "payload_total_s": {
+   "values": [
+    6.411,
+    6.415,
+    6.598,
+    6.713,
+    6.38,
+    6.445,
+    6.407
+   ],
+   "mean": 6.4813,
+   "sd": 0.125,
+   "cv_pct": 1.93
+  },
+  "node_s": {
+   "values": [
+    0.056,
+    0.058,
+    0.058,
+    0.056,
+    0.056,
+    0.057,
+    0.058
+   ],
+   "mean": 0.057,
+   "sd": 0.001,
+   "cv_pct": 1.75
+  },
+  "git_s": {
+   "values": [
+    0.067,
+    0.07,
+    0.069,
+    0.067,
+    0.068,
+    0.069,
+    0.069
+   ],
+   "mean": 0.0684,
+   "sd": 0.0011,
+   "cv_pct": 1.66
+  },
+  "bash_s": {
+   "values": [
+    0.529,
+    0.533,
+    0.528,
+    0.55,
+    0.504,
+    0.533,
+    0.518
+   ],
+   "mean": 0.5279,
+   "sd": 0.0142,
+   "cv_pct": 2.69
+  },
+  "python_s": {
+   "values": [
+    0.067,
+    0.069,
+    0.068,
+    0.075,
+    0.067,
+    0.067,
+    0.066
+   ],
+   "mean": 0.0684,
+   "sd": 0.003,
+   "cv_pct": 4.45
+  },
+  "opencode_s": {
+   "values": [
+    0.513,
+    0.504,
+    0.501,
+    0.646,
+    0.509,
+    0.497,
+    0.504
+   ],
+   "mean": 0.5249,
+   "sd": 0.0537,
+   "cv_pct": 10.23
+  },
+  "task_s": {
+   "values": [
+    0.725,
+    0.727,
+    0.899,
+    0.858,
+    0.721,
+    0.725,
+    0.723
+   ],
+   "mean": 0.7683,
+   "sd": 0.0762,
+   "cv_pct": 9.92
+  }
+ },
+ "not_measured": [
+  "confined setups (phase 2)",
+  "opencode against a model",
+  "thermal state",
+  "idle-gated runs",
+  "fixture-copy toolchain"
+ ]
+}

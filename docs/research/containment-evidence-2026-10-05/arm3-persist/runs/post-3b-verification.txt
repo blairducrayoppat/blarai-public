@@ -1,0 +1,8 @@
+post-3b verification, run by the builder session at 2026-10-12 16:57:54 -04:00
+spike-wfp-persist.ps1 -Check exit code: 20 (20 = ABSENT)
+arm3 scheduled tasks under \BlarAI\ : 0
+--- output
+fence ABSENT: fence ABSENT: the account is not allowed to run
+  present: 
+  missing: filter:block-account-v4, filter:block-account-v6, sublayer:sublayer, provider:provider
+  flags  : ; all persistent: False

@@ -1,0 +1,52 @@
+[
+ {
+  "case": "stock + v6-open",
+  "out": {
+   "tree": "stock",
+   "ok": true,
+   "result": {
+    "target": "127.0.0.1:56709",
+    "stderr": "BLOCKED (fake)"
+   }
+  }
+ },
+ {
+  "case": "patched + v6-open",
+  "out": {
+   "tree": "patched",
+   "ok": false,
+   "code": "wfp_fence_inactive",
+   "message": "WFP egress fence is not active — direct outbound from the sandbox user to [::1]:56711 succeeded. Re-run `srt-win install` (one UAC prompt). (CONNECTED (fake))"
+  }
+ },
+ {
+  "case": "patched + all-blocked",
+  "out": {
+   "tree": "patched",
+   "ok": true,
+   "result": {
+    "target": "127.0.0.1:56712",
+    "targetV6": "[::1]:56713",
+    "stderr": "BLOCKED (fake)"
+   }
+  }
+ },
+ {
+  "case": "patched + v4-open",
+  "out": {
+   "tree": "patched",
+   "ok": false,
+   "code": "wfp_fence_inactive",
+   "message": "WFP egress fence is not active — direct outbound from the sandbox user to 127.0.0.1:56714 succeeded. Re-run `srt-win install` (one UAC prompt). (CONNECTED (fake))"
+  }
+ },
+ {
+  "case": "stock + v4-open",
+  "out": {
+   "tree": "stock",
+   "ok": false,
+   "code": "wfp_fence_inactive",
+   "message": "WFP egress fence is not active — direct outbound from the sandbox user to 127.0.0.1:56716 succeeded. Re-run `srt-win install` (one UAC prompt). (CONNECTED (fake))"
+  }
+ }
+]

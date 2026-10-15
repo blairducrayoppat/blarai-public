@@ -203,7 +203,7 @@ def _classify(sid_str: str, *, current: str, resolvable: set[str]) -> bool:
 class TestSidClassification:
     """_sid_is_legitimate keeps legitimate principals and flags foreign ones."""
 
-    _CURRENT = "S-1-5-21-4125655822-2918122917-2734753367-1001"
+    _CURRENT = "S-1-5-21-1000000001-1000000002-1000000003-1001"
 
     def test_current_user_is_kept(self) -> None:
         assert _classify(self._CURRENT, current=self._CURRENT, resolvable=set()) is True
@@ -229,7 +229,7 @@ class TestSidClassification:
         assert _classify(ac, current=self._CURRENT, resolvable=set()) is True
 
     def test_resolvable_local_account_kept(self) -> None:
-        other = "S-1-5-21-4125655822-2918122917-2734753367-1002"
+        other = "S-1-5-21-1000000001-1000000002-1000000003-1002"
         assert (
             _classify(other, current=self._CURRENT, resolvable={other}) is True
         )

@@ -1,0 +1,331 @@
+From 26716c135846904aacdb03fcd92c43c93fae576f Mon Sep 17 00:00:00 2001
+From: Blair DuCray-Oppat <251061449+blairducrayoppat@users.noreply.github.com>
+Date: Wed, 14 Oct 2026 10:24:21 -0400
+Subject: [PATCH] windows: `wfp status` reads `partial` when the set is
+ incomplete, so a plain `install` repairs it
+
+`filter_status` read `installed` whenever one `block-user` filter existed. With one address family's block deleted the set still read `installed`, `install` returned early with "already installed ... no changes", and that family stayed open; with the IPv4 block gone, the "Re-run `srt-win install`" that `initialize()` asks for then changed nothing.
+
+- `installed` only when a `block-user` and a `permit-loopback-user` exist at both the v4 and v6 connect layers; `partial` when some of those are present; `absent` when none. Extra filters under the sublayer are still ignored. `port_range` comes from the first permit tag, as the comment says
+- `install`: the early return applies only to `installed`, so a `partial` set is re-added. The config-drift refusal (exit 13 without --force) applies to a `partial` set too; a partial set with no permit left has no range to compare and falls through
+- `WindowsWfpStatus` gains `partial`; `checkWindowsDependencies` names an incomplete set, with a fake-stdout test
+- Unit test `fence_parts_state`; `note()` reads the layer names from `ALE_LAYERS`
+- Measured on one Windows 11 build (26200), 3 of 3 per state, with the status change alone: every half-set read `partial`; after a plain `install`, `wfp status` read `installed` with filters=4 and `wfp verify` read blocked on 127.0.0.1 and [::1]
+---
+ src/sandbox/windows-sandbox-utils.ts | 18 ++++--
+ test/sandbox/winsrt.test.ts          | 18 ++++++
+ vendor/srt-win-src/src/cli.rs        | 47 +++++++++------
+ vendor/srt-win-src/src/wfp.rs        | 89 ++++++++++++++++++++++++----
+ 4 files changed, 137 insertions(+), 35 deletions(-)
+
+diff --git a/src/sandbox/windows-sandbox-utils.ts b/src/sandbox/windows-sandbox-utils.ts
+index 56a7785..2ea82c3 100644
+--- a/src/sandbox/windows-sandbox-utils.ts
++++ b/src/sandbox/windows-sandbox-utils.ts
+@@ -167,7 +167,11 @@ export const DEFAULT_WINDOWS_PROXY_PORT_RANGE: readonly [number, number] = [
+  * is access-denied (it is admin-gated). The non-elevated readiness
+  * check is {@link verifyWindowsWfpEgress}, not this enum.
+  */
+-export type WindowsWfpStatus = 'absent' | 'installed' | 'cannot-read'
++export type WindowsWfpStatus =
++  | 'absent'
++  | 'partial'
++  | 'installed'
++  | 'cannot-read'
+ 
+ export interface WindowsWfpStatusResult {
+   state: WindowsWfpStatus
+@@ -1508,7 +1512,7 @@ function remapInstallTimeout(e: unknown): never {
+ //   0  ok
+ //   10 user cancelled UAC elevation
+ //   12 WFP install failed
+-//   13 already installed with different config (use --force)
++//   13 a filter set exists with a different config (use --force)
+ //   14 sandbox-user provisioning failed
+ //   17 ambient write-deny stamping failed
+ //   1  other error (stderr has detail)
+@@ -2383,11 +2387,15 @@ function interpretDependencyProbes(
+       `[Sandbox Windows] wfp status cannot-read (non-elevated): ${ws.hint}`,
+     )
+   } else if (ws.state !== 'installed') {
+-    // 'absent'. If the user is also not-provisioned, the user-state
+-    // error above already gave the right instruction; don't repeat.
++    // 'absent' or 'partial' (some of the set is missing, so one address
++    // family may be open). If the user is also not-provisioned, the
++    // user-state error above already gave the right instruction; don't
++    // repeat.
+     if (us.provisioned && us.credPresent) {
+       errors.push(
+-        `WFP filters not installed under sublayer ` +
++        (ws.state === 'partial'
++          ? `WFP filter set incomplete (${ws.filters} present) under sublayer `
++          : `WFP filters not installed under sublayer `) +
+           `${sublayerGuid ?? '(default)'}. ` +
+           windowsInstallInstructions(sublayerGuid),
+       )
+diff --git a/test/sandbox/winsrt.test.ts b/test/sandbox/winsrt.test.ts
+index 1223e0f..9cb85b4 100644
+--- a/test/sandbox/winsrt.test.ts
++++ b/test/sandbox/winsrt.test.ts
+@@ -1481,6 +1481,24 @@ describe('windows-sandbox-utils async twins (pure, all platforms)', () => {
+     expect(asynFail).toEqual(syncFail)
+   })
+ 
++  it('checkWindowsDependencies{,Async}: a partial WFP set is an install error', async () => {
++    const srtWin = resolveSrtWin({ path: process.execPath })
++    const partial = JSON.stringify({
++      ...JSON.parse(RAW_WFP),
++      state: 'partial',
++      filters: 3,
++    })
++    stubSpawn(argv => ({
++      status: 0,
++      stdout: argv.includes('user') ? RAW_USER : partial,
++    }))
++    const sync = checkWindowsDependencies({ srtWin })
++    const asyn = await checkWindowsDependenciesAsync({ srtWin })
++    expect(sync.errors).toHaveLength(1)
++    expect(sync.errors[0]).toMatch(/WFP filter set incomplete \(3 present\)/)
++    expect(asyn).toEqual(sync)
++  })
++
+   it('checkWindowsDependenciesAsync: probes run concurrently', async () => {
+     const srtWin = resolveSrtWin({ path: process.execPath })
+     let inFlight = 0
+diff --git a/vendor/srt-win-src/src/cli.rs b/vendor/srt-win-src/src/cli.rs
+index 677f895..9dbbfac 100644
+--- a/vendor/srt-win-src/src/cli.rs
++++ b/vendor/srt-win-src/src/cli.rs
+@@ -110,9 +110,9 @@ enum Cmd {
+     ///        port-range; no changes)
+     ///   10 — UAC prompt cancelled by the user
+     ///   12 — WFP filter install failed
+-    ///   13 — already installed under this sublayer with a
+-    ///        DIFFERENT port-range or sandbox-user name; pass
+-    ///        `--force` to replace
++    ///   13 — a filter set (complete or partial) exists under
++    ///        this sublayer with a DIFFERENT port-range or
++    ///        sandbox-user name; pass `--force` to replace
+     ///   14 — sandbox user provisioning failed
+     ///   1  — other error (parse, elevation check, etc.)
+     Install {
+@@ -747,13 +747,16 @@ fn run(cli: Cli, args: &[OsString]) -> anyhow::Result<()> {
+             // Idempotency / conflict pre-check. With a DIFFERENT
+             // port-range or sandbox-user name and no --force, refuse
+             // (exit 13) so an unintended config drift surfaces
+-            // instead of silently overwriting. With the SAME config,
+-            // only return early when the install is COMPLETE — i.e.
+-            // the sandbox user is provisioned and the marker is
+-            // current. A partial install falls through and the
+-            // (idempotent) steps below complete it. A pre-existing
+-            // install whose tags lack a port_range (legacy) is
+-            // treated as "different" and requires --force.
++            // instead of silently overwriting; this holds for a
++            // complete and for a partial filter set. With the SAME
++            // config, only return early when the install is
++            // COMPLETE — i.e. the filter set is whole, the sandbox
++            // user is provisioned and the marker is current. A
++            // partial install falls through and the (idempotent)
++            // steps below complete it. A complete set whose tags
++            // lack a port_range (legacy) is treated as "different"
++            // and requires --force; a partial set without one has
++            // no range to compare and is re-added.
+             let existing = install::read_setup().ok().flatten();
+             // Shared by the early-out completeness check and the
+             // stamping step below (env reads + a stat per entry).
+@@ -761,10 +764,17 @@ fn run(cli: Cli, args: &[OsString]) -> anyhow::Result<()> {
+             let name_changed = existing.as_ref().is_some_and(|s| s.sandbox_user != name);
+             if !force
+                 && let Ok(st) = wfp::filter_status(&sl)
+-                && st.state == "installed"
++                && (st.state == "installed" || st.state == "partial")
+             {
+                 let want = [range.0, range.1];
+-                if st.port_range != Some(want) || name_changed {
++                // A partial set with no permit left has no range to
++                // compare; a complete set without one is legacy and
++                // counts as different.
++                let range_differs = match st.port_range {
++                    Some(have) => have != want,
++                    None => st.state == "installed",
++                };
++                if range_differs || name_changed {
+                     let have_range = st
+                         .port_range
+                         .map(|[l, h]| format!("{l}-{h}"))
+@@ -774,13 +784,13 @@ fn run(cli: Cli, args: &[OsString]) -> anyhow::Result<()> {
+                         .map(|s| s.sandbox_user.as_str())
+                         .unwrap_or("<none>");
+                     eprintln!(
+-                        "srt-win: error: already installed under \
++                        "srt-win: error: existing filter set is {} under \
+                          sublayer {sl:?} with port_range={have_range}, \
+                          sandbox_user='{have_name}'; requested \
+                          port_range={}-{}, sandbox_user='{name}'. \
+                          Pass --force to replace, or run `srt-win \
+                          uninstall` first.",
+-                        range.0, range.1,
++                        st.state, range.0, range.1,
+                     );
+                     std::process::exit(13);
+                 }
+@@ -801,7 +811,8 @@ fn run(cli: Cli, args: &[OsString]) -> anyhow::Result<()> {
+                 // missing/undecryptable Cred\Blob with a healthy
+                 // marker must fall through and be rewritten rather
+                 // than early-outing on "already installed".
+-                if us.exists
++                if st.state == "installed"
++                    && us.exists
+                     && us.in_sandbox_group
+                     && mv == Some(install::SETUP_VERSION)
+                     && install::cred_present()
+@@ -832,9 +843,9 @@ fn run(cli: Cli, args: &[OsString]) -> anyhow::Result<()> {
+                 }
+                 eprintln!(
+                     "srt-win: partial install detected \
+-                     (user_provisioned={}, marker_version={:?}) — \
+-                     completing",
+-                    us.exists, mv,
++                     (wfp={}, user_provisioned={}, \
++                     marker_version={:?}) — completing",
++                    st.state, us.exists, mv,
+                 );
+                 // Fall through; the steps are idempotent.
+             }
+diff --git a/vendor/srt-win-src/src/wfp.rs b/vendor/srt-win-src/src/wfp.rs
+index 5515e8e..606496a 100644
+--- a/vendor/srt-win-src/src/wfp.rs
++++ b/vendor/srt-win-src/src/wfp.rs
+@@ -639,11 +639,16 @@ pub fn uninstall_filters(sublayer: &GUID) -> Result<usize> {
+     })
+ }
+ 
+-/// Status of the WFP fence under `sublayer`. `installed` iff at
+-/// least one `block-user` srt-win filter exists. (We don't insist
+-/// on the exact count so enterprise tooling that adds extras under
+-/// the same sublayer doesn't break detection.) `port_range` is read
+-/// from the first `permit-loopback-user` tag.
++/// Status of the WFP fence under `sublayer`. `installed` iff every
++/// filter of the set is present: a `block-user` and a
++/// `permit-loopback-user` at BOTH the v4 and v6 connect layers.
++/// `partial` when some but not all of those are present (e.g. one
++/// address family's block was deleted: that family is open while a
++/// block on the other still exists), so `install`'s early-out falls
++/// through and re-adds the set. (We still don't insist on the exact
++/// count so enterprise tooling that adds extras under the same
++/// sublayer doesn't break detection.) `port_range` is read from the
++/// first `permit-loopback-user` tag.
+ ///
+ /// `cannot-read` is the graceful-degrade state when BFE
+ /// enumeration is admin-gated ([`WfpAccessDenied`]). The
+@@ -678,18 +683,17 @@ pub fn filter_status(sublayer: &GUID) -> Result<WfpStatus> {
+         Err(e) => return Err(e),
+     };
+     let mut filters = 0usize;
+-    let mut have_block = false;
++    let mut seen = FenceParts::default();
+     let mut port_range: Option<[u16; 2]> = None;
+     let mut user_sid: Option<String> = None;
+-    let enum_result = for_each_tagged_filter(&engine, sublayer, |_, _, tag| {
++    let enum_result = for_each_tagged_filter(&engine, sublayer, |layer, _, tag| {
+         filters += 1;
+         if user_sid.is_none() {
+             user_sid.clone_from(&tag.user_sid);
+         }
+-        match tag.kind.as_str() {
+-            "block-user" => have_block = true,
+-            "permit-loopback-user" => port_range = tag.port_range,
+-            _ => {}
++        seen.note(layer, &tag.kind);
++        if tag.kind == "permit-loopback-user" && port_range.is_none() {
++            port_range = tag.port_range;
+         }
+     });
+     if let Err(e) = enum_result {
+@@ -699,7 +703,7 @@ pub fn filter_status(sublayer: &GUID) -> Result<WfpStatus> {
+         return Err(e);
+     }
+     Ok(WfpStatus {
+-        state: if have_block { "installed" } else { "absent" },
++        state: seen.state(),
+         filters,
+         port_range,
+         user_sid,
+@@ -707,6 +711,40 @@ pub fn filter_status(sublayer: &GUID) -> Result<WfpStatus> {
+     })
+ }
+ 
++/// Which parts of the [`FILTER_COUNT`] set [`filter_status`] saw:
++/// `[block, permit]` per connect layer, v4 then v6.
++#[derive(Debug, Default, Clone, Copy)]
++struct FenceParts([[bool; 2]; 2]);
++
++impl FenceParts {
++    fn note(&mut self, layer: &str, kind: &str) {
++        let l = if layer == ALE_LAYERS[0].1 {
++            0
++        } else if layer == ALE_LAYERS[1].1 {
++            1
++        } else {
++            return;
++        };
++        match kind {
++            "block-user" => self.0[l][0] = true,
++            "permit-loopback-user" => self.0[l][1] = true,
++            _ => {}
++        }
++    }
++
++    fn state(&self) -> &'static str {
++        let all = self.0.iter().flatten().all(|&b| b);
++        let any = self.0.iter().flatten().any(|&b| b);
++        if all {
++            "installed"
++        } else if any {
++            "partial"
++        } else {
++            "absent"
++        }
++    }
++}
++
+ fn cannot_read(e: anyhow::Error) -> WfpStatus {
+     WfpStatus {
+         state: "cannot-read",
+@@ -852,6 +890,33 @@ mod tests {
+         assert_eq!(g1, DEFAULT_SUBLAYER_GUID);
+     }
+ 
++    #[test]
++    fn fence_parts_state() {
++        const V4: &str = "ale_auth_connect_v4";
++        const V6: &str = "ale_auth_connect_v6";
++        let full = |skip: Option<(&str, &str)>| {
++            let mut p = FenceParts::default();
++            for l in [V4, V6] {
++                for k in ["block-user", "permit-loopback-user"] {
++                    if skip != Some((l, k)) {
++                        p.note(l, k);
++                    }
++                }
++            }
++            p.state()
++        };
++        assert_eq!(FenceParts::default().state(), "absent");
++        assert_eq!(full(None), "installed");
++        assert_eq!(full(Some((V4, "block-user"))), "partial");
++        assert_eq!(full(Some((V6, "block-user"))), "partial");
++        assert_eq!(full(Some((V6, "permit-loopback-user"))), "partial");
++        // Unknown kinds/layers neither complete nor start a set.
++        let mut p = FenceParts::default();
++        p.note(V4, "legacy-group");
++        p.note("other", "block-user");
++        assert_eq!(p.state(), "absent");
++    }
++
+     #[test]
+     fn parse_guid_rejects_garbage() {
+         assert!(parse_guid("not-a-guid").is_err());
+-- 
+2.55.0.windows.1
+

@@ -13,7 +13,7 @@
     "planner_model": "Qwen3-14B INT4 (embedded LLMPipeline, speculative decoding via Qwen3-0.6B pruned-6L INT8 draft)",
     "coder_model": "Qwen3-Coder-30B-A3B INT4 (OVMS :8000 behind the :8099 repair proxy, continuous batching, best-of-N C=3)"
   },
-  "methodology": "tools.dispatch_harness one-goal dispatch (auto-approve) of a 3-part python-cli goal (B1-shaped: expense tracker - storage/add/list) through the M2 plan-graph path (plan_graph=true): 14B decomposes to a dependency graph (greedy, deterministic), ruler validates + right-sizes, swap driver executes waves serially (per-task fleet gate + best-of-3), per-wave integration gate on the integrated main, plan-time job oracle grades the final tree. Sandbox repos under C:/Users/mrbla/projects (m2-verify, m2-verify2). Times from the harness wall-clock + driver scorecard.",
+  "methodology": "tools.dispatch_harness one-goal dispatch (auto-approve) of a 3-part python-cli goal (B1-shaped: expense tracker - storage/add/list) through the M2 plan-graph path (plan_graph=true): 14B decomposes to a dependency graph (greedy, deterministic), ruler validates + right-sizes, swap driver executes waves serially (per-task fleet gate + best-of-3), per-wave integration gate on the integrated main, plan-time job oracle grades the final tree. Sandbox repos under C:/Users/__USER__/projects (m2-verify, m2-verify2). Times from the harness wall-clock + driver scorecard.",
   "runs": [
     {
       "run_id": "20260705-214803-bd",

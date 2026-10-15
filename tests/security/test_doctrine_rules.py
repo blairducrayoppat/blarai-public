@@ -211,6 +211,51 @@ def test_index_check_fires_on_a_missing_entry() -> None:
     assert _index_drift(text, names - {"journal.md"}) == ["no such file: journal.md"]
 
 
+def _claimed_surface_drift(text: str, rules: list, top_dirs: set[str]) -> list[str]:
+    """Each top-level directory an index line says its file is "delivered on" must be matched, at any depth, by a path glob of that rule."""
+    m = re.search(r"\n<rules_index[^>]*>\n(.*?)\n</rules_index>", text, re.S)
+    assert m, "CLAUDE.md lost its <rules_index> section"
+    by_name = {r.name: r for r in rules}
+    out: list[str] = []
+    for name, claim in re.findall(r"^- ([a-z_-]+\.md) — .*?delivered on ([^\n]*)", m.group(1), re.M):
+        rule = by_name.get(name)
+        if rule is None:
+            continue
+        for word in re.findall(r"[a-z_]+", claim):
+            if word in top_dirs and not all(dr.path_matches(rule, f"{word}/{tail}") for tail in ("x.md", "a/b/x.md")):
+                out.append(f"{name}: the index says it is delivered on {word}/, the file's path globs do not match every path under {word}/ (a narrower glob delivers on part of it)")
+    return out
+
+
+def _repo_top_dirs() -> set[str]:
+    return {p.name for p in REPO_ROOT.iterdir() if p.is_dir()}
+
+
+def test_rules_index_delivery_claims_match_the_frontmatter() -> None:
+    names = _repo_top_dirs()
+    assert {"docs", "scripts", "tools", "tests"} <= names
+    assert not _claimed_surface_drift(CLAUDE_MD.read_text(encoding="utf-8"), dr.load_rules(RULES_DIR), names)
+
+
+def test_delivery_claim_check_fires_when_a_surface_is_narrowed() -> None:
+    """R4-4: the claim check must be able to fail (the index names scripts/, tools/ and tests/ for identity.md)."""
+    text = CLAUDE_MD.read_text(encoding="utf-8")
+    rules = dr.load_rules(RULES_DIR)
+    ident = next(r for r in rules if r.name == "identity.md")
+    for dropped in ("scripts", "tools", "tests", "docs"):
+        narrowed = [g for g in ident.paths if not g.startswith(dropped + "/")]
+        stub = type("R", (), {"name": "identity.md", "paths": tuple(narrowed)})()
+        drift = _claimed_surface_drift(text, [stub], _repo_top_dirs())
+        assert drift and dropped in drift[0], (dropped, drift)
+
+
+def test_identity_rule_is_delivered_on_every_surface_the_index_claims(tmp_path: Path) -> None:
+    """R4-4 through the real hook: a new file under each claimed directory shows the rule (held once per agent)."""
+    for rel in ("scripts/new_tool.py", "tests/security/test_new.py", "tools/probes/x.py", "docs/governance/x.md",
+                "docs/sprints/x.md", "docs/design/x.md"):
+        assert "identity.md" in Hook(tmp_path / rel.replace("/", "_")).delivered(_edit(rel)), rel
+
+
 # ---------------------------------------------------------------- 3. wiring
 
 def _wiring_faults(settings: dict) -> list[str]:
@@ -344,7 +389,7 @@ def test_first_write_to_a_rules_subject_is_held_once(tmp_path: Path) -> None:
     h = Hook(tmp_path)
     write = {"tool_name": "Write", "tool_input": {"file_path": "docs/journal_fragments/x.md", "content": "y"}}
     ctx, held = h.call(write)
-    assert held and ctx.startswith("HELD ONCE, NOT AN ERROR") and names_in(ctx) == {"journal.md"}
+    assert held and ctx.startswith("HELD ONCE, NOT AN ERROR") and names_in(ctx) == {"journal.md", "identity.md"}
     assert h.call(write) == ("", False), "the re-issued write passes"
     assert h.call({**write, "agent_id": "child-1"})[1], "a subagent's first write is held for it too"
     assert h.call(_edit("LESSONS.md")) == ("", False), "already told: no second hold on another file"
@@ -428,19 +473,19 @@ def test_a_changed_rules_file_is_delivered_again(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("cmd, want", [
     ("cat > BUILD_JOURNAL.md <<'EOF'\nx\nEOF", {"journal.md"}),
-    ("printf 'x' | tee docs/journal_fragments/a.md b.txt", {"journal.md"}),
+    ("printf 'x' | tee docs/journal_fragments/a.md b.txt", {"journal.md", "identity.md"}),
     ("sed -i 's/a/b/' LESSONS.md", {"journal.md"}),
-    ("Set-Content -Path docs\\performance\\run.json -Value 1", {"performance.md"}),
+    ("Set-Content -Path docs\\performance\\run.json -Value 1", {"performance.md", "identity.md"}),
     ("cat > notes.txt <<'EOF'\nsee BUILD_JOURNAL.md, don't > LESSONS.md\nEOF", set()),
     ("cat > notes.txt <<-EOF\n\tBUILD_JOURNAL.md\n\tEOF", set()),
     ("LOCALAPPDATA=/tmp/x python -m pytest shared/ -q", {"testing.md"}),
     ("python -m evals.run --suite all", {"performance.md"}),
-    ("python scripts/measure_decode.py --runs 5", {"performance.md", "coding.md"}),
+    ("python scripts/measure_decode.py --runs 5", {"performance.md", "coding.md", "identity.md"}),
     ("Start-ScheduledTask -TaskName BlarAI-Probe", {"performance.md"}),
     ("curl -s https://api.github.com/repos/o/r/pulls/1/reviews", {"performance.md"}),
     ("git status", set()),
     (f"cat /{str(REPO_ROOT)[0].lower()}{str(REPO_ROOT)[2:]}/LESSONS.md".replace("\\", "/"), {"journal.md"}),
-    (f"git -C {REPO_ROOT.as_posix()} add docs/journal_fragments/a.md", {"journal.md"}),
+    (f"git -C {REPO_ROOT.as_posix()} add docs/journal_fragments/a.md", {"journal.md", "identity.md"}),
 ])
 def test_shell_commands(tmp_path: Path, cmd: str, want: set[str]) -> None:
     assert Hook(tmp_path).delivered(_bash(cmd)) == want
@@ -449,7 +494,7 @@ def test_shell_commands(tmp_path: Path, cmd: str, want: set[str]) -> None:
 def test_git_dash_c_and_cd_rebase_relative_tokens(tmp_path: Path) -> None:
     h = Hook(tmp_path)
     away = "C:/Windows"
-    assert h.delivered(_bash(f"git -C {REPO_ROOT.as_posix()} add docs/journal_fragments/a.md", cwd=away)) == {"journal.md"}
+    assert h.delivered(_bash(f"git -C {REPO_ROOT.as_posix()} add docs/journal_fragments/a.md", cwd=away)) == {"journal.md", "identity.md"}
     assert Hook(tmp_path / "2").delivered(_bash(f"cd {REPO_ROOT.as_posix()} && cat LESSONS.md", cwd=away)) == {"journal.md"}
     assert Hook(tmp_path / "3").delivered(_bash("cat LESSONS.md", cwd=away)) == set()
 
@@ -602,3 +647,25 @@ def test_an_ancestor_check_that_errors_is_loud_not_in_sync(tmp_path: Path) -> No
     ctx = Hook(tmp_path, checkout=repo).run({"source": "startup"}, event="SessionStart")
     assert ctx.startswith("DOCTRINE DELIVERY FAILED") and "merge-base" in ctx, ctx
     assert "NOT delivered for this tool call" not in ctx and "UNKNOWN" in ctx
+
+
+def test_delivery_claim_check_fires_when_a_surface_is_narrowed_to_a_subdirectory() -> None:
+    """R5-2: ``docs/reviews/**`` opens with ``docs/`` but does not deliver on docs; the claim check alone must fail."""
+    text = CLAUDE_MD.read_text(encoding="utf-8")
+    ident = next(r for r in dr.load_rules(RULES_DIR) if r.name == "identity.md")
+    narrowed = tuple("docs/reviews/**" if g == "docs/**" else g for g in ident.paths)
+    assert narrowed != tuple(ident.paths)
+    stub = type("R", (), {"name": "identity.md", "paths": narrowed})()
+    drift = _claimed_surface_drift(text, [stub], _repo_top_dirs())
+    assert drift and "docs" in drift[0], drift
+
+
+def test_delivery_claim_check_accepts_an_equivalent_glob() -> None:
+    """R1-3: ``docs/**/*`` delivers on the same paths as ``docs/**``; the claim check asks the matcher, not the spelling."""
+    text = CLAUDE_MD.read_text(encoding="utf-8")
+    ident = next(r for r in dr.load_rules(RULES_DIR) if r.name == "identity.md")
+    spelled = tuple("docs/**/*" if g == "docs/**" else g for g in ident.paths)
+    assert spelled != tuple(ident.paths)
+    stub = dr.RulesFile(name="identity.md", path=ident.path, paths=spelled, tools=ident.tools, commands=ident.commands,
+                        body=ident.body, top_tag=ident.top_tag)
+    assert _claimed_surface_drift(text, [stub], _repo_top_dirs()) == []

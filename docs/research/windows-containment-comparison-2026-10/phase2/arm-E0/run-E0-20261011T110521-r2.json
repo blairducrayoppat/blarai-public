@@ -1,0 +1,388 @@
+{
+ "variant": "E0",
+ "description": "default UI lockdown, network none (the container's defaults)",
+ "tag": "E0-20261011T110521-r2",
+ "config": {
+  "version": "1.0.0",
+  "containment": "processcontainer",
+  "lifecycle": {
+   "destroyOnExit": true
+  },
+  "fallback": {
+   "allowDaclMutation": false
+  },
+  "process": {
+   "commandLine": "\"C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe\" -I \"C:\\blarai-spike-1740\\payload\\arm_payload.py\" --arm E --tag E0-20261011T110521-r2 --out \"C:\\blarai-spike-1740\\worktree\\result-E0-20261011T110521-r2.json\" --tools \"C:\\blarai-spike-1740\\payload\\tools.json\" --listener-port 49270",
+   "cwd": "C:\\blarai-spike-1740\\worktree",
+   "inheritDefaultEnv": true,
+   "timeout": 240000
+  },
+  "filesystem": {
+   "readwritePaths": [
+    "C:\\blarai-spike-1740\\worktree"
+   ],
+   "readonlyPaths": [
+    "C:\\blarai-spike-1740\\toolchain",
+    "C:\\blarai-spike-1740\\payload"
+   ]
+  },
+  "network": {
+   "egress": {
+    "default": "deny"
+   },
+   "ingress": {
+    "default": "deny",
+    "hostLoopback": "deny"
+   }
+  }
+ },
+ "dry_run": {
+  "rc": 0,
+  "stdout": "SECTION: Request simplified\nScript code length: 282\nWorking directory: C:\\blarai-spike-1740\\worktree\nScript timeout: 240000\nContainer name: CLI\nselected isolation tier: base-container\nRunner completed in 0ms\nDry run completed. Result: validation passed",
+  "stderr": ""
+ },
+ "snapshot_before": {
+  "acl": {
+   "C:\\blarai-spike-1740": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\payload": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\worktree": "eed43a1d6e9b65c0",
+   "C:\\blarai-spike-1740\\leak": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\instrument": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe": "ca7c61792557ae4f",
+   "C:\\blarai-spike-1740\\toolchain\\Git\\cmd\\git.exe": "ca7c61792557ae4f"
+  },
+  "process_sandboxes": [
+   "<absent>"
+  ],
+  "appcontainer_mappings": 217,
+  "state_dir": []
+ },
+ "launch": {
+  "exit_code": 0,
+  "wall_secs": 1.765,
+  "listener_accepts": 0,
+  "stdout_tail": "",
+  "stderr_tail": "Failed to find real location of C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe"
+ },
+ "mxc_log_tail": "al_enabled\": false,\n[1791731121]   \"testing_features_enabled\": false,\n[1791731121]   \"dry_run\": false\n[1791731121] }\n[1791731121] [network_proxy: disabled][1791731121] \n[1791731121] {\"event\":\"mxc.PolicyHash\",\"backend\":\"processcontainer\",\"policy_hash\":\"sha256:5f121872623c5ebcb67b5161d1d812cde022f3a84720225d91c641a8781967f0\",\"config_schema_version\":\"1.0.0\"}\n[1791731121] selected isolation tier: [1791731121] base-container[1791731121] \n[1791731121] \u25b6[1791731121]  SECTION: Backend runner 'BaseContainer'\n[1791731121] \u25b6[1791731121]  SECTION: Build sandbox spec\n[1791731121] process security environment spec built (PSEC [1791731121] 1[1791731121] .[1791731121] 0[1791731121] , [1791731121] 216[1791731121]  bytes)\n[1791731121] \u25b6[1791731121]  SECTION: Load API\n[1791731121] \u25b6[1791731121]  SECTION: Launch process\n[1791731121] working directory: [1791731121] C:\\blarai-spike-1740\\worktree (from process.cwd)[1791731121] \n[1791731121] STDIO mode: passthrough (forwarding parent handles to child)\n[1791731121] launching: [1791731121] \"C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe\" -I \"C:\\blarai-spike-1740\\payload\\arm_payload.py\" --arm E --tag E0-20261011T110521-r2 --out \"C:\\blarai-spike-1740\\worktree\\result-E0-20261011T110521-r2.json\" --tools \"C:\\blarai-spike-1740\\payload\\tools.json\" --listener-port 49270[1791731121] \n[1791731121] identity: [1791731121] <process-security-environment>[1791731121] \n[1791731121] process security environment created (processmodel.dll)\n[1791731121] process created (PID: [1791731121] 5392[1791731121] )\n[1791731121] {\"event\":\"mxc.NetworkPolicyApplied\",\"backend\":\"processcontainer\",\"identity\":\"redacted\",\"tier\":\"base-container\",\"enforcement_mode\":\"capabilities\",\"default_policy\":\"block\",\"proxy_port\":0,\"firewall_rules_created\":0,\"firewall_applied\":false,\"status\":\"success\"}\n[1791731123] {\"event\":\"mxc.ProcessExited\",\"backend\":\"processcontainer\",\"identity\":\"redacted\",\"tier\":\"base-container\",\"pid\":5392,\"exit_code\":0}\n[1791731123] {\"event\":\"mxc.SandboxTornDown\",\"backend\":\"processcontainer\",\"identity\":\"redacted\",\"tier\":\"base-container\",\"pid\":5392,\"status\":\"success\",\"firewall_rules_removed\":0,\"firewall_removal_ok\":true,\"bfs_removed\":false,\"proxy_stopped\":false,\"preserve_policy\":false,\"container_released\":false}\n[1791731123] Runner completed in [1791731123] 1659[1791731123] ms\n[1791731123] Exit code: [1791731123] 0[1791731123]  (0x[1791731123] 0[1791731123] 0[1791731123] 0[1791731123] 0[1791731123] 0[1791731123] 0[1791731123] 0[1791731123] 0[1791731123] )\n",
+ "payload": {
+  "arm": "E",
+  "tag": "E0-20261011T110521-r2",
+  "started": "2026-10-11T11:05:21-04:00",
+  "identity": {
+   "error": "ImportError('DLL load failed while importing _ctypes: A dynamic link library (DLL) initialization routine failed.')"
+  },
+  "toolchain": {
+   "node": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/nodejs/node.exe",
+     "--version"
+    ],
+    "rc": 3221225794,
+    "secs": 0.062,
+    "out": "",
+    "err": ""
+   },
+   "git": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+     "--version"
+    ],
+    "rc": 3221225794,
+    "secs": 0.053,
+    "out": "",
+    "err": ""
+   },
+   "bash": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/Git/bin/bash.exe",
+     "-lc",
+     "echo bash-ok; uname -s"
+    ],
+    "rc": 3221225794,
+    "secs": 0.058,
+    "out": "",
+    "err": ""
+   },
+   "python": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/Python314/python.exe",
+     "-I",
+     "-c",
+     "import sys; print(sys.version)"
+    ],
+    "rc": 0,
+    "secs": 0.171,
+    "out": "3.14.3 (tags/v3.14.3:323c59a, Feb  3 2026, 16:04:56) [MSC v.1944 64 bit (AMD64)]",
+    "err": "Failed to find real location of C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe"
+   },
+   "opencode": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/npm/opencode.cmd",
+     "--version"
+    ],
+    "rc": 1,
+    "secs": 0.057,
+    "out": "",
+    "err": "Access is denied."
+   },
+   "task": {
+    "ok": false,
+    "secs": 0.41,
+    "steps": [
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "init",
+       "-q"
+      ],
+      "rc": 3221225794,
+      "secs": 0.053,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Python314/python.exe",
+       "-I",
+       "-c",
+       "open('a.txt','w').write('alpha\\n')"
+      ],
+      "rc": 0,
+      "secs": 0.104,
+      "out": "",
+      "err": "Failed to find real location of C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe"
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/nodejs/node.exe",
+       "-e",
+       "require('fs').writeFileSync('b.txt', String(6*7)+'\\n')"
+      ],
+      "rc": 3221225794,
+      "secs": 0.052,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/bin/bash.exe",
+       "-c",
+       "cat a.txt b.txt > c.txt && wc -l c.txt"
+      ],
+      "rc": 3221225794,
+      "secs": 0.046,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "add",
+       "a.txt",
+       "b.txt",
+       "c.txt"
+      ],
+      "rc": 3221225794,
+      "secs": 0.057,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "commit",
+       "-q",
+       "-m",
+       "probe"
+      ],
+      "rc": 3221225794,
+      "secs": 0.051,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "log",
+       "--oneline",
+       "-1"
+      ],
+      "rc": 3221225794,
+      "secs": 0.046,
+      "out": "",
+      "err": ""
+     }
+    ]
+   }
+  },
+  "loopback": [
+   {
+    "target": "127.0.0.1:8099",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.011
+   },
+   {
+    "target": "127.0.0.1:8000",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.025
+   },
+   {
+    "target": "127.0.0.1:49270",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.003
+   }
+  ],
+  "file_reach": {
+   "secret_reads": {
+    "C:\\Users\\__USER__\\.ssh": "denied",
+    "C:\\Users\\__USER__\\.git-credentials": "denied",
+    "C:\\Users\\__USER__\\AppData\\Local\\BlarAI": "denied",
+    "C:\\Users\\__USER__\\.config\\opencode": "denied",
+    "C:\\Users\\__USER__\\.codex\\.sandbox-secrets": "denied"
+   },
+   "fixture_writes": {
+    "C:\\blarai-spike-1740\\leak\\authenticated-users-modify": "denied",
+    "C:\\blarai-spike-1740\\leak\\fleet": "denied",
+    "C:\\blarai-spike-1740\\leak\\models": "denied",
+    "C:\\blarai-spike-1740\\leak\\projects": "denied",
+    "C:\\blarai-spike-1740\\leak\\users-modify": "denied",
+    "C:\\blarai-spike-1740\\leak\\windows-temp-classic": "denied",
+    "C:\\blarai-spike-1740\\leak\\windows-temp-today": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-A": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-B2": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-C": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-D": "denied",
+    "C:\\blarai-spike-1740\\instrument\\grant-A": "denied",
+    "C:\\blarai-spike-1740\\instrument\\grant-B2": "denied",
+    "C:\\blarai-spike-1740\\instrument\\grant-C": "denied",
+    "C:\\blarai-spike-1740\\instrument\\grant-D": "denied",
+    "C:\\blarai-spike-1740\\worktree": "allowed"
+   }
+  },
+  "egress": [
+   {
+    "target": "1.1.1.1:443",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.02
+   },
+   {
+    "target": "example.com:443",
+    "result": "failed",
+    "winerror": null,
+    "errno": 11001,
+    "error": "gaierror",
+    "secs": 0.008
+   }
+  ],
+  "inheritance": {
+   "depth": 0,
+   "identity": {
+    "error": "ImportError('DLL load failed while importing _ctypes: An internal error occurred.')"
+   },
+   "write_authusers": "denied",
+   "egress": {
+    "target": "1.1.1.1:443",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.002
+   },
+   "child": {
+    "depth": 1,
+    "identity": {
+     "error": "ImportError('DLL load failed while importing _ctypes: A dynamic link library (DLL) initialization routine failed.')"
+    },
+    "write_authusers": "denied",
+    "egress": {
+     "target": "1.1.1.1:443",
+     "result": "failed",
+     "winerror": 10013,
+     "errno": 13,
+     "error": "PermissionError",
+     "secs": 0.009
+    },
+    "child": {
+     "depth": 2,
+     "identity": {
+      "error": "ImportError('DLL load failed while importing _ctypes: A dynamic link library (DLL) initialization routine failed.')"
+     },
+     "write_authusers": "denied",
+     "egress": {
+      "target": "1.1.1.1:443",
+      "result": "failed",
+      "winerror": 10013,
+      "errno": 13,
+      "error": "PermissionError",
+      "secs": 0.007
+     }
+    }
+   }
+  },
+  "total_secs": 1.353
+ },
+ "snapshot_after": {
+  "acl": {
+   "C:\\blarai-spike-1740": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\payload": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\worktree": "eed43a1d6e9b65c0",
+   "C:\\blarai-spike-1740\\leak": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\instrument": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe": "ca7c61792557ae4f",
+   "C:\\blarai-spike-1740\\toolchain\\Git\\cmd\\git.exe": "ca7c61792557ae4f"
+  },
+  "process_sandboxes": [
+   "<absent>"
+  ],
+  "appcontainer_mappings": 217,
+  "state_dir": []
+ },
+ "state_changed_by_run": {}
+}

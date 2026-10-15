@@ -1,0 +1,7 @@
+measured 2026-10-10 ~22:20 -04:00, PowerShell 7, elevated
+objects: 266  locked-shape: 197  inherited: 69  other: 0
+locked newest creation: 2026-10-08 21:59:23
+inherited oldest creation: 2026-10-02 13:15:40
+inherited created after the newest locked object: 65; earliest 2026-10-09 04:09:14
+inherited created before it: 4 (parent: C:\Windows\Temp)
+folder SDDL: O:SYG:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)

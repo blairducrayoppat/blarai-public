@@ -1,0 +1,156 @@
+{
+ "groups": {
+  "CodexSandboxOffline": {
+   "sid": "S-1-5-21-1000000001-1000000002-1000000003-1007",
+   "computed": [
+    "S-1-1-0",
+    "S-1-5-11",
+    "S-1-5-21-1000000001-1000000002-1000000003-513",
+    "S-1-5-21-1000000001-1000000002-1000000003-1006",
+    "S-1-5-32-545"
+   ],
+   "added": [
+    "S-1-2-0",
+    "S-1-5-15",
+    "S-1-5-3"
+   ]
+  },
+  "CodexSandboxOnline": {
+   "sid": "S-1-5-21-1000000001-1000000002-1000000003-1008",
+   "computed": [
+    "S-1-1-0",
+    "S-1-5-11",
+    "S-1-5-21-1000000001-1000000002-1000000003-513",
+    "S-1-5-21-1000000001-1000000002-1000000003-1006",
+    "S-1-5-32-545"
+   ],
+   "added": [
+    "S-1-2-0",
+    "S-1-5-15",
+    "S-1-5-3"
+   ]
+  }
+ },
+ "rows": [
+  {
+   "path": "C:\\Users\\__USER__\\.ssh",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\.git-credentials",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\AppData\\Local\\BlarAI",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\.config\\opencode",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\.aws",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\.codex\\.sandbox-secrets",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\Documents",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\BlarAI",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "B:/models",
+   "CodexSandboxOffline": "RW",
+   "CodexSandboxOnline": "RW"
+  },
+  {
+   "path": "C:/Windows/Temp",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:/blarai-fleet",
+   "CodexSandboxOffline": "RW",
+   "CodexSandboxOnline": "RW"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\projects",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:/blarai-fleet/worktrees",
+   "CodexSandboxOffline": "RW",
+   "CodexSandboxOnline": "RW"
+  },
+  {
+   "path": "C:/blarai-fleet/coder-leg",
+   "CodexSandboxOffline": "RW",
+   "CodexSandboxOnline": "RW"
+  },
+  {
+   "path": "C:/ProgramData",
+   "CodexSandboxOffline": "RW",
+   "CodexSandboxOnline": "RW"
+  },
+  {
+   "path": "C:/Users/Public",
+   "CodexSandboxOffline": "RW",
+   "CodexSandboxOnline": "RW"
+  },
+  {
+   "path": "C:/",
+   "CodexSandboxOffline": "R-",
+   "CodexSandboxOnline": "R-"
+  },
+  {
+   "path": "C:/Users/blarai-coder",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:/Python314",
+   "CodexSandboxOffline": "R-",
+   "CodexSandboxOnline": "R-"
+  },
+  {
+   "path": "C:/Program Files/nodejs",
+   "CodexSandboxOffline": "R-",
+   "CodexSandboxOnline": "R-"
+  },
+  {
+   "path": "C:/Program Files/Git",
+   "CodexSandboxOffline": "R-",
+   "CodexSandboxOnline": "R-"
+  },
+  {
+   "path": "C:\\Users\\__USER__\\AppData\\Roaming\\npm",
+   "CodexSandboxOffline": "--",
+   "CodexSandboxOnline": "--"
+  },
+  {
+   "path": "C:/Windows/System32",
+   "CodexSandboxOffline": "R-",
+   "CodexSandboxOnline": "R-"
+  }
+ ]
+}

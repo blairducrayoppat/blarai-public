@@ -1,0 +1,53 @@
+{
+ "instrument": "AccessCheck, in-memory lowbox token",
+ "results": [
+  {
+   "case": "grant package (control: allowed)",
+   "appcontainer_write_data": true,
+   "limited_token_write_data": true,
+   "sddl": "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)(A;;0x1301bf;;;<package>)"
+  },
+  {
+   "case": "no package ACE (control: denied)",
+   "appcontainer_write_data": false,
+   "limited_token_write_data": true,
+   "sddl": "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)"
+  },
+  {
+   "case": "deny package 0x116 + grant package",
+   "appcontainer_write_data": true,
+   "limited_token_write_data": true,
+   "sddl": "D:P(D;;0x116;;;<package>)(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)(A;;0x1301bf;;;<package>)"
+  },
+  {
+   "case": "deny package 0x2 + grant package",
+   "appcontainer_write_data": true,
+   "limited_token_write_data": true,
+   "sddl": "D:P(D;;0x2;;;<package>)(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)(A;;0x1301bf;;;<package>)"
+  },
+  {
+   "case": "deny ALL APPLICATION PACKAGES 0x2 + grant package",
+   "appcontainer_write_data": true,
+   "limited_token_write_data": true,
+   "sddl": "D:P(D;;0x2;;;AC)(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)(A;;0x1301bf;;;<package>)"
+  },
+  {
+   "case": "deny user 0x2 + grant package (first-pass control)",
+   "appcontainer_write_data": false,
+   "limited_token_write_data": false,
+   "sddl": "D:P(D;;0x2;;;<operator>)(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)(A;;0x1301bf;;;<package>)"
+  },
+  {
+   "case": "grant capability (cap token)",
+   "appcontainer_write_data": true,
+   "limited_token_write_data": true,
+   "sddl": "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)(A;;0x1301bf;;;<capability>)"
+  },
+  {
+   "case": "deny capability 0x2 + grant package (cap token)",
+   "appcontainer_write_data": true,
+   "limited_token_write_data": true,
+   "sddl": "D:P(D;;0x2;;;<capability>)(A;;FA;;;SY)(A;;FA;;;BA)(A;;0x1301bf;;;<operator>)(A;;0x1301bf;;;<package>)"
+  }
+ ]
+}

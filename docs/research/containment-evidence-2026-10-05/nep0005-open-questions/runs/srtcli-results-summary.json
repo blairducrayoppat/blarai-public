@@ -1,0 +1,1334 @@
+{
+  "schema": "nep5-1763-srtcli-summary-v1",
+  "what": "srt-win's own command line (install, wfp status, wfp verify, install again, install --force, uninstall) against half-sets in a test sublayer, stock and patched builds",
+  "srt_win_pin": "anthropics/sandbox-runtime 24eb39e94a6de386e83d126c52317d8e0fa49522",
+  "sublayer": "c971a69f-d6ab-4885-9b49-506d8aa51c86 (test sublayer S1; srt-win default sublayer never used)",
+  "states": {
+    "F": "full set as installed",
+    "H6": "IPv6 block filter deleted",
+    "H4": "IPv4 block filter deleted",
+    "HP": "both loopback permit filters deleted",
+    "<state>-after-reinstall": "the same state after a plain `srt-win install` with the same arguments"
+  },
+  "probes": "wfp verify targets: a 127.0.0.1 and a [::1] listener on an ephemeral port outside 60080-60089; in-range controls on 60085 in F and HP. Host check = verifyWindowsWfpEgress from the stock and the patched TypeScript build, pointed at the build under test.",
+  "not_measured": [
+    "real IPv6 or internet egress",
+    "another machine or Windows build",
+    "a restart with a half-set in place",
+    "a non-elevated run of the host checks (status needs elevation; verify does not)",
+    "the patched status-type change through checkWindowsDependencies (only verifyWindowsWfpEgress was driven)",
+    "file ownership (only the access section of each DACL was snapshotted)"
+  ],
+  "builds": [
+    {
+      "build": "stock",
+      "exe_sha256": "620CCB9819896663466719E32BD61998A6E238C42C7607F61907C1F09B90E6DE",
+      "driver_sha256": "BAAA87645C2E883609F84CF40217D22EDCDF933699BA55C601F4A03E707059A0",
+      "windows_build": "10.0.26200.0",
+      "started": "2026-10-13T16:52:47.212346-04:00",
+      "finished": "2026-10-13T16:57:46.3317015-04:00",
+      "exit": 0,
+      "passes_done": 3,
+      "acl_baseline": {
+        "entries": 129680,
+        "churn": 1
+      },
+      "ambient_stamped_entries": 10693,
+      "install": [
+        {
+          "pass": 1,
+          "exit": 0,
+          "ms": 1608,
+          "ambient_paths": 11
+        },
+        {
+          "pass": 2,
+          "exit": 0,
+          "ms": 1420,
+          "ambient_paths": 11
+        },
+        {
+          "pass": 3,
+          "exit": 0,
+          "ms": 1412,
+          "ambient_paths": 11
+        }
+      ],
+      "export_positive_controls": [
+        {
+          "pass": 1,
+          "srt_win": 9,
+          "s1": 5
+        },
+        {
+          "pass": 2,
+          "srt_win": 9,
+          "s1": 5
+        },
+        {
+          "pass": 3,
+          "srt_win": 9,
+          "s1": 5
+        }
+      ],
+      "states": [
+        {
+          "pass": 1,
+          "state": "F",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 1,
+          "state": "H6",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 1,
+          "state": "H6-after-reinstall",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 1,
+          "state": "H4",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 1,
+          "state": "H4-after-reinstall",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 1,
+          "state": "HP",
+          "srt_status": "installed",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 1,
+          "state": "HP-after-reinstall",
+          "srt_status": "installed",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 2,
+          "state": "F",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 2,
+          "state": "H6",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 2,
+          "state": "H6-after-reinstall",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 2,
+          "state": "H4",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 2,
+          "state": "H4-after-reinstall",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 2,
+          "state": "HP",
+          "srt_status": "installed",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 2,
+          "state": "HP-after-reinstall",
+          "srt_status": "installed",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 3,
+          "state": "F",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 3,
+          "state": "H6",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 3,
+          "state": "H6-after-reinstall",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 3,
+          "state": "H4",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 3,
+          "state": "H4-after-reinstall",
+          "srt_status": "installed",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 3,
+          "state": "HP",
+          "srt_status": "installed",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 3,
+          "state": "HP-after-reinstall",
+          "srt_status": "installed",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        }
+      ],
+      "reinstalls": [
+        {
+          "pass": 1,
+          "state": "H6",
+          "exit": 0,
+          "ms": 108,
+          "srt_win_said": "srt-win: already installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, port_range=60080-60089, sandbox_user='srt-sandbox', filters=3); no changes"
+        },
+        {
+          "pass": 1,
+          "state": "H4",
+          "exit": 0,
+          "ms": 111,
+          "srt_win_said": "srt-win: already installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, port_range=60080-60089, sandbox_user='srt-sandbox', filters=3); no changes"
+        },
+        {
+          "pass": 1,
+          "state": "HP",
+          "exit": 13,
+          "ms": 110,
+          "srt_win_said": "srt-win: error: already installed under sublayer C971A69F-D6AB-4885-9B49-506D8AA51C86 with port_range=<unknown>, sandbox_user='srt-sandbox'; requested port_range=60080-60089, sandbox_user='srt-sandbox'. Pass --force to replace, or run `srt-win uninstall` first."
+        },
+        {
+          "pass": 2,
+          "state": "H6",
+          "exit": 0,
+          "ms": 106,
+          "srt_win_said": "srt-win: already installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, port_range=60080-60089, sandbox_user='srt-sandbox', filters=3); no changes"
+        },
+        {
+          "pass": 2,
+          "state": "H4",
+          "exit": 0,
+          "ms": 109,
+          "srt_win_said": "srt-win: already installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, port_range=60080-60089, sandbox_user='srt-sandbox', filters=3); no changes"
+        },
+        {
+          "pass": 2,
+          "state": "HP",
+          "exit": 13,
+          "ms": 98,
+          "srt_win_said": "srt-win: error: already installed under sublayer C971A69F-D6AB-4885-9B49-506D8AA51C86 with port_range=<unknown>, sandbox_user='srt-sandbox'; requested port_range=60080-60089, sandbox_user='srt-sandbox'. Pass --force to replace, or run `srt-win uninstall` first."
+        },
+        {
+          "pass": 3,
+          "state": "H6",
+          "exit": 0,
+          "ms": 109,
+          "srt_win_said": "srt-win: already installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, port_range=60080-60089, sandbox_user='srt-sandbox', filters=3); no changes"
+        },
+        {
+          "pass": 3,
+          "state": "H4",
+          "exit": 0,
+          "ms": 107,
+          "srt_win_said": "srt-win: already installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, port_range=60080-60089, sandbox_user='srt-sandbox', filters=3); no changes"
+        },
+        {
+          "pass": 3,
+          "state": "HP",
+          "exit": 13,
+          "ms": 98,
+          "srt_win_said": "srt-win: error: already installed under sublayer C971A69F-D6AB-4885-9B49-506D8AA51C86 with port_range=<unknown>, sandbox_user='srt-sandbox'; requested port_range=60080-60089, sandbox_user='srt-sandbox'. Pass --force to replace, or run `srt-win uninstall` first."
+        }
+      ],
+      "restores_force": [
+        {
+          "pass": 1,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1490
+        },
+        {
+          "pass": 1,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1148
+        },
+        {
+          "pass": 1,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1111
+        },
+        {
+          "pass": 2,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1210
+        },
+        {
+          "pass": 2,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1126
+        },
+        {
+          "pass": 2,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1127
+        },
+        {
+          "pass": 3,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1086
+        },
+        {
+          "pass": 3,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1167
+        },
+        {
+          "pass": 3,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1252
+        }
+      ],
+      "after_uninstall": [
+        {
+          "pass": 1,
+          "clean": true,
+          "uninstall_exit": 0,
+          "uninstall_ms": 1532,
+          "footprint": {
+            "account": false,
+            "group": false,
+            "hklm_key": false,
+            "hide_value": false,
+            "store_dir": true,
+            "profile_dir": false,
+            "profile_list": false
+          },
+          "enum_counts_s1_s2_s3": [
+            0,
+            0,
+            0
+          ],
+          "sweep_count": 0,
+          "wfp_state_export": {
+            "ok": true,
+            "srt_win": 0,
+            "s1": 0,
+            "s2": 0,
+            "s3": 0,
+            "default_sublayer": 0
+          },
+          "user_rights_sid_hits": 0,
+          "store_dir_sddl": "D:PAI(D;OICI;FA;;;S-1-5-21-<machine>-2236)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;BU)",
+          "acl": {
+            "entries": 129681,
+            "sid_hits": 0,
+            "changed": 0,
+            "equivalent": 0,
+            "narrowed": 0,
+            "other": 0
+          }
+        },
+        {
+          "pass": 2,
+          "clean": true,
+          "uninstall_exit": 0,
+          "uninstall_ms": 1494,
+          "footprint": {
+            "account": false,
+            "group": false,
+            "hklm_key": false,
+            "hide_value": false,
+            "store_dir": true,
+            "profile_dir": false,
+            "profile_list": false
+          },
+          "enum_counts_s1_s2_s3": [
+            0,
+            0,
+            0
+          ],
+          "sweep_count": 0,
+          "wfp_state_export": {
+            "ok": true,
+            "srt_win": 0,
+            "s1": 0,
+            "s2": 0,
+            "s3": 0,
+            "default_sublayer": 0
+          },
+          "user_rights_sid_hits": 0,
+          "store_dir_sddl": "D:PAI(D;OICI;FA;;;S-1-5-21-<machine>-2238)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;BU)",
+          "acl": {
+            "entries": 129682,
+            "sid_hits": 0,
+            "changed": 0,
+            "equivalent": 0,
+            "narrowed": 0,
+            "other": 0
+          }
+        },
+        {
+          "pass": 3,
+          "clean": true,
+          "uninstall_exit": 0,
+          "uninstall_ms": 1340,
+          "footprint": {
+            "account": false,
+            "group": false,
+            "hklm_key": false,
+            "hide_value": false,
+            "store_dir": true,
+            "profile_dir": false,
+            "profile_list": false
+          },
+          "enum_counts_s1_s2_s3": [
+            0,
+            0,
+            0
+          ],
+          "sweep_count": 0,
+          "wfp_state_export": {
+            "ok": true,
+            "srt_win": 0,
+            "s1": 0,
+            "s2": 0,
+            "s3": 0,
+            "default_sublayer": 0
+          },
+          "user_rights_sid_hits": 0,
+          "store_dir_sddl": "D:PAI(D;OICI;FA;;;S-1-5-21-<machine>-2240)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;BU)",
+          "acl": {
+            "entries": 129683,
+            "sid_hits": 0,
+            "changed": 0,
+            "equivalent": 0,
+            "narrowed": 0,
+            "other": 0
+          }
+        }
+      ],
+      "operator_controls": {
+        "states": 21,
+        "outside_failures": 0,
+        "loopback_failures": 0
+      }
+    },
+    {
+      "build": "patched",
+      "exe_sha256": "A5724CE9E1AE6C4E2ABA9F1AAC91A167DEE4D8EE02E7B225C28A0A7D6E5F71B7",
+      "driver_sha256": "BAAA87645C2E883609F84CF40217D22EDCDF933699BA55C601F4A03E707059A0",
+      "windows_build": "10.0.26200.0",
+      "started": "2026-10-13T16:58:02.0913556-04:00",
+      "finished": "2026-10-13T17:03:13.8003423-04:00",
+      "exit": 0,
+      "passes_done": 3,
+      "acl_baseline": {
+        "entries": 129686,
+        "churn": 1
+      },
+      "ambient_stamped_entries": 10693,
+      "install": [
+        {
+          "pass": 1,
+          "exit": 0,
+          "ms": 1725,
+          "ambient_paths": 11
+        },
+        {
+          "pass": 2,
+          "exit": 0,
+          "ms": 1462,
+          "ambient_paths": 11
+        },
+        {
+          "pass": 3,
+          "exit": 0,
+          "ms": 1502,
+          "ambient_paths": 11
+        }
+      ],
+      "export_positive_controls": [
+        {
+          "pass": 1,
+          "srt_win": 9,
+          "s1": 5
+        },
+        {
+          "pass": 2,
+          "srt_win": 9,
+          "s1": 5
+        },
+        {
+          "pass": 3,
+          "srt_win": 9,
+          "s1": 5
+        }
+      ],
+      "states": [
+        {
+          "pass": 1,
+          "state": "F",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 1,
+          "state": "H6",
+          "srt_status": "partial",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 1,
+          "state": "H6-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass"
+        },
+        {
+          "pass": 1,
+          "state": "H4",
+          "srt_status": "partial",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 1,
+          "state": "H4-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass"
+        },
+        {
+          "pass": 1,
+          "state": "HP",
+          "srt_status": "partial",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 1,
+          "state": "HP-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 2,
+          "state": "F",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 2,
+          "state": "H6",
+          "srt_status": "partial",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 2,
+          "state": "H6-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass"
+        },
+        {
+          "pass": 2,
+          "state": "H4",
+          "srt_status": "partial",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 2,
+          "state": "H4-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass"
+        },
+        {
+          "pass": 2,
+          "state": "HP",
+          "srt_status": "partial",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 2,
+          "state": "HP-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 3,
+          "state": "F",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        },
+        {
+          "pass": 3,
+          "state": "H6",
+          "srt_status": "partial",
+          "filters": 3,
+          "roles_present": [
+            "block-v4",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "connected",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 3,
+          "state": "H6-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass"
+        },
+        {
+          "pass": 3,
+          "state": "H4",
+          "srt_status": "partial",
+          "filters": 3,
+          "roles_present": [
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "connected",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "wfp_fence_inactive",
+          "host_check_patched_ts": "wfp_fence_inactive"
+        },
+        {
+          "pass": 3,
+          "state": "H4-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass"
+        },
+        {
+          "pass": 3,
+          "state": "HP",
+          "srt_status": "partial",
+          "filters": 2,
+          "roles_present": [
+            "block-v4",
+            "block-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "blocked",
+          "verify_v6_in_range": "blocked"
+        },
+        {
+          "pass": 3,
+          "state": "HP-after-reinstall",
+          "srt_status": "installed",
+          "filters": 4,
+          "roles_present": [
+            "block-v4",
+            "block-v6",
+            "permit-v4",
+            "permit-v6"
+          ],
+          "verify_v4_out": "blocked",
+          "verify_v6_out": "blocked",
+          "host_check_stock_ts": "pass",
+          "host_check_patched_ts": "pass",
+          "verify_v4_in_range": "connected",
+          "verify_v6_in_range": "connected"
+        }
+      ],
+      "reinstalls": [
+        {
+          "pass": 1,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1398,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2243, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2242)"
+        },
+        {
+          "pass": 1,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1570,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2243, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2242)"
+        },
+        {
+          "pass": 1,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1214,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2243, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2242)"
+        },
+        {
+          "pass": 2,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1224,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2245, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2244)"
+        },
+        {
+          "pass": 2,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1203,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2245, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2244)"
+        },
+        {
+          "pass": 2,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1200,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2245, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2244)"
+        },
+        {
+          "pass": 3,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1157,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2247, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2246)"
+        },
+        {
+          "pass": 3,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1236,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2247, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2246)"
+        },
+        {
+          "pass": 3,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1288,
+          "srt_win_said": "srt-win: ambient write-deny stamped on 11 system path(s) / srt-win: installed (sublayer=C971A69F-D6AB-4885-9B49-506D8AA51C86, proxy_port_range=60080-60089, filters=4) / srt-win: sandbox user 'srt-sandbox' provisioned (sid=S-1-5-21-<machine>-2247, group=sandbox-runtime-users sid=S-1-5-21-<machine>-2246)"
+        }
+      ],
+      "restores_force": [
+        {
+          "pass": 1,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1117
+        },
+        {
+          "pass": 1,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1259
+        },
+        {
+          "pass": 1,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1221
+        },
+        {
+          "pass": 2,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1258
+        },
+        {
+          "pass": 2,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1185
+        },
+        {
+          "pass": 2,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1195
+        },
+        {
+          "pass": 3,
+          "state": "H6",
+          "exit": 0,
+          "ms": 1271
+        },
+        {
+          "pass": 3,
+          "state": "H4",
+          "exit": 0,
+          "ms": 1296
+        },
+        {
+          "pass": 3,
+          "state": "HP",
+          "exit": 0,
+          "ms": 1218
+        }
+      ],
+      "after_uninstall": [
+        {
+          "pass": 1,
+          "clean": true,
+          "uninstall_exit": 0,
+          "uninstall_ms": 1494,
+          "footprint": {
+            "account": false,
+            "group": false,
+            "hklm_key": false,
+            "hide_value": false,
+            "store_dir": true,
+            "profile_dir": false,
+            "profile_list": false
+          },
+          "enum_counts_s1_s2_s3": [
+            0,
+            0,
+            0
+          ],
+          "sweep_count": 0,
+          "wfp_state_export": {
+            "ok": true,
+            "srt_win": 0,
+            "s1": 0,
+            "s2": 0,
+            "s3": 0,
+            "default_sublayer": 0
+          },
+          "user_rights_sid_hits": 0,
+          "store_dir_sddl": "D:PAI(D;OICI;FA;;;S-1-5-21-<machine>-2242)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;BU)",
+          "acl": {
+            "entries": 129687,
+            "sid_hits": 0,
+            "changed": 0,
+            "equivalent": 0,
+            "narrowed": 0,
+            "other": 0
+          }
+        },
+        {
+          "pass": 2,
+          "clean": true,
+          "uninstall_exit": 0,
+          "uninstall_ms": 1499,
+          "footprint": {
+            "account": false,
+            "group": false,
+            "hklm_key": false,
+            "hide_value": false,
+            "store_dir": true,
+            "profile_dir": false,
+            "profile_list": false
+          },
+          "enum_counts_s1_s2_s3": [
+            0,
+            0,
+            0
+          ],
+          "sweep_count": 0,
+          "wfp_state_export": {
+            "ok": true,
+            "srt_win": 0,
+            "s1": 0,
+            "s2": 0,
+            "s3": 0,
+            "default_sublayer": 0
+          },
+          "user_rights_sid_hits": 0,
+          "store_dir_sddl": "D:PAI(D;OICI;FA;;;S-1-5-21-<machine>-2244)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;BU)",
+          "acl": {
+            "entries": 129688,
+            "sid_hits": 0,
+            "changed": 0,
+            "equivalent": 0,
+            "narrowed": 0,
+            "other": 0
+          }
+        },
+        {
+          "pass": 3,
+          "clean": true,
+          "uninstall_exit": 0,
+          "uninstall_ms": 1569,
+          "footprint": {
+            "account": false,
+            "group": false,
+            "hklm_key": false,
+            "hide_value": false,
+            "store_dir": true,
+            "profile_dir": false,
+            "profile_list": false
+          },
+          "enum_counts_s1_s2_s3": [
+            0,
+            0,
+            0
+          ],
+          "sweep_count": 0,
+          "wfp_state_export": {
+            "ok": true,
+            "srt_win": 0,
+            "s1": 0,
+            "s2": 0,
+            "s3": 0,
+            "default_sublayer": 0
+          },
+          "user_rights_sid_hits": 0,
+          "store_dir_sddl": "D:PAI(D;OICI;FA;;;S-1-5-21-<machine>-2246)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;BU)",
+          "acl": {
+            "entries": 129689,
+            "sid_hits": 0,
+            "changed": 0,
+            "equivalent": 0,
+            "narrowed": 0,
+            "other": 0
+          }
+        }
+      ],
+      "operator_controls": {
+        "states": 21,
+        "outside_failures": 0,
+        "loopback_failures": 0
+      }
+    }
+  ],
+  "first_cycle": {
+    "note": "the first live stock pass (driver 819b4d9a) completed every state with the same results as the counted runs, then stopped on its ACL check; not counted in the 3-pass results",
+    "started": "2026-10-13T16:39:32.1392486-04:00",
+    "exit": 10,
+    "stop_class": "not_clean_after_uninstall",
+    "acl_changes_vs_prerun_snapshot": {
+      "equivalent": 570,
+      "narrowed": 7,
+      "other": 0
+    },
+    "kinds": {
+      "DACL flags P -> PAI, ACEs identical": 50,
+      "DACL flags (none) -> AI, ACEs identical": 513,
+      "CREATOR OWNER ACE canonicalised": 7,
+      "allow ACEs removed (re-derived from the parent)": 7
+    },
+    "example_per_kind": {
+      "DACL flags P -> PAI, ACEs identical": {
+        "path": "C:\\ProgramData\\...\\(file .dll)",
+        "old": "D:P(A;;0x1201bf;;;WD)",
+        "new": "D:PAI(A;;0x1201bf;;;WD)"
+      },
+      "DACL flags (none) -> AI, ACEs identical": {
+        "path": "C:\\ProgramData\\...\\(file .db)",
+        "old": "D:(A;;FA;;;SY)(A;;0x1200a9;;;BA)",
+        "new": "D:AI(A;;FA;;;SY)(A;;0x1200a9;;;BA)"
+      },
+      "CREATOR OWNER ACE canonicalised": {
+        "path": "C:\\ProgramData\\...\\(folder)",
+        "old": "D:P(A;OICI;FR;;;WD)(A;OICI;FA;;;CO)(A;OICI;FA;;;SY)(A;OICI;FA;;;LS)(A;OICI;FA;;;BA)(A;OICI;FA;;;BU)(A;OICI;FA;;;BG)(A;OICI;FA;;;PU)",
+        "new": "D:PAI(A;OICI;FR;;;WD)(A;OICIIO;FA;;;CO)(A;OICI;FA;;;SY)(A;OICI;FA;;;LS)(A;OICI;FA;;;BA)(A;OICI;FA;;;BU)(A;OICI;FA;;;BG)(A;OICI;FA;;;PU)"
+      },
+      "allow ACEs removed (re-derived from the parent)": {
+        "path": "C:\\Windows\\Temp\\...\\(file .tmp)",
+        "old": "D:AI(A;ID;FA;;;BA)(A;ID;FA;;;SY)(A;ID;0x1200a9;;;WD)(A;ID;0x1200a9;;;BU)",
+        "new": "D:AI(A;ID;FA;;;SY)(A;ID;FA;;;BA)"
+      }
+    },
+    "later_cycles": "install/uninstall cycles 2 to 7 (both counted runs) changed no access list"
+  }
+}

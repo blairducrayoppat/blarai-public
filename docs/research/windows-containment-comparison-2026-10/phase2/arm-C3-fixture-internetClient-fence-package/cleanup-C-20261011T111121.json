@@ -1,0 +1,10 @@
+{
+ "loopback_exempt_remove": {
+  "action": "remove",
+  "rc": 0,
+  "listed_after": false,
+  "ok": true
+ },
+ "delete_profile_hr": 0,
+ "profile_folder_gone": true
+}

@@ -21,9 +21,10 @@ Originals are the source of truth and are never written. Run this on every
 artifact before it is published, IN ADDITION TO an independent human/agent review
 (it cannot judge prose semantics — only structured-data integrity + residue).
 
-INTERNAL TOOL — it embeds the local-path patterns (incl. the username). Do NOT
-publish this script. Extend SUBSTITUTIONS / SENSITIVE_FAIL / WARN_INTERNAL for
-your machine (hostname, etc.) before relying on it.
+The operator and host names are not embedded: they are read from the machine for the
+path patterns and recognised by digest (scripts/identity_lock.py) in the residual scan,
+so the scan holds under any account. Extend SUBSTITUTIONS / SENSITIVE_FAIL / WARN_INTERNAL
+for new local paths before relying on it.
 
 Usage:
   python scripts/verify_community_scrub.py --original <f.json> --scrubbed <f.json>
@@ -34,27 +35,37 @@ Exit code 0 = PASS (safe to publish, integrity intact); non-zero = FAIL/needs re
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
+import os
+import platform
 import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import identity_lock as _il  # noqa: E402  (digest recognition of this machine's names; works under any account)
+
 # --- Known local-path -> placeholder substitutions (the ONLY string changes the
 #     scrub is allowed to make). Order: most-specific first. Patterns match the
 #     PARSED string (single backslashes), case-insensitive, both slash styles. ---
+# The operator user name and the host name are read from the machine for the path patterns and recognised by digest in
+# residual_scan (identity_lock), never held as literals (gate lock: tests/security/test_no_host_identity_in_tree.py).
+_USER = re.escape(os.environ.get("USERNAME") or getpass.getuser())
+_HOST = re.escape(os.environ.get("COMPUTERNAME") or platform.node())
 SUBSTITUTIONS: list[tuple[str, str]] = [
-    (r"[A-Za-z]:[\\/]Users[\\/]mrbla[\\/]AppData[\\/]Local[\\/]Temp[\\/]claude[\\/][^\"'\s]*", "<scratch>"),
-    (r"[A-Za-z]:[\\/]Users[\\/]mrbla[\\/]tools[\\/]intel-ut[^\"'\s]*", "<ut-home>"),
-    (r"[A-Za-z]:[\\/]Users[\\/]mrbla[\\/](?:blarai|BlarAI)", "<repo>"),
-    (r"[A-Za-z]:[\\/]Users[\\/]mrbla", "<home>"),
-    (r"(?i)\bNORTHSTAR100\b", "<host>"),
-    (r"\bmrbla\b", "<user>"),
+    (rf"[A-Za-z]:[\\/]Users[\\/]{_USER}[\\/]AppData[\\/]Local[\\/]Temp[\\/]claude[\\/][^\"'\s]*", "<scratch>"),
+    (rf"[A-Za-z]:[\\/]Users[\\/]{_USER}[\\/]tools[\\/]intel-ut[^\"'\s]*", "<ut-home>"),
+    (rf"[A-Za-z]:[\\/]Users[\\/]{_USER}[\\/](?:blarai|BlarAI)", "<repo>"),
+    (rf"[A-Za-z]:[\\/]Users[\\/]{_USER}", "<home>"),
+    (rf"(?i)\b{_HOST}\b", "<host>"),
+    (rf"(?i)\b{_USER}\b", "<user>"),
 ]
 
 # --- Residual scan: these MUST NOT survive in a scrubbed artifact (hard fail). ---
 SENSITIVE_FAIL: list[tuple[str, str]] = [
-    (r"mrbla", "username"),
-    (r"(?i)NORTHSTAR100", "hostname"),
+    (rf"(?i){_USER}", "username"),
+    (rf"(?i){_HOST}", "hostname"),
     (r"[A-Za-z]:[\\/]Users", "windows user path"),
     (r"[A-Za-z]:\\", "windows absolute path (backslash)"),
     (r"AppData[\\/]Local", "appdata path"),
@@ -75,6 +86,12 @@ def apply_subs(s: str) -> str:
     out = s
     for pat, repl in SUBSTITUTIONS:
         out = re.sub(pat, repl, out)
+    # The known scrub also replaces any token identity_lock recognises by digest (its own, independent read of the names).
+    hosts, users = _il.find_hits(out.encode("utf-8", "surrogatepass"))
+    for tok in sorted(hosts, key=len, reverse=True):
+        out = re.sub(re.escape(tok.decode()), "<host>", out, flags=re.IGNORECASE)
+    for tok in sorted(users, key=len, reverse=True):
+        out = re.sub(r"(?<![A-Za-z])" + re.escape(tok.decode()) + r"(?![A-Za-z])", "<user>", out, flags=re.IGNORECASE)
     return out
 
 
@@ -119,6 +136,11 @@ def deep_check(orig, scrub, path: str = "$") -> list[tuple[str, str]]:
 
 def residual_scan(text: str) -> tuple[list[str], list[str]]:
     fails, warns = [], []
+    hosts, users = _il.find_hits(text.encode('utf-8', 'surrogatepass'))
+    for _ in hosts:
+        fails.append('hostname (digest match)')
+    for _ in users:
+        fails.append('username (digest match)')
     for pat, label in SENSITIVE_FAIL:
         for m in re.finditer(pat, text):
             snippet = text[max(0, m.start() - 20):m.start() + 40].replace("\n", " ")

@@ -1,0 +1,737 @@
+{
+ "date": "2026-10-11",
+ "ticket": "#1746 item a",
+ "mxc_commit": "70fc7d52 (PR #1406, self-built, Rust 1.93)",
+ "windows": "Microsoft Windows [Version 10.0.26200.9457]",
+ "main_launcher_sha256": "3cf91a4598a9acb657f8ca959a7393dab5b79ece2d993dfe3c392f2615279311",
+ "v100_launcher_sha256": "aa444c0fc4b7f155fd8631068ffafb453d71d8b47fc47d417a74c9545a344031",
+ "priority": "BelowNormal",
+ "runs": [
+  {
+   "condition": "L-off-a",
+   "tag": "L-off-a-r1-132518",
+   "record": "raw/run-L-off-a-r1-132518.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "error: network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 54,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-a",
+   "tag": "L-off-a-r2-132540",
+   "record": "raw/run-L-off-a-r2-132540.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "error: network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 57,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-a",
+   "tag": "L-off-a-r3-132601",
+   "record": "raw/run-L-off-a-r3-132601.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "error: network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 66,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-b",
+   "tag": "L-off-b-r1-132522",
+   "record": "raw/run-L-off-b-r1-132522.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "Request error",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 42,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-b",
+   "tag": "L-off-b-r2-132544",
+   "record": "raw/run-L-off-b-r2-132544.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "Request error",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 36,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-b",
+   "tag": "L-off-b-r3-132605",
+   "record": "raw/run-L-off-b-r3-132605.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "Request error",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 78,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-c",
+   "tag": "L-off-c-r1-132514",
+   "record": "raw/run-L-off-c-r1-132514.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.556,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     false,
+     10013
+    ],
+    [
+     "127.0.0.1:18100",
+     false,
+     10013
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     null
+    ]
+   ],
+   "dns_example_com": null,
+   "proxied_clients": {
+    "urllib": null,
+    "curl_rc": 6,
+    "winhttp_default": null,
+    "winhttp_automatic": null
+   },
+   "cpu_total_pct_before": 45,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-c",
+   "tag": "L-off-c-r2-132535",
+   "record": "raw/run-L-off-c-r2-132535.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.58,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     false,
+     10013
+    ],
+    [
+     "127.0.0.1:18100",
+     false,
+     10013
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     null
+    ]
+   ],
+   "dns_example_com": null,
+   "proxied_clients": {
+    "urllib": null,
+    "curl_rc": 6,
+    "winhttp_default": null,
+    "winhttp_automatic": null
+   },
+   "cpu_total_pct_before": 55,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "L-off-c",
+   "tag": "L-off-c-r3-132556",
+   "record": "raw/run-L-off-c-r3-132556.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.463,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     false,
+     10013
+    ],
+    [
+     "127.0.0.1:18100",
+     false,
+     10013
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     null
+    ]
+   ],
+   "dns_example_com": null,
+   "proxied_clients": {
+    "urllib": null,
+    "curl_rc": 6,
+    "winhttp_default": null,
+    "winhttp_automatic": null
+   },
+   "cpu_total_pct_before": 66,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "T-on",
+   "tag": "T-on-r1-132526",
+   "record": "raw/run-T-on-r1-132526.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.831,
+   "listener_hits": {
+    "loop18099_hits": 5,
+    "loop18099_direct_marker": true,
+    "loop18099_proxied_request_lines": [
+     "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-urllib HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-curl HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-winhttp0 HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-winhttp4 HTTP/1.1"
+    ],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     true,
+     null
+    ],
+    [
+     "127.0.0.1:18100",
+     false,
+     10013
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     10013
+    ]
+   ],
+   "dns_example_com": [
+    "104.20.23.154",
+    "172.66.147.243"
+   ],
+   "proxied_clients": {
+    "urllib": 200,
+    "curl_rc": 0,
+    "winhttp_default": "200",
+    "winhttp_automatic": "200"
+   },
+   "cpu_total_pct_before": 61,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "T-on",
+   "tag": "T-on-r2-132548",
+   "record": "raw/run-T-on-r2-132548.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.648,
+   "listener_hits": {
+    "loop18099_hits": 5,
+    "loop18099_direct_marker": true,
+    "loop18099_proxied_request_lines": [
+     "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-urllib HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-curl HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-winhttp0 HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-winhttp4 HTTP/1.1"
+    ],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     true,
+     null
+    ],
+    [
+     "127.0.0.1:18100",
+     false,
+     10013
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     10013
+    ]
+   ],
+   "dns_example_com": [
+    "104.20.23.154",
+    "172.66.147.243"
+   ],
+   "proxied_clients": {
+    "urllib": 200,
+    "curl_rc": 0,
+    "winhttp_default": "200",
+    "winhttp_automatic": "200"
+   },
+   "cpu_total_pct_before": 54,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "T-on",
+   "tag": "T-on-r3-132609",
+   "record": "raw/run-T-on-r3-132609.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.612,
+   "listener_hits": {
+    "loop18099_hits": 5,
+    "loop18099_direct_marker": true,
+    "loop18099_proxied_request_lines": [
+     "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-urllib HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-curl HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-winhttp0 HTTP/1.1",
+     "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-winhttp4 HTTP/1.1"
+    ],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     true,
+     null
+    ],
+    [
+     "127.0.0.1:18100",
+     false,
+     10013
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     10013
+    ]
+   ],
+   "dns_example_com": [
+    "104.20.23.154",
+    "172.66.147.243"
+   ],
+   "proxied_clients": {
+    "urllib": 200,
+    "curl_rc": 0,
+    "winhttp_default": "200",
+    "winhttp_automatic": "200"
+   },
+   "cpu_total_pct_before": 55,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "V100",
+   "tag": "V100-r1-132531",
+   "record": "raw/run-V100-r1-132531.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "error: network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 57,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "V100",
+   "tag": "V100-r2-132552",
+   "record": "raw/run-V100-r2-132552.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "error: network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 50,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "V100",
+   "tag": "V100-r3-132614",
+   "record": "raw/run-V100-r3-132614.json",
+   "dry_run_rc": 1,
+   "dry_run_message": "error: network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support",
+   "launch_exit": null,
+   "wall_secs": null,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 0,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [],
+   "dns_example_com": null,
+   "proxied_clients": null,
+   "cpu_total_pct_before": 40,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "P-18100",
+   "tag": "P-18100-r1-132648",
+   "record": "raw-p18100/run-P-18100-r1-132648.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.661,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 5,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     false,
+     10013
+    ],
+    [
+     "127.0.0.1:18100",
+     true,
+     null
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     10013
+    ]
+   ],
+   "dns_example_com": [
+    "104.20.23.154",
+    "172.66.147.243"
+   ],
+   "proxied_clients": {
+    "urllib": 200,
+    "curl_rc": 0,
+    "winhttp_default": "200",
+    "winhttp_automatic": "200"
+   },
+   "cpu_total_pct_before": 56,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "P-18100",
+   "tag": "P-18100-r2-132653",
+   "record": "raw-p18100/run-P-18100-r2-132653.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.84,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 5,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     false,
+     10013
+    ],
+    [
+     "127.0.0.1:18100",
+     true,
+     null
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     10013
+    ]
+   ],
+   "dns_example_com": [
+    "104.20.23.154",
+    "172.66.147.243"
+   ],
+   "proxied_clients": {
+    "urllib": 200,
+    "curl_rc": 0,
+    "winhttp_default": "200",
+    "winhttp_automatic": "200"
+   },
+   "cpu_total_pct_before": 63,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  },
+  {
+   "condition": "P-18100",
+   "tag": "P-18100-r3-132658",
+   "record": "raw-p18100/run-P-18100-r3-132658.json",
+   "dry_run_rc": 0,
+   "dry_run_message": "SECTION: Request simplified",
+   "launch_exit": 0,
+   "wall_secs": 0.672,
+   "listener_hits": {
+    "loop18099_hits": 0,
+    "loop18099_direct_marker": false,
+    "loop18099_proxied_request_lines": [],
+    "loop18100_hits": 5,
+    "lan18099_hits": 0
+   },
+   "container_tcp": [
+    [
+     "127.0.0.1:18099",
+     false,
+     10013
+    ],
+    [
+     "127.0.0.1:18100",
+     true,
+     null
+    ],
+    [
+     "10.0.10.12:18099",
+     false,
+     10013
+    ],
+    [
+     "1.1.1.1:443",
+     false,
+     10013
+    ],
+    [
+     "example.com:443",
+     false,
+     10013
+    ]
+   ],
+   "dns_example_com": [
+    "104.20.23.154",
+    "172.66.147.243"
+   ],
+   "proxied_clients": {
+    "urllib": 200,
+    "curl_rc": 0,
+    "winhttp_default": "200",
+    "winhttp_automatic": "200"
+   },
+   "cpu_total_pct_before": 66,
+   "ac_power": true,
+   "verify_clean_rc": 0,
+   "state_changed": {}
+  }
+ ]
+}

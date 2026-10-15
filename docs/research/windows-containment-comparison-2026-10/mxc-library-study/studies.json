@@ -1,0 +1,273 @@
+[
+ {
+  "topic": "MXC v1.0.0 backends beyond the Windows process container, judged for two BlarAI jobs",
+  "summary": "Read the primary docs (raw.githubusercontent.com at v1.0.0, diffed against main) for every Windows backend. No backend documents a way for a confined coder to reach host 127.0.0.1:8099/8000. Windows Sandbox is block-only on network. IsolationSession cannot restrict network and has no folder sharing. Hyperlight and NanVix cannot run git-bash or opencode. WSLC says a proxy on the host loopback is not reachable. For untrusted-input parsing, Hyperlight, NanVix, Windows Sandbox and WSLC are all separate-kernel designs, but Hyperlight, NanVix and Windows Sandbox are experimental. CORRECTION: tag v1.0.0 is commit 7bf21024 (2026-10-06); c6f301d5 is current main (2026-10-09), 20 commits ahead of the tag, so the earlier read was main. This host (Win11 Pro 26200.9457): WindowsSandbox.exe absent, WSL 3.0.1.0 with wslc.exe present, wxc-exec --probe reports tier base-container, isolationSessionAvailable false, hyperlightAvailable true, baseContainerSupportsIngressHostLoopbackAllow false. Raw files: C:/blarai-spike-1740-mxc/study-backends/raw and main/.",
+  "findings": [
+   {
+    "claim": "Platform table at v1.0.0: Windows default is processcontainer (min build 26100). Others are windows_sandbox, wslc, microvm, hyperlight, isolation_session (isolation_session needs build 26340.9212, an Insider Preview). Linux: bubblewrap (default), lxc, microvm, hyperlight. macOS: seatbelt (macOS 15+). Stable: processcontainer, bubblewrap, lxc, seatbelt, wslc, isolation_session. Experimental (need --experimental): windows_sandbox, microvm, hyperlight.",
+    "evidence": "https://raw.githubusercontent.com/microsoft/mxc/v1.0.0/README.md : 'Experimental backends (windows_sandbox, microvm, and hyperlight) require { experimental: true }'",
+    "read": "primary"
+   },
+   {
+    "claim": "IsolationSession: separate OS session with a freshly provisioned agent user account on the SAME kernel (docs say a Win32k kernel exploit escapes a session like a job). Filesystem policy rejected at every phase (no host-folder-sharing primitive); a staging directory ephemeralWorkspacePath is returned instead. Network must be declared all-allow incl. hostLoopback; any restriction is rejected. Needs an interactive caller (not Session 0 / network logon). OS API is Windows.AI.IsolationSession.Preview with a private WinMD; CI has no agent for it. Early StopSession delay ~30 s (unquantified later). Not available on this host.",
+    "evidence": "v1.0.0 docs/development/architecture/backends/isolation-session/state-aware-rust.md : 'IsolationSession rejects every policy.filesystem field ... no host-folder-sharing primitive'; '...a Win32k kernel exploit escapes a session exactly as it escapes a job'; oneshot.md : 'Windows.AI.IsolationSession.Preview'; probe.txt : isolationSessionAvailable false",
+    "read": "primary"
+   },
+   {
+    "claim": "Windows Sandbox (WSB, experimental): hypervisor-isolated disposable VM with its own kernel; one-shot pays a full VM cold boot every call (no figure given); only ONE WSB VM per logon session; folders map at the same absolute path (directories only, rw or ro); network is block-only (allow, host lists and proxy are rejected), so no route to a host port; state-aware mode has no idle timeout and a hard-killed launcher can leave a wedged orphan (--force-reclaim). Requires the Windows Sandbox optional feature (reboot to enable) and hardware virtualisation; Microsoft Learn says it is not supported on Windows Home (Pro/Enterprise/Education). Runs commands via cmd.exe /C inside a stock Windows guest, so git-bash/node would have to exist in the guest; no host runtime is mapped. Not installed here.",
+    "evidence": "v1.0.0 docs/backends/windows-sandbox/windows-sandbox.md : 'Network access is block-only; allow-lists, block-lists, proxies, and unrestricted outbound access are unsupported.'; 'One-shot execution pays the full VM cold-boot cost on every invocation.'; Learn page: 'Windows Sandbox is currently not supported on Windows Home edition.'; Test-Path WindowsSandbox.exe = False",
+    "read": "primary"
+   },
+   {
+    "claim": "Hyperlight (experimental): Hyperlight micro-VM booting a Unikraft unikernel in the executor's own process, via WHP on Windows (KVM on Linux); hardware-virtualisation isolation with its own filesystem. Takes SOURCE code for a guest runtime (python, python-shell, node 22, bash, dotnet-jit, an 'agent' python with pandas/lxml/bs4/requests), not a command line; no git or Windows tools. Network is rejected at preflight (no networking in this release); workingDirectory rejected; mounts appear at /host/<basename> and the readonly list is enforced by guest kernel and host. Warm snapshot restore on every run, hermetic; per-run latency not stated. Setup pulls images from ghcr.io and writes %LOCALAPPDATA%\\mxc-hyperlight; admin not stated. x86_64 only. Probe on this host: hyperlightAvailable true.",
+    "evidence": "v1.0.0 docs/backends/hyperlight/hyperlight-backend.md : 'network | Rejected at preflight in this release: the guest runs without networking'; 'commandLine is source for the guest runtime'",
+    "read": "primary"
+   },
+   {
+    "claim": "MicroVM / NanVix (experimental): WHP (Windows) or KVM micro-VM, ~100 ms spawn-to-guest on Windows via warm snapshot, ~100 MB resident, 256 MB guest RAM. Guest is Python only (python3.initrd); files are COPIED into a staging dir and copied back after exit (not live mounts; <4 GB per file; symlinks rejected); no deniedPaths, no workingDirectory. Network: all-deny (no sockets) or all-allow unrestricted host networking incl. bind/listen; no rules, no proxy. Needs build --with-microvm and binaries beside wxc-exec.exe, and WHP enabled via bcdedit hypervisorlaunchtype. Not the coder's toolchain.",
+    "evidence": "v1.0.0 docs/backends/nanvix/nanvix.md : 'Fast cold-start - ~100 ms from process spawn to guest code execution'; 'Disabled networking prevents guest socket creation'; 'copied into a private per-run staging directory before boot'",
+    "read": "primary"
+   },
+   {
+    "claim": "WSLC (Linux containers via WSL, labelled stable v0.9): runs inside a WSL VM (own Linux kernel, not the Windows kernel; docs say kernel 6.6.x in the example, host has 6.18.40.1). Needs WSL >= 2.9.9 (host has 3.0.1.0, wslc.exe present), a separately shipped wslcsdk.dll, and an image (registry pull on cache miss, or local tar via imageTarPath, or pre-warmed cache). Startup called 'high cold-start cost' with no figure; a persistent per-user daemon keeps it warm in state-aware mode. Files: host dirs mounted as /mnt/c/... (rw/ro). Network is all-or-nothing: all-deny = no network; all-allow = unrestricted bridged; mixed and per-host rules rejected; cooperative HTTP proxy via env vars only; 'a proxy on the host's or WSL distro's loopback is not reachable'. No stdin, no interactive processes, no long-running daemons (must exit within timeout), no GUI. Registry allowlist is an admin registry policy. Main (post-tag) adds host-to-container TCP portMappings (inbound only).",
+    "evidence": "v1.0.0 docs/backends/wslc/wsl-container-getting-started.md : 'a proxy on the host's or WSL distro's loopback is not reachable'; 'Interactive processes (REPLs, shells) | MXC does not pass stdin'; 'Long-running daemons ... expects the process to exit within the configured timeout'; main version adds portMappings 'Host→container TCP forwards'",
+    "read": "primary"
+   },
+   {
+    "claim": "Process container tiers (this host is Win11 25H2 build 26200): T1 BaseContainer (PSEC) is a 25H2+ (26600+) capability and needs an enabled OS contract; T2 AppContainer+BFS is compiled out of all shipping builds because bfscfg.exe 'can deadlock the host on 25H2'; T3 AppContainer+DACL is the universal fallback and edits host path ACLs (persistent state while granted; DENY ACEs for deniedPaths). The AppContainer fallback rejects ingress.hostLoopback allow, runtimeConfig.networkProxy and explicit egress rules; only PSEC supports them, and even there a proxy-mode inbound limitation is documented on build 26691. wxc-host-prep requires administrator and adds persistent ACEs on C:\\ roots for AppContainer SIDs, plus per-boot null-device prep. Same kernel as host for all tiers. Host probe reports tier base-container but baseContainerSupportsIngressHostLoopbackAllow false.",
+    "evidence": "v1.0.0 docs/backends/process-container/os-version-support.md : '| Explicit egress IP/CIDR/port/protocol rules | WFP | AppContainer fallback unsupported |' and 'the tier2_bfs Cargo feature is off in all shipping builds because invoking bfscfg.exe can deadlock the host on 25H2'; host-prep.md : 'All subcommands require elevation'; probe.txt",
+    "read": "primary"
+   },
+   {
+    "claim": "Linux and macOS backends (list only): bubblewrap (stable default, unprivileged user namespaces), lxc (needs root for network filtering), microvm/NanVix and hyperlight (KVM), seatbelt on macOS 15+ (kernel-enforced profile, no root, no daemon). None run on this Windows host.",
+    "evidence": "v1.0.0 README.md platform table; docs/backends/bwrap/bubblewrap-backend.md 'Status: Stable - the default Linux backend'; docs/backends/seatbelt/seatbelt-backend.md 'Requires | macOS 15 (Sequoia) or later'",
+    "read": "primary"
+   },
+   {
+    "claim": "MXC's own licence is MIT (Microsoft). CI validates Windows backends on Azure Pro/Enterprise pools; ARM64 virtualisation backends are dormant because no nested-virtualisation ARM VM SKU exists.",
+    "evidence": "v1.0.0 LICENSE.md 'MIT License Copyright (c) Microsoft Corporation'; docs/development/build-and-test/ci-validation-infrastructure.md platform table",
+    "read": "primary"
+   },
+   {
+    "claim": "Tag/commit discrepancy: git ref v1.0.0 resolves to commit 7bf21024 (2026-10-06, tree sha matches the recursive tree used here); c6f301d5 is main HEAD dated 2026-10-09, ahead by 20 commits. Release list: v1.0.0 (2026-10-07, not prerelease), v0.9.0 (prerelease). Doc differences main vs tag in the five backend docs are mostly wording (one-shot renamed 'create-and-run'), plus WSLC portMappings and a main README platform table marking windows_sandbox, microvm, hyperlight with an asterisk.",
+    "evidence": "api.github.com/repos/microsoft/mxc/git/ref/tags/v1.0.0 and /compare/v1.0.0...main : status ahead, ahead_by 20; /commits/main sha c6f301d5",
+    "read": "primary"
+   }
+  ],
+  "fit_for_blarai": "Job (a), confining the coder while it reaches a model on host 127.0.0.1:8099/8000. Documented as unable: Windows Sandbox (block-only network, no proxy), Hyperlight and NanVix (no network or unrestricted-only, cannot run git-bash/opencode), IsolationSession (network cannot be restricted, no folder sharing, not available on this build; confinement would rest only on a separate account/session on the same kernel). WSLC could in principle host a Linux build of node/git/opencode, but docs say a host-loopback proxy is not reachable, the only network modes are none or unrestricted, it takes no stdin and expects processes that exit; whether the host model port is reachable from the WSL VM at some routable address, and whether a host-side firewall rule could narrow it, is not documented and not tested. Process container on this host: loopback allow is reported unsupported by the probe. Job (b), parsing unbounded untrusted input (the Alpine VM job today): Hyperlight (hardware VM, no network, ro mounts, python/node guest, snapshot restore, experimental, no latency figure) and NanVix (hardware VM, no network by default, copy-in/copy-back, 256 MB, ~100 ms, python only, experimental) match 'no network, own kernel' structurally; WSLC (stable, own Linux kernel, isolated-network mode, tar-imported image, cache pre-warm) is the closest analogue to the Alpine VM but adds a daemon and the WSL VM; Windows Sandbox is a separate kernel with no network but is heavy, singleton, experimental and not installed. None provides vsock; data goes in/out by mounts, staging copy, or stdout. Whether any of these beats the existing Hyper-V Alpine VM + vsock design, and whether the Hyperlight/NanVix guest libraries parse BlarAI's formats, is unknown.",
+  "unknowns": [
+   "Startup and per-run latency for WSLC, Hyperlight, IsolationSession and Windows Sandbox on this box (docs give no numbers except NanVix ~100 ms, none measured here).",
+   "Whether a WSLC container can reach a host service on 127.0.0.1 or a host-routable address (docs only say the host loopback is not reachable via a loopback proxy URL); not tested, no container run allowed.",
+   "Licences of third-party parts (Hyperlight, hyperlight-unikraft, Unikraft, NanVix, WSL/wslcsdk.dll) were not read; only MXC's MIT licence was.",
+   "Whether Hyperlight/WHP setup or WSLC use needs administrator rights on first run (setup scripts not read; host probe shows hyperlightAvailable true and wslc.exe present).",
+   "Whether the 20 post-tag commits on main change any backend behaviour beyond docs diffed (only five backend docs and README were diffed).",
+   "Whether IsolationSession becomes available on this machine (needs build 26340.9212+ Insider Preview; host is 26200.9457).",
+   "Isolation strength of a WSLC container versus another container in the same WSL VM was not documented in the pages read."
+  ]
+ },
+ {
+  "topic": "MXC as a library (SDKs, stateful lifecycle, \"composition\") and fit for the BlarAI coder fleet",
+  "summary": "1) The stateful sandbox (provision/start/exec/stop/deprovision) exists in the v1.0.0 SDKs only for IsolationSession and WSLC (Linux containers). The Windows process-container tier that arm E measured has no stateful form. IsolationSession needs Windows build 26340.9212 (Insider); wxc-exec --probe on this laptop reports isolationSessionAvailable false. So no held-open sandbox is available here for the Windows coder.\n2) IsolationSession cannot restrict the network: provision rejects anything but allow-all egress/ingress plus hostLoopback allow. It would fix localhost by removing the network block, which BlarAI policy forbids.\n3) \"Dynamic composition\" is not an MXC feature name. The only source with composition vocabulary is open, unmerged PR #1309 (Policy Store, proposal by one contributor, maintainer CHANGES_REQUESTED). It composes per-tool allow lists at lookup time from data embedded at build time and says \"no dynamic fetching\" (possible V2).\n4) Tag v1.0.0 is commit 7bf21024. The earlier-read c6f301d5 is main HEAD, 20 commits ahead, so the earlier reading was main, not the tag.\n5) Supply chain: binaries are Microsoft Authenticode-valid; npm package has registry signatures, no provenance; koffi and node-pty run install scripts; telemetry off by default.\n6) Executed only wxc-exec --help, a rejected --version, and --probe; no container run. Files are in C:/blarai-spike-1740-mxc/study-library/.",
+  "findings": [
+   {
+    "claim": "The SDK stateful lifecycle is typed to IsolationSession and WSLC only. ProcessContainer (the arm E tier) has no provision/start/exec/stop/deprovision in the Node, Rust or .NET v1 SDKs.",
+    "evidence": "v1.0.0 docs/api-reference/node/v1/types.md: \"export type LifecycleContainmentKind = Extract<ContainmentBackend, 'isolation_session' | 'wslc'>;\" and api.md: \"Existing-container PTY support remains IsolationSession-only.\"",
+    "read": "primary"
+   },
+   {
+    "claim": "The lifecycle is five phases; spawnSandbox/run is documented as the composition of those phases. This is the only use of \"composition\" in the v1.0.0 lifecycle docs. Sandbox state is owned by the backend service; the caller holds an opaque ContainerId and MXC keeps no state or orchestration.",
+    "evidence": "v1.0.0 docs/development/architecture/container-lifecycle.md: \"The mental model: `spawnSandbox` is the composition of the five phases into one call.\" and \"MXC retains no state between calls and does not become a sandbox orchestrator.\"",
+    "read": "primary"
+   },
+   {
+    "claim": "IsolationSession (the only Windows stateful backend in the SDK) requires the unrestricted network posture, so a held sandbox cannot keep the network blocked. It does grant host loopback, which is what the coder needs for its model on 127.0.0.1, but only together with full egress.",
+    "evidence": "docs/development/architecture/backends/isolation-session/state-aware-typescript.md: \"The backend's actual unrestricted posture: { egress: { default: 'allow' }, ingress: { default: 'allow', hostLoopback: 'allow' } }. ... Rules, proxies, mixed postures, and omission are rejected\"; state-aware-rust.md matrix: policy.filesystem readwrite/readonly/denied paths rejected at provision and exec.",
+    "read": "primary"
+   },
+   {
+    "claim": "IsolationSession is not available on this laptop: README minimum build is 26340.9212 (Insider Preview); the project's own probe on the verified wxc-exec.exe says false on build 26200.9457.",
+    "evidence": "README.md platforms table: \"`isolation_session`: 26340.9212 (Insider Preview)\"; local `wxc-exec.exe --probe` output: \"isolationSessionAvailable\": false, \"baseContainerSupportsIngressHostLoopbackAllow\": false, tier \"base-container\".",
+    "read": "primary"
+   },
+   {
+    "claim": "IsolationSession identity lifetime: provision mints an OS-assigned agent user account (name, SID) and a shared ephemeral workspace folder. The ContainerId is iso:<base64url JSON containing agentUserName>. Both session and account survive an MXC binary upgrade. Session ends at stop; deprovision removes the account and workspace. The caller can read every concurrent sandbox's workspace. MXC stores nothing; losing the id strands the sandbox.",
+    "evidence": "state-aware-rust.md: \"Both the running session and the agent user account survive a binary upgrade\"; \"a sandbox left behind that way cannot be addressed through MXC afterwards\"; TS doc: \"the caller can access every concurrent sandbox's workspace. Deleted when the container is deprovisioned.\"",
+    "read": "primary"
+   },
+   {
+    "claim": "WSLC supports a warm stateful container via a persistent per-user daemon (wxc-wslc-daemon.exe), but it is a Linux container (git-bash and the Windows opencode launcher do not apply), networking is all-or-nothing, exec is single-flight in v1.0.0, and it needs WSL 2.9.9+. Main (after the tag) changed the daemon to admit concurrent execs and add port mappings.",
+    "evidence": "docs/backends/wslc/wslc-state-aware.md: \"The daemon runs one exec at a time\"; policy matrix: Isolated deny/deny/deny or Bridged allow/allow/allow, \"Mixed postures and per-host rules are rejected\"; compare commits b342f718 and edb59aa3 (2026-10-08) on main.",
+    "read": "primary"
+   },
+   {
+    "claim": "Windows Sandbox (a Windows VM guest) has a stateful lifecycle via a detached host daemon, but it is experimental (requires --experimental) and is not in the SDK v1 lifecycle type. Only the CLI or raw JSON reach it. Not measured here.",
+    "evidence": "docs/backends/windows-sandbox/windows-sandbox.md: \"It is experimental and requires `--experimental`.\" and \"`provision`, `start`, repeated `exec`, `stop`, and `deprovision` calls share one VM through a detached host daemon.\"; schemas/schema-version.json: \"stateAwareWindowsSandbox\": \"1.1.0-alpha\".",
+    "read": "primary"
+   },
+   {
+    "claim": "The \"composable filesystem-policy fragments discovered from the host\" are three Node helper functions (also in .NET and Rust) that read the CALLER's environment (default process.env): getAvailableToolsPolicy reads PATH plus a fixed list of tool env vars (PYTHONHOME, JAVA_HOME, CARGO_HOME, NODE_PATH, etc.), drops non-existent and %WINDIR% paths, and returns readonly path lists. getUserProfilePolicy lists subfolders of %LOCALAPPDATA%\\Programs; getTemporaryFilesPolicy returns TEMP as read-write. 'Combined' means the caller merges the arrays into ContainerRequest.filesystem. Whoever controls the harness environment controls the fragments; nothing is fetched, signed or remote.",
+    "evidence": "v1.0.0 sdk/node/src/v1/policy/filesystem.ts: \"A composable fragment of filesystem policy. Callers merge one or more fragments into ContainerRequest.filesystem.\" and KNOWN_ENV_VARS list; `environment = environment ?? process.env`.",
+    "read": "primary"
+   },
+   {
+    "claim": "A security-relevant default in that helper: if pwsh.exe is found on PATH, getAvailableToolsPolicy adds the whole system drive root (C:\\) to readonlyPaths and the PSReadLine history folder to readwritePaths. BlarAI's harness runs PowerShell 7, so using the helper unmodified would widen the strict default-deny arm E observed. Explicit hand-written paths avoid it.",
+    "evidence": "filesystem.ts getPowerShellPolicy: \"`C:\\` in `readonlyPaths` — pwsh.exe enumerates the drive root on startup.\" Not run; read from source.",
+    "read": "primary"
+   },
+   {
+    "claim": "The README tells the SDK to be used per call: one-shot run/spawn/spawnWithPty in-process for ProcessContainer. The Rust crate and .NET package call the native engine in-process through mxc_ffi.dll, no wxc-exec child. Node needs Node 24.21+ (Windows). There is no Python or PowerShell SDK. PowerShell 7 can load the .NET 8 package; Python would need the CLI or the C ABI (unsupported by docs, not tested).",
+    "evidence": "src/mxc-sdk/README.md: \"neither launches an MXC executor binary\"; sdk/node/README.md: \"Node.js 24 or later is required. On Windows, native stdio transfer requires Node.js 24.21.0 or later\"; sdk/dotnet nuspec dependency group net8.0.",
+    "read": "primary"
+   },
+   {
+    "claim": "Where \"composition\" or \"dynamic\" appear across README, docs, samples and release notes at v1.0.0: only the lifecycle sentence above, the 'composable fragment' comments and docs/api-reference type text, and the 0.7.0 policy non-goal \"Multi-container orchestration: Composing sandboxes or sandbox-to-sandbox communication.\" No 'dynamic composition' in any README, sample README, CHANGELOG or release body (5 release bodies searched). My grep covered the 29 doc/README/CHANGELOG/sample files I fetched, not all 100 files.",
+    "evidence": "grep over fetched v1.0.0 files; docs/containment-configuration/0.7.0/policy.md line 44; releases API bodies for v1.0.0, v0.9.0, v0.8.0, v0.7.0-rc1, v0.6.1 had no match.",
+    "read": "primary"
+   },
+   {
+    "claim": "The one source using the phrase: open PR #1309 'docs: add MXC Policy Store feature spec' (ChazGo, opened 2026-09-28, head 2c682f35). It proposes a catalog of per-tool minimum-access 'floors' (git, node, ...) with lookup-time composition: read-write beats read-only on the same path, overlapping catalog denies are removed, multiple tools' network allow rules are unioned, conflicting ui/timeout fail. 'Dynamic' appears only as 'no dynamic fetching; that is a possible V2 capability' (data embedded at build time) and in a bot review about 'dynamic path-conflict behavior'. Status: not implemented, 'Not part of MXC 1.0; no later release is committed.' Reviewer MGudgin: CHANGES_REQUESTED, \"This doesn't belong in the mxc repository.\" It builds on closed PR #779 (closed 2026-09-25 by a maintainer).",
+    "evidence": "gh api repos/microsoft/mxc/pulls/1309 and /reviews; ChazGo fork raw docs/mxc-policy-store.md at 2c682f35: \"V1 data is embedded at build time, with no dynamic fetching; that is a possible V2 capability.\"; docs/mxc-policy-store-api.md 'Dependencies and composition'. Issue search 'dynamic composition' repo-wide returned only #1309.",
+    "read": "primary"
+   },
+   {
+    "claim": "The Policy Store's own text says floors may BROADEN file access to make tools work, are 'best-effort ... guarantee neither success nor safety', and the data is community-contributed. That is the opposite direction from BlarAI's deny-by-default allowlists.",
+    "evidence": "mxc-policy-store.md header: \"Floors may broaden file access to unblock tools, but guarantee neither success nor safety.\"",
+    "read": "primary"
+   },
+   {
+    "claim": "Host loopback for process containers: v1.0.0 rejects hostLoopback allow when PSEC 1.1 ingress support is absent (matches arm E and this host's probe). Main, after the tag, adds a narrow workaround (#1406, 2026-10-06): an identity-less runtimeConfig.networkProxy on loopback with explicit hostLoopback allow on PSEC 1.0 hosts, plus probe field baseContainerSupportsIdentitylessLoopbackProxy. Not tested; the model endpoint would have to be reached through a caller-run proxy, not direct 127.0.0.1.",
+    "evidence": "main docs/backends/process-container/networking.md: \"For an identity-less `runtimeConfig.networkProxy` with explicit `hostLoopback: \\\"allow\\\"`, MXC also supports a compatibility workaround on hosts that support PSEC 1.0 but not 1.1.\"; commit 70fc7d52; v1.0.0 text: \"`hostLoopback: \\\"allow\\\"` is rejected when the PSEC 1.1 ingress contract is unavailable.\"",
+    "read": "primary"
+   },
+   {
+    "claim": "Release facts: @microsoft/mxc-sdk 1.0.0 was published 2026-10-06; the npm tarball is 105 MB because it bundles prebuilt Windows/Linux/macOS binaries (wxc-exec.exe, mxc_ffi.dll, wslcsdk.dll, daemons) with SPDX/ESRP signing manifests. Registry shows signatures but no provenance attestation. The 11 Windows binaries I already hold are Authenticode status Valid, signer Microsoft Corporation. Runtime deps: koffi (install script cnoke --prebuild), node-pty (install: prebuild.js || node-gyp rebuild), semver. Install-time network behaviour of koffi/node-pty not measured. Crates.io mxc-sdk 1.0.0 exists (1 version, created 2026-10-06, 127 downloads); NuGet Microsoft.Mxc.Sdk 1.0.0 exists. GitHub release has one asset mxc-release-binaries.zip (536 MB).",
+    "evidence": "registry.npmjs.org/@microsoft%2fmxc-sdk (dist.signatures, no dist.attestations; package.json dependencies); tar -tzf of the 1.0.0 tarball; Get-AuthenticodeSignature on dl/x64 (via pwsh); crates.io API; api.nuget.org flatcontainer.",
+    "read": "primary"
+   },
+   {
+    "claim": "Telemetry is off by default; collection needs the per-run flag, per-user consent and an allowing HKLM policy; unreadable policy fails closed. Local/open-source builds route nothing to Microsoft. Official shipped builds set a provider group GUID and route to Microsoft via the UTC pipeline if all gates open. I did not verify whether the signed binaries I hold are 'official' builds, so the no-send claim for them rests on the three gates, not on build type.",
+    "evidence": "README.md Telemetry section: \"Telemetry is off by default.\" and \"Official/shipped Microsoft builds set a TraceLogging provider group GUID at build time\"; docs/telemetry.md: \"Any value MXC cannot read or cannot parse ... is treated as Blocked.\"",
+    "read": "primary"
+   },
+   {
+    "claim": "The tag/commit mismatch: tag v1.0.0 resolves to commit 7bf210247986cb73b1b314df60c2f1109c479c0b (2026-10-06). c6f301d5 is main HEAD (2026-10-09, '[docs] Glossary...'), 20 commits ahead, so main-only content (glossary, WSLC concurrency, loopback proxy workaround) is not in v1.0.0. The new glossary has no 'composition'/'dynamic' match.",
+    "evidence": "api.github.com/repos/microsoft/mxc/commits/v1.0.0 and /compare/v1.0.0...main (status ahead, ahead_by 20).",
+    "read": "primary"
+   }
+  ],
+  "fit_for_blarai": "Facts only. (a) For the coder (Windows opencode + git-bash, 127.0.0.1 model, network blocked, hundreds of commands per job): the only tier that fits the security posture, ProcessContainer, is one-shot per command in the SDK; a stateful sandbox that holds state across commands exists only as IsolationSession (needs an Insider build this laptop lacks, and forces open network) or WSLC (Linux; would not run the Windows git-bash/opencode launcher). So a held sandbox does not solve the git-bash or localhost problem today; it is not available or not compatible. (b) Use shape if the process tier is adopted: per-command run via the .NET package from PowerShell 7, or the CLI with a JSON config per command, or the Rust crate; Node 24 is needed only for the Node SDK. A per-command process container means git-bash/opencode launch failures from arm E still apply; the stateful API changes nothing there. (c) 'Dynamic composition' is a draft proposal (PR #1309) not shipped and not accepted; it would pull per-tool access that can broaden file access and is community-contributed data, so it would work against deny-by-default unless BlarAI kept its own explicit allowlists. The shipped host-discovery helpers read the harness's own environment and add C:\\ read-only when pwsh is on PATH, so they should not be used unmodified. (d) Possible new lead from main: the loopback-proxy workaround (#1406) for process containers, untested; requires running a caller-controlled loopback proxy in front of the model. (e) Supply chain: Microsoft-signed binaries (verified Valid), local-only telemetry gates; npm path adds koffi/node-pty install scripts, the Rust/.NET paths avoid Node. Blocks: IsolationSession build, process-container loopback (PSEC 1.1 ingress absent on this host), git-bash/opencode launcher failures from arm E.",
+  "unknowns": [
+   "Whether any non-GitHub source (Microsoft blog, Build/Ignite talk, learn.microsoft.com) uses 'dynamic composition' for MXC; only GitHub repo content, issues and PRs were searched with API/raw fetches.",
+   "Whether PRs/issues beyond search hit limits mention it; unauthenticated search was rate-limited once, gh-authenticated search for 'dynamic composition' returned only #1309.",
+   "My term grep covered the 29 doc, README, CHANGELOG and sample files I fetched at v1.0.0, not the full tree of 100 doc files; the earlier 100-file result was not re-run.",
+   "Whether Windows Sandbox stateful mode can host git-bash/opencode with network blocked and loopback to the host model; not read in depth, not measured.",
+   "Whether koffi/node-pty install steps touch the network, and whether the signed 'dl' binaries are official (Microsoft-routed telemetry) or open-source builds.",
+   "Whether the #1406 loopback-proxy workaround works on this host's PSEC version and with opencode's HTTP client.",
+   "How the .NET package behaves from PowerShell 7 on this machine (not installed or run).",
+   "Rust crate dependency count and cargo-vet/audit posture not examined."
+  ]
+ },
+ {
+  "topic": "MXC v1.0.0: policy authoring (audit/learning mode), schema stability, known limits, what adoption commits BlarAI to",
+  "summary": "Audit mode (wxc-exec --audit) exists and its availability probe passes on this laptop, but it was not run. It produces a starting list of exact file paths the coder touched, not a minimal or trustworthy grant list. It records only what one run did, and it grants whatever the run touched, with the container's protections switched off during that run. It cannot see some denials at all, including the one that blocks git-bash. Config schemas churned heavily in 0.x. Versions 0.6 to 0.8 were declared supported on 29 Sept and rejected by v1.0.0 on 7 Oct, and the v1.0.0 release notes do not list that change under breaking changes. v1.0.0 is 5 days old, and rc1 to final took about 19 hours. No security advisory or CVE was found for MXC itself. Open Windows bugs overlap the coder's tools (git, node, git-bash, loopback, non-interactive launch). Correction to the brief: c6f301d5 is main HEAD of 2026-10-09, not the v1.0.0 tag; the tag is 7bf21024.",
+  "findings": [
+   {
+    "claim": "The v1.0.0 tag is commit 7bf21024 (2026-10-06T22:42Z), the same commit as v1.0.0-rc5, with rc1 at 04:35Z the same day. Commit c6f301d5 is main HEAD of 2026-10-09, 20 commits ahead of the tag (including Learning Mode network-event decoding, COM diagnostics, a glossary). GitHub release published 2026-10-07; npm 1.0.0 published 2026-10-06. Earlier work that cited c6f301d5 as the tag was reading main.",
+    "evidence": "api.github.com/repos/microsoft/mxc/commits/v1.0.0 -> sha 7bf21024..., date 2026-10-06T22:42:43Z; commits/v1.0.0-rc5 same date; compare/v1.0.0...main -> ahead_by 20, head c6f301d5; releases.json v1.0.0 published_at 2026-10-07T05:54:01Z",
+    "read": "primary"
+   },
+   {
+    "claim": "Audit mode is real and documented. `wxc-exec --audit` is ProcessContainer-only. It wraps captureDenials mode allow with ETL retention forced on. It injects the permissiveLearningMode capability, so ungranted accesses are allowed and recorded and deny-by-default is not enforced for the run. Outputs go to %LOCALAPPDATA%\\Microsoft\\MXC\\PLM\\logs\\<timestamp>_pid<pid>\\ as denials.json, denials.verbose.json, trace.etl, a source-config snapshot and Adjusted_*.json (only if analysis was not truncated and at least one denial merged). Docs say not to use it to validate production containment.",
+    "evidence": "docs/development/guides/diagnostics.md at v1.0.0: \"Permissive audit policy-authoring mode ... Ungranted checks are recorded **and allowed**\"; `wxc-exec.exe --help`: \"--audit Audit mode: run captureDenials in permissive allow mode with ETL retention, then generate developer policy-authoring artifacts. Windows ProcessContainer only\"",
+    "read": "primary"
+   },
+   {
+    "claim": "On this laptop the availability probe passes for a captureDenials config (nothing was run). tier base-container, nativeCaptureAvailable true, guardedCaptureAvailable false (so no elevated fallback). Native capture is documented as running without UAC. The same probe shows baseContainerSupportsIngressHostLoopbackAllow false and baseContainerSupportsEnumeratePaths false, which matches arm E's loopback refusal; Get-HotFix lists KB5124007, KB5126052, KB5129195 but not KB5124010, the update the 0.9.0 notes name for host-loopback. Build 26200.9457.",
+    "evidence": "study-policy-maturity/probe_capture.json (wxc-exec.exe --probe cfg_capture_probe.json): \"nativeCaptureAvailable\": true, \"guardedCaptureAvailable\": false, \"baseContainerSupportsIngressHostLoopbackAllow\": false; v0.9.0 release notes: \"Install KB5124010 or a later cumulative update ... Container-to-host loopback networking\"",
+    "read": "primary"
+   },
+   {
+    "claim": "The generated policy is a list of exact paths, not a minimal grant design. Each write-access event becomes a readwritePaths entry for that exact file, and each read-access event becomes a readonlyPaths entry for the exact path. Nothing is coalesced to folders. Paths already covered by an existing grant, the audited binary itself, bare drive roots, 8.3 short names (not provable as non-aliases of a denied path), UNC-verbatim and alternate-data-stream forms are skipped. Entries under deniedPaths are never promoted. Merge is into the operator's existing config. Symlink and junction aliasing of a deny rule is a documented limitation: deny is checked on the literal normalized path only.",
+    "evidence": "src/mxc-sdk/src/core/plm/config.rs @7bf21024 update_from_access_events: \"arr.push(Value::String(ev.file_path.clone()))\"; \"Emit a file-scope grant for the exact path the audited process wrote to\"; \"the reparse-point / symlink case ... remains a documented limitation — deny is enforced on the literal normalized path only\"",
+    "read": "primary"
+   },
+   {
+    "claim": "Over-grant risk: the run executes with deny-by-default off, so every path the tool touches or probes (including config, credential or profile locations it merely tries to read) is recorded and, per the merge code, turned into a grant. No review step is built into the generator. DERIVED from the code above, not observed in a run. Under-grant risk: only what the exercised run touched is captured, and per-run file names (temp files) become one-off exact-file grants that do not generalize. Also derived, not run.",
+    "evidence": "docs/logging-access-denied.md: \"permissiveLearningMode ... allows it ... Weakened — the container no longer enforces deny-by-default\"; config.rs update_from_access_events (exact-path grants, no generalisation)",
+    "read": "primary"
+   },
+   {
+    "claim": "Documented blind spots of the recorder: file denials only appear if convertible to a safe absolute DOS/UNC path. Named Section, SymbolicLink, Timer, registry writes, ALPC ports, RPC interfaces and `\\BaseNamedObjects` directory objects are verbose-log-only, not in the actionable output. Capability checks under allow mode are omitted. Caps: 10,000 unique denials and 1,000,000 events (then deniedResourcesTruncated true and no Adjusted config), 4096 process generations (beyond that no output). Network events are not in the 1.0.0 actionable output (open issue #1286; main added WFP network-event decoding in #1418 after the tag).",
+    "evidence": "docs/logging-access-denied.md: \"`unsupportedObjectType` ... Examples include `\\BaseNamedObjects` as a Directory\"; \"current `allow` traces expose capability checks as empty-`ObjectType` access events that are omitted\"; issue #1286 \"Add network into capture denials\" open; compare/v1.0.0...main commit bd355ba1 \"decode WFP Learning Mode network events (#1418)\"",
+    "read": "primary"
+   },
+   {
+    "claim": "Concrete case where audit cannot rescue a coder tool: git-bash/MSYS2 fails creating `\\BaseNamedObjects\\msys-2.0S5-...` (access denied, then STATUS_DLL_INIT_FAILED). The reporter states no filesystem, capability or UI setting can grant it, and the recorder classes that object type as unsupported. A Microsoft maintainer says supporting it needs MSYS changes plus OS-side namespace virtualization; no ETA, issue open since 2026-08-28 (a user asked for an ETA on 09-22, no reply recorded). Also open: #1464, `GetFinalPathNameByHandleW(VOLUME_NAME_DOS)` fails in BaseContainer, breaking Node realpath.native and git's working-directory lookup unless C:\\ is readable.",
+    "evidence": "issue #1061 body: \"This is not a policy or configuration problem — no filesystem, capability, or UI setting can grant it\"; maintainer comment 2026-09-14: \"In OS, we will need true namespace virtualization support for BNO\"; issue #1464 (open, 2026-10-10): \"git init ... fatal: unable to get current working directory: Permission denied\"",
+    "read": "primary"
+   },
+   {
+    "claim": "The SDK helper getAvailableToolsPolicy adds the drive root C:\\ to readonlyPaths when pwsh.exe is on PATH, and on BaseContainer that is a recursive read of the whole system drive with no warning. The issue was filed against 1.0.0 on build 26200.9457 (same build as this laptop). A fix PR #1463 exists (default false for a drive-root read option); not seen merged in the tag. Anything built on that helper's output needs a check for this.",
+    "evidence": "issue #1455 (open): \"readonlyPaths contains C:\\ whenever pwsh.exe is on PATH ... can read every file the user can\"; comment 2026-10-10 referencing PR #1463",
+    "read": "primary"
+   },
+   {
+    "claim": "Non-interactive launch failure: from a session-0 process (OpenSSH shell, service, CI agent) every contained workload that imports USER32 (whoami, powershell, node, cl.exe) fails with STATUS_DLL_INIT_FAILED regardless of ui.disable; works from an interactive session. Open, filed 2026-10-11 against 1.0.0, build 26200.9550. The error text points users to a setting that is already set. Relevant if the coder fleet is launched by a service or non-interactive scheduled task. How BlarAI's fleet launches is not checked here.",
+    "evidence": "issue #1465 (open): \"every contained workload that imports USER32 fails with STATUS_DLL_INIT_FAILED ... The identical request works from an interactive session\"",
+    "read": "primary"
+   },
+   {
+    "claim": "Loopback to a model on 127.0.0.1: another open Windows bug (#1261) reports that with egress deny, Python asyncio hangs because intra-container loopback socketpair is blocked (workaround: explicit 127.0.0.1/32 egress allow rule, which adds internetClient and leaves blocking to the network filters alone). Reported on v0.8.0 binaries; not shown fixed by 1.0.0. Container-to-host loopback needs the OS update KB5124010 and the probe reports it unsupported on this box.",
+    "evidence": "issue #1261 (open): \"socket.socketpair() hangs indefinitely in accept() ... Workaround: an explicit egress allow rule for {\\\"cidr\\\":\\\"127.0.0.1/32\\\"}. It also adds internetClient to the token\"; v0.9.0 notes on KB5124010",
+    "read": "primary"
+   },
+   {
+    "claim": "Schema churn inside 0.x was large. Structural diff of the stable schema files: 0.5->0.6 removed appContainer, experimental (renamed to processContainer plus fallback); 0.7->0.8 moved to directional network (egress/ingress) and runtimeConfig.networkProxy; 0.8->0.9 removed legacy network fields (allowedHosts, blockedHosts, defaultPolicy, enforcementMode, proxy, allowLocalNetwork); 0.9.0->1.0.0 removed only appContainer and macos_sandbox from the one-shot request. schemas/ docs say that in 0.x any release may break (semver 4) and that only exact registered version strings parse (1.0.1, 0.10.0-alpha, an absent version are rejected).",
+    "evidence": "study-policy-maturity/schema_diff.txt (computed from schemas/stable/*.json at the tag; the 0.7->0.8 and 0.8->0.9 lists are inflated by schemas moving into $defs, only the named fields were confirmed removed); docs/schema.md: \"An absent version, a retired version, or any unregistered spelling such as `0.6.1-alpha`, `0.10.0-alpha`, or `1.0.1` is rejected.\"",
+    "read": "primary"
+   },
+   {
+    "claim": "Old schemas were dropped on a very short clock. v0.9.0 (tag 2026-09-28; release notes 09-29): \"Existing policies using schema 0.6, 0.7, or 0.8 remain supported\" with schema-version.json min 0.6.0-alpha. v1.0.0 (2026-10-06/07): min 0.9.0-alpha, \"Contracts before 0.9.0-alpha are retired\". Schema 0.8 had been published 2026-08-22 (46 days). The v1.0.0 'Breaking Changes' section lists only SDK import and type changes; the schema retirement appears only as a changelog line, 'Retire pre-v0.9 schema contracts and migrate configurations (#1382)'.",
+    "evidence": "raw.githubusercontent.com/microsoft/mxc/v0.9.0/schemas/schema-version.json min \"0.6.0-alpha\"; .../v1.0.0/schemas/schema-version.json min \"0.9.0-alpha\", stableLatest \"1.0.0\"; release_v1.0.0.md changelog line for #1382",
+    "read": "primary"
+   },
+   {
+    "claim": "Stability promise from 1.0: schema 1.0.0 is called the first stable contract and \"After 1.0.0, breaking changes require a major version bump per semver\"; release notes: V1 SDK is the stable compatibility boundary for 1.x. Counter-signals: development contract 1.1.0-alpha is mutable; the release notes state the V1 SDK stable boundary but docs say error 'operation' and 'nativeCode' values are best-effort diagnostics that may change without a schema bump; Windows Sandbox, MicroVM, Hyperlight remain experimental (0.9.0 notes); ProcessContainer features depend on Windows servicing (host-loopback needs KB5124010; the os-version-support table still shows BaseContainer unavailable on 24H2/25H2 while the probe shows it active here, so the docs disagree with themselves).",
+    "evidence": "docs/schema.md: \"Version `1.0.0` is the first stable contract. After `1.0.0`, breaking changes require a major version bump per semver.\"; docs/development/architecture/container-lifecycle.md: values \"are best-effort diagnostics and may change without a schema version bump\"; docs/backends/process-container/os-version-support.md T1 row vs probe_plain.json",
+    "read": "primary"
+   },
+   {
+    "claim": "No security advisories and no CVEs found for MXC itself. GitHub security-advisories endpoint returned an empty list (HTTP 200); NVD keyword searches 'microsoft mxc' and 'Execution Containers' returned 0 results; issue search for 'CVE' and 'vulnerab' returned 0. CVE mentions in the changelog are third-party dependency bumps (fast-uri, anyhow). SECURITY.md is only the stock Microsoft MSRC reporting block. No threat-model or limitations page exists in the v1.0.0 docs tree for ProcessContainer; limitations are scattered in issues and backend docs. Absence of advisories at 5 days old and 8 months of repo age is weak evidence, not assurance.",
+    "evidence": "api.github.com/repos/microsoft/mxc/security-advisories -> [] HTTP 200; services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=microsoft%20mxc -> totalResults 0; SECURITY.md @v1.0.0; release_v1.0.0.md #1124",
+    "read": "primary"
+   },
+   {
+    "claim": "Closed security-relevant Windows findings: a process-container sandbox could create a junction pointing outside its allowed paths (#462, filed 2026-05-30, closed 2026-08-05 as 'Junctions are hard-blocked in AppContainer, per comments from Security team'). Other escape and bypass-type issues in the tracker are mostly Linux (LXC capabilities, Bubblewrap seccomp), plus Seatbelt metadata leak on denied paths. Open Priority1 items (#1378, #1445, #1460, #1462) are not Windows ProcessContainer. Tracker totals: 306 issues (44 open, 232... 262 closed), 995 PRs, 104 labelled OS-Windows. All 306 issues were pulled and match the search total.",
+    "evidence": "issue #462 comment by a maintainer 2026-08-05; study-policy-maturity/issues_digest.txt; api.github.com/search/issues total_count 306",
+    "read": "primary"
+   },
+   {
+    "claim": "Project age, cadence and who writes it: repo created 2026-02-06; first npm release 2026-04-30; tags v0.6.1 06-02, v0.7.0 06-13, v0.8.0 08-22, v0.9.0 09-28, v1.0.0 10-06 (rc1 to rc5 to final within one day). 59 open issues-plus-PRs, 2,635 stars, 136 forks, MIT license, not archived, pushed within a day. 30 contributors; top are MGudgin (105 commits), SohamDas2021, bbonaby, theelliotm, richiemsft, adpa-ms. In the last 100 main commits (2026-09-28 to 2026-10-09) four people wrote 64. Many handles carry -msft or -ms suffixes and the CI uses Microsoft 1ES pipelines, which suggests a Microsoft team (employment not verified). The issue tracker is triaged by an AI workflow plus humans; the 1.0 notes were published as-is with no preview label (preview disclaimer removed in #1388).",
+    "evidence": "repo.json; contributors.json; commits_main.json; npm.json time map; release_v1.0.0.md ('Remove preview disclaimer from README by @kanismohammed in #1388')",
+    "read": "primary"
+   },
+   {
+    "claim": "Windows runtime pieces are binary-distributed and trust-gated: the elevated guarded-WPR fallback refuses to elevate plm.exe unless its Authenticode signature verifies (unsigned developer builds fail late). Telemetry is Windows-only, needs explicit consent, and is subject to administrative restriction. Retained ETL traces can hold sensitive paths and the caller must delete them.",
+    "evidence": "issue #1248 (closed 2026-09-28): \"refusing to elevate the guarded PLM binary ... Authenticode verification failed (WinVerifyTrust status 0x800b0100)\"; release_v1.0.0.md: \"Telemetry remains Windows-only, requires explicit user consent\"; docs/logging-access-denied.md on ETL retention",
+    "read": "primary"
+   }
+  ],
+  "fit_for_blarai": "Facts only. Audit mode can generate a candidate list of exact paths from a real coder run on this box (native capture is probe-available, no elevation prompt documented), but the list needs human review: it is built with containment off, grants everything the run touched, will not include per-run temp names usefully, and cannot represent the git-bash object-namespace denial. It could not replace hand-narrowing; at best it can seed it, with the output diffed against a fixed expected-folders list and the retained trace (sensitive paths) stored and deleted deliberately. What adoption would commit BlarAI to: a dependency on a 5-day-old 1.0 line whose tag is the rc5 commit; a 0.x history in which schema versions were dropped 8 days after being declared supported (and not listed as breaking); Windows servicing coupling (host-loopback needs an update this laptop does not show installed); and several open Windows bugs on the coder's actual tools (git working directory #1464, git-bash #1061, asyncio loopback #1261, non-interactive launch #1465, tool-discovery over-grant #1455). Blocking facts already known for arm E remain: git-bash and the opencode launcher fail, loopback to 127.0.0.1 unsupported by this build per the probe. The semver promise from 1.0 and the absence of advisories are on the positive side, but both are very young. Not decided here: any recommendation.",
+  "unknowns": [
+   "Audit mode was not run (rules forbid running a container), so how many entries it would emit for the coder's tools, and whether the list is usable, is unmeasured.",
+   "Whether KB5124010 or a later cumulative update fixes host-loopback on this machine: the probe says host-loopback allow is unsupported, but which servicing update would change that on build 26200.9457 is not established.",
+   "Whether PR #1463 (drive-root fix) is merged or in any tagged release after 1.0.0; only a comment pointing at it was read.",
+   "Whether #1261 (asyncio loopback hang, reported on v0.8.0 binaries) still reproduces on 1.0.0.",
+   "How BlarAI's fleet harness launches the coder (interactive session versus service or scheduled task), which decides whether #1465 applies.",
+   "Why guardedCaptureAvailable is false (missing WPR, or plm.exe trust check) is not determined; it only matters if native capture were unavailable.",
+   "Whether people on the project are Microsoft employees is inferred from handle suffixes and CI configuration, not verified.",
+   "Issue 'Priority' and 'Release v1.0' label triage was not analyzed beyond counts; whether Microsoft intends any further schema retirement after 1.0 is not stated in what was read.",
+   "The earlier note cited c6f301d5 as the v1.0.0 commit; it is main HEAD. Whether earlier arm E docs reads used tag content or main content was not rechecked (docs-all matches the tag tree: it has the 0.7.0/0.8.0 policy docs that main deleted)."
+  ]
+ }
+]

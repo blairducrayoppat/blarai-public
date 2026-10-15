@@ -77,6 +77,14 @@ a structural no-VLM guarantee is enforceable, not merely promised.
    purpose-deny + flipping `[knowledge].images_enabled` + a #662 CD-ISO guest re-provision for
    `include_images`.
 
+   *Note as of 2026-10-11 (the decision text above is kept as written in June 2026):* the
+   `guest_parser.enabled=false` "weld lock" and the "no registered URL adjudicator" lock named above no
+   longer describe the live wiring. A normal launcher boot never starts the guest parser (only a
+   `--go-live` boot does, and it overrides that flag), and the request-keyed adjudicator is registered
+   whenever `web_search` is live; the image purpose-deny (`IMAGE_INGEST_DENY_PURPOSES` in
+   `services/ui_gateway/src/url_adjudicator.py`) and `[knowledge].images_enabled` are the locks specific
+   to images. See the status block at the top of `docs/adrs/ADR-027-Egress-Policy-Network-Facing.md`.
+
 ## Consequences
 
 - A new encrypted `knowledge_images` table (image_id uuid4, doc_uuid FK CASCADE, keyed-hash dedup,

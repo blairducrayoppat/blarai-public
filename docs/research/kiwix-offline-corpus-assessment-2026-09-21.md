@@ -219,7 +219,7 @@ Its schema comment states the design constraint in one line:
 1. `[knowledge] images_enabled = false` (`default.toml:210`).
 2. An egress purpose-deny on `uc003-image-ingest` in the shared Policy-Agent adjudicator, whose
    lifting is a separate ceremony (ADR-032 Am.1).
-3. The only writer is bound to URL ingest, itself dormant behind `guest_parser.enabled = false`.
+3. The only writer is bound to URL ingest, itself dormant at rest because a normal boot never starts the guest parser (only `--go-live` does).
 4. **Structural:** `bank.get_display_image_by_id` does not exist. `generated_image_resolver.py:101`
    probes for it by `getattr`, receives `None`, and line 102 never runs. Flip every flag and a
    stored image still cannot reach the screen.

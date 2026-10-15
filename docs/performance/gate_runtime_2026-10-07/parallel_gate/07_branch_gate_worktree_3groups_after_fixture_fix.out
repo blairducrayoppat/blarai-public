@@ -1,4 +1,4 @@
-collected 13269 tests in 480 files (620 deselected); 3 groups; logs in C:\Users\mrbla\BlarAI-worktrees\_gatelogs\wt1
+collected 13269 tests in 480 files (620 deselected); 3 groups; logs in C:\Users\__USER__\BlarAI-worktrees\_gatelogs\wt1
 FAILED tests/integration/test_brain_turn_end_token.py::TestTheIdComesFromTheModel::test_resolved_from_the_real_tokenizer[qwen3-14b]
 FAILED tests/security/test_doc_pointers_and_banners.py::test_real_docs_tree_has_no_dead_markdown_pointers
 FAILED tests/security/test_doc_pointers_and_banners.py::test_verify_passes_on_the_real_tree

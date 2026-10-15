@@ -1476,3 +1476,12 @@ Also: a Windows checkout stores these files CRLF, so a Python `read`/`replace` t
   subcommand has no such option), and fetch the live card read-only with `hf download ... README.md` before editing it.
 - **A process scan on this box takes about 7 s** (380 processes, command lines read one by one): never put one in a
   per-sample loop.
+
+## PowerShell and ACL gotchas from the #1763 srt-win command-line run (2026-10-13)
+
+- `icacls <dir> /save <file> /T` follows junctions. `C:\ProgramData\Application Data` is a junction to `C:\ProgramData`, so a recursive save loops: 1.2 GB of output in 40 minutes before it was stopped. Enumerate with `[IO.Directory]::EnumerateFileSystemEntries` and `EnumerationOptions.AttributesToSkip = ReparsePoint`: about 130,000 entries under the 11 of srt-win's 13 target directories that exist here, in 31 to 38 s.
+- `ConvertFrom-Json` (PowerShell 7) turns an ISO time stamp into a `DateTime` of Kind Utc. `[datetime]::Parse($obj.stamp)` turns it back into text (no zone marker) and parses that as local time, shifting it by the UTC offset (a fresh proof read as four hours in the future). Use the `DateTime` as is (`.ToUniversalTime()`), or `[datetimeoffset]::Parse` for a string. Same class as `716fd87a`.
+- `[ordered]@{...}` passed straight to a .NET method (`$list.Add([ordered]@{...})`) fails with "Argument types do not match"; bind it to a variable first. Wrapping a `List[object]` of ordered dictionaries in `@(...)` failed the same way; `.ToArray()` works.
+- A scriptblock made with `.GetNewClosure()` runs in its own dynamic module, so `$script:X` inside it does not reach the defining file's script scope: copy what it needs into locals before creating the closure.
+- `Write-Error` under `$ErrorActionPreference = 'Stop'` is terminating: a script that does `Write-Error '...'; exit 4` exits 1, never 4. Write to `[Console]::Error` and then `exit`.
+- srt-win's first ambient write-deny stamp and unstamp makes Windows rewrite access lists below the stamped folders: entries gain the auto-inherited flag (`D:` to `D:AI`), CREATOR OWNER entries take their canonical form and stale inherited entries are re-derived from the parent. Compare access lists by class (order-aware wherever a deny entry exists), not by text, or a clean uninstall reads as a change.

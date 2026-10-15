@@ -59,7 +59,7 @@ RULE_TOP_TAGS = frozenset({
     "motto", "critical_rules", "session_start_protocol", "user_operator", "decision_boundary",
     "autonomy", "event_time_banking", "identity_split", "journal_discipline",
     "performance_capture", "vikunja", "testing", "security_by_design", "git_discipline",
-    "coding_standards", "context_handoff", "maintenance",
+    "coding_standards", "context_handoff", "maintenance", "identity_hygiene",
 })
 # State, facts and pointers: not rules. Listed so the exclusion is explicit and checkable.
 FACT_TOP_TAGS = frozenset({
@@ -78,7 +78,7 @@ IMPERATIVE_CASE = re.compile(r"\bUSE\b")  # case-sensitive: "use" alone is not a
 SCOPE_BY_TOP = {
     "git_discipline": ["git"], "journal_discipline": ["journal"],
     "performance_capture": ["perf"], "vikunja": ["vikunja"], "testing": ["tests"],
-    "security_by_design": ["security"], "context_handoff": ["process"],
+    "security_by_design": ["security"], "identity_hygiene": ["security"], "context_handoff": ["process"],
     "session_start_protocol": ["process"], "event_time_banking": ["process"],
 }
 SCOPE_KEYWORDS = (

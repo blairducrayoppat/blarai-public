@@ -1,0 +1,308 @@
+{
+  "spike": "#1682 arm 3b: persistence across a restart, absence detection, removal by key",
+  "run_id": "arm3b-20261012-150113",
+  "started": "2026-10-12T15:01:13.952-04:00",
+  "steps": {
+    "boot_time": "2026-10-12T14:59:46.5000000-04:00",
+    "uptime_seconds": 88,
+    "env": {
+      "machine_clock": "2026-10-12 15:01:14 -04:00",
+      "uptime_hours": 0.02,
+      "os": "Microsoft Windows 11 Pro 10.0.26200",
+      "ps_version": "5.1.26100.9444",
+      "process_64bit": true,
+      "bitdefender_processes": [
+        "bdntwrk",
+        "bdservicehost"
+      ],
+      "firewall_profiles": [
+        {
+          "name": "Domain",
+          "enabled": "True",
+          "default_outbound": "NotConfigured"
+        },
+        {
+          "name": "Private",
+          "enabled": "True",
+          "default_outbound": "NotConfigured"
+        },
+        {
+          "name": "Public",
+          "enabled": "True",
+          "default_outbound": "NotConfigured"
+        }
+      ],
+      "svc_mpssvc": "Running/Automatic",
+      "svc_BFE": "Running/Automatic",
+      "windows_build": "26200.9457 (25H2)",
+      "ps_host": "ConsoleHost 5.1.26100.9444 (Desktop)"
+    },
+    "arm_state": {
+      "armed_at": "2026-10-12T14:49:23.412-04:00",
+      "boot_time_at_arm": "2026-10-12T12:05:40.5000000-04:00",
+      "filters_added_at": "2026-10-12T14:49:23.911-04:00",
+      "post_task": "blarai-arm3b-post-reboot",
+      "veto_task": "blarai-arm3b-veto",
+      "wrapper_task": "blarai-arm3b-arm-run",
+      "veto_fires_at": "2026-10-12T15:19:23.4120917-04:00",
+      "shutdown_command": "shutdown.exe /r /t 600 /c arm 3b",
+      "shutdown_delay_seconds": 600,
+      "out_dir": "C:\\ProgramData\\BlarAI\\arm3b-out",
+      "account_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+      "flags": {
+        "filter:block-account-v4": "0x1",
+        "filter:block-account-v6": "0x1",
+        "sublayer:sublayer": "0x1",
+        "provider:provider": "0x1"
+      }
+    },
+    "reboot_confirmed": true,
+    "fence_state_at_start": {
+      "State": "PRESENT",
+      "Present": [
+        "filter:block-account-v4",
+        "filter:block-account-v6",
+        "sublayer:sublayer",
+        "provider:provider"
+      ],
+      "Missing": [],
+      "AllPersistent": true,
+      "Flags": {
+        "filter:block-account-v4": "0x1",
+        "filter:block-account-v6": "0x1",
+        "sublayer:sublayer": "0x1",
+        "provider:provider": "0x1"
+      },
+      "Error": null
+    },
+    "absence_check_at_start": {
+      "allowed": true,
+      "state": "PRESENT",
+      "reason": "fence present: all four objects exist"
+    },
+    "network": {
+      "up": true,
+      "attempts": 1,
+      "seconds": 0.1,
+      "last_error": ""
+    },
+    "operator_control": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-12T15:01:17.5604247-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-12T15:01:17.5918082-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-12T15:01:17.6246183-04:00"
+      }
+    ],
+    "account_probe_under_fence": {
+      "started": true,
+      "outcome": null,
+      "guard_reason": "fence present: all four objects exist",
+      "run": {
+        "run_id": "arm3b-block-150118",
+        "expected_blocked": true,
+        "started": "2026-10-12T15:01:18.003-04:00",
+        "task_ready": true,
+        "task_started": true,
+        "task_start": {
+          "Started": true,
+          "Detail": "state=Ready"
+        },
+        "valid": true,
+        "schema_violations": [],
+        "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+        "outbound_probe": {
+          "probe": {
+            "target": "1.1.1.1:443",
+            "connected": false,
+            "ms": 28,
+            "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+            "error_code": 10013,
+            "t": "2026-10-12T15:01:20.621-04:00"
+          },
+          "blocked": true,
+          "expected_blocked": true
+        },
+        "finished": "2026-10-12T15:01:21.915-04:00"
+      }
+    },
+    "removal": {
+      "Ok": true,
+      "Rows": [
+        {
+          "kind": "filter",
+          "key": "f1300003-0000-4d8e-9a31-2b6d4c8e3f21",
+          "name": "block-account-v4",
+          "status": "deleted"
+        },
+        {
+          "kind": "filter",
+          "key": "f1300004-0000-4d8e-9a31-2b6d4c8e3f22",
+          "name": "block-account-v6",
+          "status": "deleted"
+        },
+        {
+          "kind": "sublayer",
+          "key": "7e1f6a10-5c0b-4d8e-9a31-2b6d4c8e3f02",
+          "name": "sublayer",
+          "status": "deleted"
+        },
+        {
+          "kind": "provider",
+          "key": "7e1f6a10-5c0b-4d8e-9a31-2b6d4c8e3f01",
+          "name": "provider",
+          "status": "deleted"
+        }
+      ],
+      "Errors": [],
+      "StateAfter": {
+        "State": "ABSENT",
+        "Present": [],
+        "Missing": [
+          "filter:block-account-v4",
+          "filter:block-account-v6",
+          "sublayer:sublayer",
+          "provider:provider"
+        ],
+        "AllPersistent": false,
+        "Flags": {},
+        "Error": null
+      },
+      "At": "2026-10-12T15:01:21.971-04:00"
+    },
+    "objects_existed_seconds": 718.1,
+    "absence_check_after_removal": {
+      "allowed": false,
+      "state": "ABSENT",
+      "reason": "fence ABSENT: the account is not allowed to run"
+    },
+    "guarded_probe_after_removal": {
+      "started": false,
+      "outcome": "fence_absent_not_started"
+    },
+    "operator_after_removal": {
+      "target": "1.1.1.1:443",
+      "ok": true,
+      "ms": 20,
+      "error": "",
+      "t": "2026-10-12T15:01:22.1523872-04:00"
+    },
+    "account_probe_after_removal_unguarded": {
+      "run_id": "arm3b-after-150122",
+      "expected_blocked": false,
+      "started": "2026-10-12T15:01:22.152-04:00",
+      "task_ready": true,
+      "task_started": true,
+      "task_start": {
+        "Started": true,
+        "Detail": "state=Ready"
+      },
+      "valid": true,
+      "schema_violations": [],
+      "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+      "outbound_probe": {
+        "probe": {
+          "target": "1.1.1.1:443",
+          "connected": true,
+          "ms": 39,
+          "error": "",
+          "error_code": 0,
+          "t": "2026-10-12T15:01:23.722-04:00"
+        },
+        "blocked": false,
+        "expected_blocked": false
+      },
+      "finished": "2026-10-12T15:01:25.130-04:00"
+    },
+    "engine_open_attempts": 1
+  },
+  "exports": [
+    {
+      "label": "post-reboot-before-removal",
+      "at": "2026-10-12T15:01:17.624-04:00",
+      "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\arm3b-filters-post-reboot-before-removal.xml",
+      "ok": true,
+      "bytes": 3511754,
+      "sha256": "AD4ECD448F01C20C8036F5C616EEBD275596D229E058591AC2B7D6CED12EF282",
+      "summary": {
+        "marker": "BlarAI #1682",
+        "marker_count": 3,
+        "keys_expected": [
+          "f1300003-0000-4d8e-9a31-2b6d4c8e3f21",
+          "f1300004-0000-4d8e-9a31-2b6d4c8e3f22"
+        ],
+        "keys_found": [
+          "f1300003-0000-4d8e-9a31-2b6d4c8e3f21",
+          "f1300004-0000-4d8e-9a31-2b6d4c8e3f22"
+        ],
+        "keys_missing": [],
+        "ok": true
+      },
+      "error": null,
+      "seconds": 0.3
+    },
+    {
+      "label": "post-reboot-after-removal",
+      "at": "2026-10-12T15:01:21.978-04:00",
+      "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\arm3b-filters-post-reboot-after-removal.xml",
+      "ok": false,
+      "bytes": 3508782,
+      "sha256": "34FC1A285270D58ABFF661B6E23B12F8D21D9A666A4C92EE8B8F8A91F8478ACF",
+      "summary": {
+        "marker": "BlarAI #1682",
+        "marker_count": 0,
+        "keys_expected": [
+          "f1300003-0000-4d8e-9a31-2b6d4c8e3f21",
+          "f1300004-0000-4d8e-9a31-2b6d4c8e3f22"
+        ],
+        "keys_found": [],
+        "keys_missing": [
+          "f1300003-0000-4d8e-9a31-2b6d4c8e3f21",
+          "f1300004-0000-4d8e-9a31-2b6d4c8e3f22"
+        ],
+        "ok": false
+      },
+      "error": null,
+      "seconds": 0.2
+    }
+  ],
+  "attempt": 1,
+  "max_attempts": 3,
+  "expired": false,
+  "claim_inputs": {
+    "c10_survived_reboot": true,
+    "c10_note": "true only when a restart since arming is confirmed (boot time later than the arm time) and all four objects read back with the persistent flag at startup",
+    "c11_gate_refused_when_absent": true,
+    "c11_gate_at_start": "PRESENT"
+  },
+  "decision_inputs": {
+    "FenceAtStart": "PRESENT",
+    "AllPersistentAtStart": true,
+    "ProbeValid": true,
+    "ProbeBlocked": true,
+    "AddRecorded": true,
+    "RepeatAttempt": false,
+    "RemovalVerified": true,
+    "RebootConfirmed": true,
+    "NetworkUp": true,
+    "GuardRefusedAfterRemoval": true
+  },
+  "exit_code": 0,
+  "exit_reason": "the persistent set survived the restart (all four objects, persistent), the account was blocked, removal by key verified, the gate refused once the set was gone",
+  "finished": "2026-10-12T15:01:25.159-04:00"
+}

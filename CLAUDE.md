@@ -252,6 +252,7 @@ Security is designed IN from the first line, never reviewed in at the end. Every
 - coding.md — docstring truth and language standards; delivered on source files.
 - handoff.md — landing card content; the card is docs/handoffs/<topic>-landing-<YYYYMMDD>.md from docs/governance/handoff-brief-template.md.
 - doctrine.md — upkeep of CLAUDE.md and these files; delivered when either is edited.
+- identity.md — the public-identifier scrub and the operator-name ratchet; delivered on docs, scripts, tools, tests and the publishing scripts.
 - Each rule has one home, CLAUDE.md or one of these files; docs/governance/rules-corpus.yaml records which.
 </rules_index>
 

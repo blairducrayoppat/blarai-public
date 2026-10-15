@@ -1,0 +1,5 @@
+# scope-1406 findings (2026-10-11). Raw API dumps in this folder (pr.json, files.json, tags.json, releases.json, networking.md, bcr-main.rs, bcr-v1.0.0.rs, probe-out.txt).
+- PR #1406 merged 2026-10-06T23:16:41Z, squash 70fc7d52, 1 commit after v1.0.0 (7bf21024, 22:42:43Z). Not in v1.0.0 (v1.0.0 base_container_runner.rs lacks psec_1_0_proxy_loopback_workaround; main has it).
+- Latest release v1.0.0 (2026-10-07T05:54Z) mxc-release-binaries.zip 536398432 B sha256:0bb483b3...fe828ed. No tag/release after v1.0.0. npm @microsoft/mxc-sdk latest=1.0.0.
+- Host --probe: baseContainerApiPresent=true, baseContainerSupportsIngressHostLoopbackAllow=false, no identity-less field (v1.0.0 predates it).
+- No cargo/rustc on machine, no ~/.cargo. VS 2022 BuildTools present (MSVC 14.44.35207, SDK 10.0.26100.0).

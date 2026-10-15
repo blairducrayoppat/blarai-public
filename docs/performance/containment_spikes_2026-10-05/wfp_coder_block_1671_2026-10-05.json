@@ -1,0 +1,182 @@
+{
+  "ticket": "#1671",
+  "title": "Raw WFP block keyed to the dedicated coder account (blarai-coder): egress block runs",
+  "date": "2026-10-04",
+  "measured": "2026-10-04T23:59:31-04:00 to 2026-10-05T00:00:28-04:00 (3 runs inside about 57 s: a repeat, not independent replications)",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "os": "Windows 11 Pro",
+    "note": "Intel Core Ultra 7 258V, Windows 11 Pro; no GPU or model involved"
+  },
+  "software": {
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "powershell": "5.1.26100.9444",
+    "process_64bit": true,
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ],
+    "firewall_profiles": [
+      {
+        "name": "Domain",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      }
+    ],
+    "BFE": "Running/Automatic",
+    "mpssvc": "Running/Automatic",
+    "openvino": "not applicable",
+    "gpu_driver": "not applicable"
+  },
+  "method": "wfp-coder-egress-spike.ps1 -Live -HoldSeconds 100; elevated; dynamic WFP session; 1 provider + 1 sublayer + 4 filters (permit loopback V4/V6 weight 0x2000, block V4/V6 weight 0x1000), all keyed to the coder SID; one TCP connect to 1.1.1.1:443 per reading; blocked = no completed connect within 5000 ms or an exception",
+  "runs": [
+    {
+      "source": "docs/research/containment-evidence-2026-10-05/wfp-spike/result-20261004-235941.json",
+      "started": "2026-10-04T23:59:31.0080890-04:00",
+      "finished": "2026-10-04T23:59:41.8994471-04:00",
+      "exit_code": 0,
+      "requested_hold_seconds_recorded": 100,
+      "uptime_hours": 18.94,
+      "filter_ids": [
+        407213,
+        407214,
+        407215,
+        407216
+      ],
+      "filters_added_to_post_removal_read_s": 5.13,
+      "filters_added_to_during_block_read_s": 3.21,
+      "operator_baseline_connects_ok": 6,
+      "operator_baseline_connects": 6,
+      "operator_baseline_ms": [
+        24,
+        21,
+        23,
+        22,
+        20,
+        20
+      ],
+      "operator_watchdog_ok": 3,
+      "operator_watchdog": 3,
+      "operator_during_ok": 2,
+      "operator_during": 2,
+      "coder_baseline_outbound_blocked": false,
+      "coder_during_outbound_blocked": true,
+      "coder_during_loopback_ok": true,
+      "coder_after_removal_outbound_blocked": false,
+      "removal_objects_absent": true
+    },
+    {
+      "source": "docs/research/containment-evidence-2026-10-05/wfp-spike/result-20261005-000002.json",
+      "started": "2026-10-04T23:59:51.6094561-04:00",
+      "finished": "2026-10-05T00:00:02.4913290-04:00",
+      "exit_code": 0,
+      "requested_hold_seconds_recorded": 100,
+      "uptime_hours": 18.95,
+      "filter_ids": [
+        407217,
+        407218,
+        407219,
+        407220
+      ],
+      "filters_added_to_post_removal_read_s": 5.35,
+      "filters_added_to_during_block_read_s": 3.18,
+      "operator_baseline_connects_ok": 6,
+      "operator_baseline_connects": 6,
+      "operator_baseline_ms": [
+        25,
+        23,
+        23,
+        22,
+        23,
+        22
+      ],
+      "operator_watchdog_ok": 3,
+      "operator_watchdog": 3,
+      "operator_during_ok": 2,
+      "operator_during": 2,
+      "coder_baseline_outbound_blocked": false,
+      "coder_during_outbound_blocked": true,
+      "coder_during_loopback_ok": true,
+      "coder_after_removal_outbound_blocked": false,
+      "removal_objects_absent": true
+    },
+    {
+      "source": "docs/research/containment-evidence-2026-10-05/wfp-spike/result-20261005-000028.json",
+      "started": "2026-10-05T00:00:17.8888847-04:00",
+      "finished": "2026-10-05T00:00:28.2801659-04:00",
+      "exit_code": 0,
+      "requested_hold_seconds_recorded": 100,
+      "uptime_hours": 18.96,
+      "filter_ids": [
+        407221,
+        407222,
+        407223,
+        407224
+      ],
+      "filters_added_to_post_removal_read_s": 5.13,
+      "filters_added_to_during_block_read_s": 3.2,
+      "operator_baseline_connects_ok": 6,
+      "operator_baseline_connects": 6,
+      "operator_baseline_ms": [
+        24,
+        20,
+        22,
+        23,
+        26,
+        21
+      ],
+      "operator_watchdog_ok": 3,
+      "operator_watchdog": 3,
+      "operator_during_ok": 2,
+      "operator_during": 2,
+      "coder_baseline_outbound_blocked": false,
+      "coder_during_outbound_blocked": true,
+      "coder_during_loopback_ok": true,
+      "coder_after_removal_outbound_blocked": false,
+      "removal_objects_absent": true
+    }
+  ],
+  "summary": {
+    "runs": 3,
+    "exit_code_all_runs": 0,
+    "coder_open_at_baseline": "3 of 3",
+    "coder_blocked_during": "3 of 3",
+    "coder_open_after_removal": "3 of 3",
+    "operator_unaffected": "3 of 3 (baseline 6/6, watchdog 3/3, during 2/2 in each run)",
+    "loopback_ok_during": "3 of 3 (stub listener started by the operator script; coder as client)"
+  },
+  "conditions_not_recorded": [
+    "thermal state",
+    "what else was running on the machine",
+    "RAM"
+  ],
+  "not_measured": [
+    "reboot persistence (dynamic by design)",
+    "IPv6 destinations (v6 filters added, never probed)",
+    "UDP, DNS, ports other than 443",
+    "Bitdefender update or restart during a block",
+    "other antivirus",
+    "a real coder dispatch under the block",
+    "any hold longer than about 5 s",
+    "latency cost of the filters (no with/without timing comparison)"
+  ],
+  "caveats": [
+    "The result files record hold_seconds=100 (requested cap); the filters stood at most about 5.1 to 5.4 s (add to post-removal read); engine close is not timestamped.",
+    "secret_reads_denied=true in these files is vacuous (empty path list).",
+    "Operator connect times are 19 to 37 ms and are not a latency finding."
+  ],
+  "claims_table": "docs/research/account-level-containment-evidence-2026-10-05.md (C1, C1b)"
+}

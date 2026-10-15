@@ -1,0 +1,18 @@
+{
+ "what": "Phrases that must not appear in a published file, stored as parts so that this file carries none of them. The lock tests/security/test_public_snapshot_excludes_private_material.py joins the parts and scans the index; the publisher's scratch test in the agentic-setup repository joins the same parts and checks that its private pattern file catches each phrase, in its plain form and in three altered forms. A phrase is the concatenation of its parts. The numbering phrases are the target's name, then one separator from 'before', then the stem, then one separator from 'after', then the number.",
+ "target": ["no", "labs"],
+ "phrases": [
+  ["Job", " Documents"],
+  ["Applications", " & Interview"],
+  ["Staff", " Solutions Engineer"],
+  ["unsolicited", " approach"],
+  ["no job", " request"],
+  ["ruling", " D14"],
+  ["STRATEGY", "_PLAN"],
+  ["CLAIMS", "_REGISTER"],
+  ["CONTRIBUTE", ".md"],
+  ["contact-form", " message"],
+  ["career", " folder"]
+ ],
+ "numbering": {"before": ["", " ", "-", "_"], "stem": ["it", "em"], "after": ["", " ", "-", "_"], "number": "3"}
+}

@@ -1,0 +1,242 @@
+{
+  "ticket": "#1689",
+  "title": "Confined-model spike: Qwen3.5-4B INT8 on the Arc 140V served by a restricted local account over loopback",
+  "date": "2026-10-05",
+  "measured": "2026-10-05T15:57:30-04:00 to 2026-10-05T16:03:04-04:00 (Test A x2, Test B x1, then the in-process control); the three confined runs span about 5 minutes: a repeat, not independent replications",
+  "hardware": {
+    "cpu": "Intel(R) Core(TM) Ultra 7 258V",
+    "gpu": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+    "npu": "Intel(R) AI Boost",
+    "ram_total_gb": 31.32
+  },
+  "software": {
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "powershell": "5.1.26100.9444",
+    "python": "3.11.9",
+    "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+    "openvino_genai": "2026.4.0.0-3407-7ea2546852a",
+    "gpu_driver": "32.0.101.8831 (from Vikunja #1689 c.3896 as cited in the claims table; NOT recorded in the run files)",
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ]
+  },
+  "model": {
+    "dir": "Qwen3.5-4B-int8-ov",
+    "precision": "INT8",
+    "device": "GPU",
+    "decoding": "plain generation; no speculative decoding, no MTP, no prefix cache"
+  },
+  "method": "Throwaway batch-logon account blarai-spike (not admin, session 0, not interactive, medium integrity) via scheduled task; 2 generations per run of 64 tokens on one prompt ('Explain in three sentences why the sky is blue.'); tok_per_s_tpot = output tokens per decode time, tok_per_s_wall = tokens over generation wall time. Test B served over 127.0.0.1 while a raw WFP block keyed to the account stood; the operator made one 32-token request. Control = same model and prompt, in-process as the operator, run afterwards.",
+  "runs": [
+    {
+      "run": "Test A run 1",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testA-20261005-155840.json",
+      "started": "2026-10-05T15:57:30.454-04:00",
+      "load_s": 24.773,
+      "free_gb": 19.4,
+      "in_use_gb": 11.92,
+      "uptime_hours": 34.93,
+      "verdict": {
+        "Code": 4,
+        "Reason": "failed steps: file_denial"
+      }
+    },
+    {
+      "run": "Test A run 2",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testA-20261005-155954.json",
+      "started": "2026-10-05T15:59:14.991-04:00",
+      "load_s": 17.192,
+      "free_gb": 19.56,
+      "in_use_gb": 11.76,
+      "uptime_hours": 34.95,
+      "verdict": {
+        "Code": 0,
+        "Reason": "all steps passed"
+      }
+    },
+    {
+      "run": "Test B",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testB-20261005-160210.json",
+      "started": "2026-10-05T16:00:02.319-04:00",
+      "load_s": 33.685,
+      "free_gb": 19.55,
+      "in_use_gb": 11.77,
+      "uptime_hours": 34.95,
+      "exit_code": 0
+    }
+  ],
+  "generations_confined": [
+    {
+      "run": "Test A run 1",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testA-20261005-155840.json",
+      "load_s": 24.773,
+      "generation_index": 1,
+      "generated_tokens": 64,
+      "ttft_ms": 3847.72,
+      "tpot_ms": 202.47,
+      "tok_per_s_tpot": 4.94,
+      "tok_per_s_wall": 3.85,
+      "wall_ms": 16622.5,
+      "started": "2026-10-05T15:57:58.406-04:00"
+    },
+    {
+      "run": "Test A run 1",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testA-20261005-155840.json",
+      "load_s": 24.773,
+      "generation_index": 2,
+      "generated_tokens": 64,
+      "ttft_ms": 525.37,
+      "tpot_ms": 269.02,
+      "tok_per_s_tpot": 3.72,
+      "tok_per_s_wall": 3.66,
+      "wall_ms": 17478.1,
+      "started": "2026-10-05T15:58:15.030-04:00"
+    },
+    {
+      "run": "Test A run 2",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testA-20261005-155954.json",
+      "load_s": 17.192,
+      "generation_index": 1,
+      "generated_tokens": 64,
+      "ttft_ms": 2368.44,
+      "tpot_ms": 118.12,
+      "tok_per_s_tpot": 8.47,
+      "tok_per_s_wall": 6.52,
+      "wall_ms": 9815.9,
+      "started": "2026-10-05T15:59:34.069-04:00"
+    },
+    {
+      "run": "Test A run 2",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testA-20261005-155954.json",
+      "load_s": 17.192,
+      "generation_index": 2,
+      "generated_tokens": 64,
+      "ttft_ms": 162.11,
+      "tpot_ms": 128.76,
+      "tok_per_s_tpot": 7.77,
+      "tok_per_s_wall": 7.73,
+      "wall_ms": 8277.3,
+      "started": "2026-10-05T15:59:43.886-04:00"
+    },
+    {
+      "run": "Test B (WFP block standing)",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testB-20261005-160210.json",
+      "load_s": 33.685,
+      "generation_index": 1,
+      "generated_tokens": 64,
+      "ttft_ms": 2698.3,
+      "tpot_ms": 147.77,
+      "tok_per_s_tpot": 6.77,
+      "tok_per_s_wall": 5.33,
+      "wall_ms": 12016.4,
+      "started": "2026-10-05T16:00:40.572-04:00"
+    },
+    {
+      "run": "Test B (WFP block standing)",
+      "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/testB-20261005-160210.json",
+      "load_s": 33.685,
+      "generation_index": 2,
+      "generated_tokens": 64,
+      "ttft_ms": 275.62,
+      "tpot_ms": 217.53,
+      "tok_per_s_tpot": 4.6,
+      "tok_per_s_wall": 4.57,
+      "wall_ms": 13991.8,
+      "started": "2026-10-05T16:00:52.593-04:00"
+    }
+  ],
+  "generations_control_in_process": {
+    "source": "docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/control/control-inproc.json",
+    "started": "2026-10-05T16:02:18.944-04:00",
+    "load_s": 13.973,
+    "generations": [
+      {
+        "generation_index": 1,
+        "generated_tokens": 64,
+        "ttft_ms": 3393.25,
+        "tpot_ms": 207.36,
+        "tok_per_s_tpot": 4.82,
+        "tok_per_s_wall": 3.89,
+        "wall_ms": 16463.6
+      },
+      {
+        "generation_index": 2,
+        "generated_tokens": 64,
+        "ttft_ms": 266.19,
+        "tpot_ms": 222.21,
+        "tok_per_s_tpot": 4.5,
+        "tok_per_s_wall": 4.49,
+        "wall_ms": 14267.4
+      }
+    ]
+  },
+  "summary": {
+    "confined_generations": 6,
+    "confined_tok_per_s_tpot_min_max": [
+      3.72,
+      8.47
+    ],
+    "confined_tok_per_s_wall_min_max": [
+      3.66,
+      7.73
+    ],
+    "spread_within_confined_tpot_ratio": 2.28,
+    "control_tok_per_s_tpot_min_max": [
+      4.5,
+      4.82
+    ],
+    "control_tok_per_s_wall_min_max": [
+      3.89,
+      4.49
+    ],
+    "load_s_confined": [
+      24.773,
+      17.192,
+      33.685
+    ],
+    "load_s_control": 13.973,
+    "test_b_operator_request": {
+      "http_status": 200,
+      "ms": 7670,
+      "model_loaded": true,
+      "server_side_request": {
+        "t": "2026-10-05T16:01:08.167-04:00",
+        "peer": "127.0.0.1",
+        "path": "/",
+        "status": 200,
+        "model": "model",
+        "wall_ms": 7572.9,
+        "generated_tokens": 32,
+        "ttft_ms": 522.71
+      }
+    },
+    "test_b_account_outbound_during_block": "PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+    "test_b_operator_watchdog_ok": "94 of 94",
+    "test_b_exit_code": 0
+  },
+  "conditions_not_recorded": [
+    "thermal state (no cold-GPU gate)",
+    "per-process CPU load (the claims table says builders were loading the CPU; the run files do not record it)",
+    "GPU driver in the run files"
+  ],
+  "not_measured": [
+    "any speed ratio confined vs unconfined (needs the repo's cold-GPU gate, thermal zone at or below 72 C per generation)",
+    "the 14B INT4 plus draft pipeline, MTP, prefix cache, speculative decoding",
+    "streaming, concurrent clients",
+    "any prompt other than one short question; 64 tokens per generation (32 in the served request)",
+    "other drivers",
+    "the account as CLIENT of a real server while blocked (done later, 2026-10-09, arm 1; not part of this entry)",
+    "memory of the model process (host In-Use only)"
+  ],
+  "caveats": [
+    "Test A run 1 used an earlier spike-run-test.ps1 that no longer exists; its file_denial step failed on a probe bug, not on the GPU path.",
+    "Scripts were hardened after the runs; results come from confined-model-spike/runs/; as-run/ holds a reconstruction of the scripts that produced them.",
+    "The control started 16:02:18.9, after Test B finished 16:02:10.7 (the ticket comment 'at the same time' was corrected in c.3897).",
+    "Model output is a 'Thinking Process' reasoning prefix; the 64 tokens are not an answer-quality sample."
+  ],
+  "claims_table": "docs/research/account-level-containment-evidence-2026-10-05.md (C3a, C3b, C6a)"
+}

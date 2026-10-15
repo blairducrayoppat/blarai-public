@@ -24,7 +24,7 @@
     "draftless": {
       "label": "draftless",
       "server_args": [],
-      "log": "C:\\Users\\mrbla\\models\\gguf-769\\results\\specdecode_draftless.log",
+      "log": "C:\\Users\\__USER__\\models\\gguf-769\\results\\specdecode_draftless.log",
       "offload_evidence": [
         "0.00.462.895 I load_tensors: offloaded 41/41 layers to GPU",
         "0.03.617.711 I load_tensors: offloaded 41/41 layers to GPU"
@@ -72,11 +72,11 @@
       "label": "specdecode",
       "server_args": [
         "-md",
-        "C:\\Users\\mrbla\\models\\gguf-769\\Qwen3-0.6B-Q8_0.gguf",
+        "C:\\Users\\__USER__\\models\\gguf-769\\Qwen3-0.6B-Q8_0.gguf",
         "-ngld",
         "99"
       ],
-      "log": "C:\\Users\\mrbla\\models\\gguf-769\\results\\specdecode_specdecode.log",
+      "log": "C:\\Users\\__USER__\\models\\gguf-769\\results\\specdecode_specdecode.log",
       "offload_evidence": [
         "0.01.630.278 I load_tensors: offloaded 41/41 layers to GPU",
         "0.09.216.539 I load_tensors: offloaded 29/29 layers to GPU"

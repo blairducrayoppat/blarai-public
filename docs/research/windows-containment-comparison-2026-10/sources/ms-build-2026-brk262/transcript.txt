@@ -1,0 +1,763 @@
+[00:01] All right, welcome everyone. Welcome,
+[00:03] great to see you all in person, as well
+[00:05] to those of you watching online.
+[00:08] So, here's the thing. Agents today,
+[00:10] they're no longer confined to a chat
+[00:11] box. They're not waiting for you and I
+[00:13] to tell them what to do. They're taking
+[00:15] action. They're calling tools, they're
+[00:18] running workflows end-to-end that are
+[00:20] pretty complex that would have been
+[00:21] almost unimaginable just a few months
+[00:23] ago. So, the problem is this. It's not
+[00:26] about capabilities anymore. Agents are
+[00:29] plenty capable. And we're a lot more
+[00:31] productive as a result of that. Now,
+[00:33] what we want is we want agents to run
+[00:35] safely and predictably. And in this
+[00:37] session, we're going to learn all about
+[00:39] the capabilities Windows is providing to
+[00:41] help your agents do just that. My name
+[00:44] is Krupa. I'm a product manager on the
+[00:46] Windows platform and developer team. I'm
+[00:47] joined by Stewart, an architect also on
+[00:50] the Windows platform and developer team,
+[00:52] and Patrick, a product manager at
+[00:54] GitHub. You'll be hearing plenty from
+[00:56] Stewart and Patrick throughout this
+[00:58] session.
+[00:59] Now, before we go into the technical
+[01:01] details, I want to take a step back. As
+[01:03] you can see from these headlines, the
+[01:05] way agents are being used today is not
+[01:07] great. As agents are gaining more
+[01:10] capabilities and working with greater
+[01:11] autonomy, they're causing real problems
+[01:14] either in the wild or maybe even within
+[01:16] our own organizations. And if I had to
+[01:19] generalize, the reason is that we're
+[01:21] moving very quickly from AI that
+[01:25] responds and answers to AI that acts
+[01:28] with agency. So, when an agent makes a
+[01:30] small mistake, like sending an unwanted
+[01:32] email or modifying a file or even making
+[01:36] something public it shouldn't, it gets
+[01:37] amplified. It creates a chain reaction.
+[01:39] The blast radius of the damage it causes
+[01:42] is much larger. Here's a great example
+[01:44] where you're using an agent, it's doing
+[01:46] some coding, deletes your production
+[01:47] database. Not great.
+[01:49] Even in situations where you might have
+[01:51] seen this example hitting your newsfeed
+[01:53] a short while ago where
+[01:54] the agent is operating on your email,
+[01:57] you're telling it to stop. Don't delete
+[01:58] it. Agent acknowledges, goes ahead and
+[02:00] deletes it anyway.
+[02:02] These are the kinds of examples that we
+[02:04] need to close at a platform layer.
+[02:06] Because when agents can operate on the
+[02:07] things that matter to us, files, code,
+[02:10] email, all the systems you and I rely
+[02:12] on, we cannot rely on the agent to
+[02:15] self-govern. We cannot rely on the agent
+[02:17] to
+[02:18] basically follow good intentions. It's
+[02:21] even best effort prompting and prompt
+[02:23] engineering can't solve this either. It
+[02:25] really requires a more holistic
+[02:26] solution. And also because it's not just
+[02:29] the agent itself, the entire environment
+[02:32] the agent operates in is a potential
+[02:34] risk vector. An agent can be talking to
+[02:36] humans and there's risk. Agent to tools,
+[02:38] agent to applications, agent to agent,
+[02:41] or even agent to LLM. All of these are
+[02:44] risk vectors and each of them has a risk
+[02:46] profile that we cannot possibly account
+[02:48] for all from just our own vantage point.
+[02:51] And this is not just a a theoretical
+[02:53] problem. So, I'm going to move away from
+[02:55] examples and headlines to something that
+[02:58] teams are actively exploring. I'm going
+[02:59] to turn it over to Patrick to talk about
+[03:01] what he and the GitHub Copilot team have
+[03:03] identified.
+[03:04] Wonderful.
+[03:05] &gt;&gt; Thanks, Grupa.
+[03:07] At GitHub, we get the unique opportunity
+[03:09] to see where modern model performance
+[03:12] intersects with user behavior and how
+[03:14] those trends alter over time.
+[03:16] If you take a look at the Copilot CLI,
+[03:18] one of the most common occurrences that
+[03:20] happens over time is users start
+[03:23] auto-approving, removing the dates, and
+[03:25] letting their agents run for longer and
+[03:26] longer sessions.
+[03:28] When you scale it up to the Copilot SDK,
+[03:30] it rides on top of our Copilot CLI
+[03:32] server. But one of the unique
+[03:34] differences that we did when we built
+[03:35] the Copilot SDK was design it in a way
+[03:37] that was made for SDK integrators and
+[03:40] not for Copilot CLI users. What that led
+[03:43] to was a mismatch between our
+[03:45] permissions model inside of our SDK and
+[03:47] one in our CLI. Certain integrators
+[03:49] expected our SDK to be fully
+[03:51] configurable, come with nothing out of
+[03:53] the box already set. All the CLI users
+[03:55] expected it to protect their current
+[03:57] working directory and other artifacts on
+[03:59] their system.
+[04:01] When you look a little bit farther into
+[04:03] the orchestration side, uh our
+[04:05] orchestrator inside of the Copilot CLI
+[04:07] and SDK has become much more powerful,
+[04:08] especially over the last 6 months. Where
+[04:11] our jobs typically ran from 3 to 5 to 10
+[04:13] minutes or so, they can now run for 30
+[04:15] minutes or more, which means that the
+[04:17] problems in these two first segments
+[04:19] compound exponentially with time,
+[04:21] especially as agents get more and more
+[04:22] powerful.
+[04:26] &gt;&gt; Thank you, Patrick. So, the problem is
+[04:28] very clear. Agents are operating with
+[04:30] high agency and they're running with
+[04:32] limited to no guardrails. Then the
+[04:34] question then shifts to what does a
+[04:36] platform need to provide to make agents
+[04:38] safe by design? That's where Windows
+[04:41] comes in. From its very beginning,
+[04:43] Windows has always evolved to handle
+[04:45] needs of its users. The part that's
+[04:47] changed is this, the definition of a
+[04:49] user is changing. What is a user? Today,
+[04:52] they now include agents acting on their
+[04:54] behalf, and that detail fundamentally
+[04:57] changes how Windows and the platform
+[04:59] need to react. And to account for this,
+[05:04] there are three key platform
+[05:05] capabilities that we're introducing that
+[05:07] when agents adopt, they can work with
+[05:09] agents as a new type of user and also
+[05:11] ensuring agents can run safely and
+[05:13] reliably. Let's walk through very
+[05:15] quickly what these primitives are and go
+[05:17] into more detail in a few moments. First
+[05:20] agent identity. The agent needs to have
+[05:22] an identity distinct from that of the
+[05:24] human user.
+[05:26] Second is containment. We don't want our
+[05:28] agent to have full access to all the
+[05:30] capabilities that our that we have as as
+[05:34] people. You know, we can't give it
+[05:35] unfettered access to all of our files
+[05:37] and all of our data. What we need is we
+[05:39] need to have agents running in a
+[05:41] controlled environment where their blast
+[05:43] radius is limited. And the last one is
+[05:46] manageability. For many of us that means
+[05:48] an IT admin can deploy, monitor, govern,
+[05:52] and enforce the policies that dictate
+[05:54] what an agent can do and also what it
+[05:56] cannot do. So, to dive deeper into this,
+[05:59] starting with identity, I'm going to
+[06:00] turn it over to Stuart.
+[06:02] &gt;&gt; Great. Thank you, Krupa.
+[06:04] So, as Krupa said, one of the most
+[06:05] interesting things about agents is what
+[06:08] is the identity of an agent. I'm here to
+[06:10] tell you
+[06:11] agents aren't you.
+[06:13] No matter what we do today, the funny
+[06:15] thing about where we got to is most
+[06:17] agents run as you, the user. If you use
+[06:20] a CLI, they're running in your session,
+[06:23] they have access to all your data, the
+[06:24] program itself is controlling what they
+[06:26] do, but they're not you. Imagine what
+[06:29] would happen if the agent could get
+[06:30] access to almost anything from you and
+[06:33] do whatever it wants. We need the system
+[06:36] to be able to enforce a separation
+[06:38] between an agent and you, and to be able
+[06:41] to enforce the capabilities and promises
+[06:44] that define what an agent is different
+[06:48] than what a user is. In general, what a
+[06:50] user is and what they do on a machine
+[06:52] today can have a lot more rights than
+[06:55] some of what we want our agents to be
+[06:56] able to do. Do you want your agent to be
+[06:59] admin on your machine? It's a question
+[07:01] that you should ask. So, for us, the way
+[07:03] we think about it is this: agents are a
+[07:05] new type of identity in the system. When
+[07:08] you think about users and devices and
+[07:10] applications, we identify those on the
+[07:13] system. Agents aren't just the processes
+[07:16] of the CLI that you're using or whatever
+[07:19] agentic application that you're using,
+[07:21] they themselves are an intrinsic
+[07:23] first-class entity on the system. Just
+[07:26] like users, apps, and devices, they need
+[07:28] to have a security principle. We need to
+[07:30] be able to make assertions [snorts]
+[07:32] about them, things that define security
+[07:35] permissions that the system itself can
+[07:37] enforce. We need to be able to author
+[07:39] policies that define what are the things
+[07:42] that they are allowed to be members of,
+[07:44] to join, to understand in general what
+[07:47] an agent is allowed to do in the system.
+[07:50] And whatever they do do needs to be
+[07:53] audited by the system. We need to have
+[07:55] logs that show what an agent does so
+[07:57] that we can separate the actions of the
+[07:59] agent from the actions of the user
+[08:01] itself. So with that, we're going to do
+[08:04] a a quick demonstration here that will
+[08:05] show you. We have worked with the Open
+[08:07] Claw team to work on showing how an
+[08:10] agent like Open Claw and a Gentex system
+[08:13] can function in an operating environment
+[08:16] where it is separated from you, the
+[08:19] user.
+[08:22] In this demo, what we'll see is this is
+[08:24] a Teams chat. And Karuppa's Teams chat,
+[08:28] he will go in and talk to his Open Claw
+[08:31] gateway node. The Open Claw gateway node
+[08:34] is running in a separate session on the
+[08:37] same machine, but as a different user
+[08:39] account and in a different session,
+[08:41] which means all of its processes are
+[08:44] separated from the desktop, from the
+[08:46] windows, and from all the processes that
+[08:48] are here. And by default, everything
+[08:50] that it tries to accomplish has no
+[08:52] access to what Karuppa himself is doing.
+[08:55] So as he interacts with the agent, it is
+[08:57] fully separated, fully identified by
+[09:00] Windows at its core. So that is how we
+[09:03] look at agent identity. It is not you,
+[09:06] and it should run separated from you.
+[09:11] Now, how do we
+[09:15] So with a after agent identity, the next
+[09:17] thing that we that Karuppa introduced
+[09:19] was containment. A really important
+[09:21] thing about agents is is that when
+[09:23] agents operate, as Karuppa said, they
+[09:25] need a blast radius, the things that
+[09:27] they can accomplish. What's really
+[09:29] important is is that for us to
+[09:30] understand agents are non-deterministic.
+[09:34] Different than the software that you run
+[09:36] today, when we install an application at
+[09:38] compile time, what the software can do
+[09:41] is already defined. Our agents today
+[09:44] write their own software. They evolve.
+[09:47] They change on a very frequent basis.
+[09:50] And as they operate with agency, they
+[09:52] make decisions themselves, not your
+[09:55] mouse clicks, but the decision of the
+[09:57] software itself. That non-determinism is
+[10:00] something that we need to think about
+[10:02] how that happens in the system. When an
+[10:04] agent can choose its own actions at run
+[10:06] time, that makes it unpredictable. But
+[10:09] because it's unpredictable, it doesn't
+[10:11] mean that it's uncontrollable. It means
+[10:13] that what it needs is a boundary around
+[10:16] what it can do, a boundary that's
+[10:18] understandable.
+[10:19] That we can understand what it can and
+[10:22] cannot do. That isolation boundary
+[10:25] allows us to control risk and to
+[10:28] understand what is the profile of risk
+[10:31] that that agent can have against our
+[10:33] system.
+[10:35] Also, what's really interesting is once
+[10:37] you put an agent inside of one of these
+[10:39] sandboxes, it allows us to enforce the
+[10:42] design of least privilege, which is we
+[10:44] can take the actions of an agent, its
+[10:47] individual actions, and put it inside of
+[10:49] a sandbox, and let that one sandbox for
+[10:52] that one action have policy that defines
+[10:55] just what it can do. And then when the
+[10:57] agent decides to do something else,
+[10:59] we'll build another sandbox for that.
+[11:02] What that means is is that the sandboxes
+[11:04] that we're going to build need to scale.
+[11:06] The isolation boundary needs to be
+[11:09] proportionate to the risk and
+[11:10] proportionate to the action that's
+[11:12] happening.
+[11:13] For that, we've introduced what we call
+[11:15] the Microsoft Execution Containers
+[11:17] Library.
+[11:18] The MXC library is a library that's
+[11:20] designed to help you create containers
+[11:24] based on policy.
+[11:26] The developer and the agent can declare
+[11:28] the security requirements of their agent
+[11:31] and the agent's actions. The library
+[11:33] will then compile that together and
+[11:36] match that against the policies of the
+[11:39] system and the policies defined by IT,
+[11:42] governed by tools that we're used to
+[11:44] using to deploy things, to manage them,
+[11:47] and monitor them. Once that match has
+[11:49] occurred, the MXC library will then look
+[11:52] at the native OS platform and try to
+[11:55] assemble together the right container
+[11:57] for the job. That process is something
+[12:00] we call dynamic composition.
+[12:03] That means that when an agent runs,
+[12:06] there isn't a fixed container. The MXC
+[12:09] library allows you to create the
+[12:11] container on the fly. It will, as I
+[12:14] said, take the definition of the
+[12:16] application that you want to run or the
+[12:18] actual action. It will take the user's
+[12:21] consent and permissions. It will take
+[12:23] the policy defined by IT and try to from
+[12:27] that craft together a configuration of a
+[12:30] container. With that configuration, it
+[12:32] will then look at the operating system
+[12:35] primitives that are available for it to
+[12:37] use.
+[12:38] It's not just Windows. It's Windows,
+[12:41] WSL, Linux, a full cross-platform
+[12:44] library that can scale everything from
+[12:48] tiny small processes to VMs, micro VMs,
+[12:52] firecracker style micro VMs, all the way
+[12:55] up to cloud-based PCs. So, MXC really
+[12:58] allows us to define a security boundary
+[13:00] that's designed and proportionate to the
+[13:02] task that we want to accomplish.
+[13:05] So, what does that really mean for us as
+[13:07] developers? How do we use this? Well,
+[13:10] let's dive in a little bit deeper.
+[13:12] MXC, as I said, has a declarative
+[13:14] approach. What it's really designed to
+[13:16] say is, let's look at the guardrails we
+[13:18] want to put in place for the components
+[13:20] of our agent. What is the composition of
+[13:23] the container? What are the security
+[13:25] requirements? And what does the workload
+[13:27] shape look like? So, as we dig into a
+[13:29] little detail, this can see
+[13:31] this is a Python script. That Python
+[13:34] script needs to be able to access my
+[13:36] certificates. Certificates to
+[13:39] authenticate somewhere in the system. It
+[13:41] needs to be able to run within a certain
+[13:43] time frame. It can only access read
+[13:46] write locations very much specified by
+[13:49] here. Everything else is denied by
+[13:51] default.
+[13:52] What network am I allowed to talk to? I
+[13:54] can only talk to the GitHub API server.
+[13:57] And even more restrictive, I can't touch
+[14:00] the UI of anything else on the system,
+[14:03] but I can see the clipboard and read
+[14:05] from it if something has done that. That
+[14:07] allows me to specify with very fine
+[14:09] grain detail what the container is and
+[14:12] what the action of the agent can do.
+[14:15] So, let's do a quick demo. I'm going to
+[14:17] escape out of here and do something
+[14:19] really dangerous and bring up a command
+[14:22] prompt.
+[14:23] So, the first thing I'm going to show
+[14:24] you here is a really simple demo. This
+[14:28] is a
+[14:30] Where's the
+[14:34] It's only showing PowerPoint.
+[14:38] Oops, that's a problem.
+[14:47] Oh, there we go. Fantastic. Awesome.
+[14:49] Thank you. All right. So, here is my
+[14:52] command prompt. So, from the command
+[14:54] prompt, what I'll show you here quickly
+[14:55] is this is essentially that script here.
+[15:00] I built for here a script that will
+[15:02] create a PowerPoint file. That
+[15:04] PowerPoint slide will be generated using
+[15:07] a Python script. That Python script will
+[15:10] launch and create a Python
+[15:12] Sorry, the PowerPoint file in this build
+[15:14] demo folder. So, if I come over here and
+[15:16] I will tell the Oops.
+[15:19] this to run.
+[15:22] What you'll see here is oh, I have a
+[15:24] mistake. It says I can't do it. The
+[15:26] agent is run that script inside of the
+[15:29] container. The container has failed. Why
+[15:31] is it failed? Because it said access to
+[15:34] the build demo folder is read only.
+[15:36] Let's come in here. We'll change that
+[15:37] quickly.
+[15:44] And we'll run it again.
+[15:46] And what you see here is
+[15:48] this is PowerPoint file generated by my
+[15:50] script.
+[15:52] Awesome. Okay.
+[15:54] So, that's a simple demo. But, the
+[15:55] reality of it is what are we really here
+[15:57] for? We're here to contain an agent that
+[16:01] may have written scripts that aren't
+[16:03] perfect. So, what I did here is
+[16:06] &gt;&gt; [snorts]
+[16:07] &gt;&gt; I created a demo
+[16:09] that shows
+[16:10] an agent
+[16:12] running
+[16:13] and a monitor of the agent. This agent
+[16:16] is purposefully malicious and will try
+[16:19] to escape its boundaries. The first
+[16:21] thing it's going to do is try to see if
+[16:23] it can get around the file system, write
+[16:25] to the the user's SAM hive, see if it
+[16:27] can steal NTUSER.DAT, see if it can grab
+[16:30] the user's credentials. And what we'll
+[16:31] see here is this. On the right-hand
+[16:33] side, those red things are it firing and
+[16:35] hitting the boundaries of the sandbox
+[16:37] itself. So, listening to events from the
+[16:40] sandbox, we can tell that the sandbox is
+[16:42] enforcing the constraints here. So, this
+[16:45] is in live, this running demo, pounding
+[16:48] against the sandbox, us listening to
+[16:50] that. What can a developer do with that?
+[16:52] Two things. One, you can monitor and
+[16:54] observe what actually is happening to
+[16:56] the agent. Two, if you want to know why
+[16:59] did my agent fail, you can pull that
+[17:02] data back in for the next loop around
+[17:04] and understand how to evolve and make
+[17:06] better policy for your agent. So,
+[17:10] there's that. The last thing I want to
+[17:12] show you quickly is this. As I said
+[17:13] before,
+[17:15] we have many different sizes and shapes
+[17:18] of containers. The smallest one is based
+[17:21] on a technology we call Hyperlight.
+[17:24] Hyperlight is a small VMM that will
+[17:27] start here a container, which is a
+[17:29] hardware-backed virtual machine. The
+[17:32] hardware-backed virtual machine runs a
+[17:34] tiny operating system called Nanvix that
+[17:36] is about 10 MB in size. It will start up
+[17:40] and run that same PowerPoint file
+[17:44] very fast.
+[17:46] Boom. And if you look,
+[17:49] that is the same exact script of the
+[17:51] other side that generated the same
+[17:53] PowerPoint file, loaded incredibly fast
+[17:56] in a very small amount of memory, and
+[17:58] fully protected by the hypervisor.
+[18:02] So,
+[18:03] with that, my demo has actually
+[18:06] succeeded.
+[18:08] Which is fantastic. Exactly.
+[18:13] So, given all that, as as Krupa said,
+[18:16] all those things put together are useful
+[18:19] ingredients, but the agent itself still
+[18:22] needs to be managed.
+[18:26] The platform that we operate in needs to
+[18:29] make sure that the management system
+[18:30] that we have can guarantee that the
+[18:32] agents are operating within defined
+[18:34] policies. So, IT, or you the user, need
+[18:38] to be able to specify what you do and
+[18:40] don't allow your agents to do. The
+[18:42] policies need to be able to control what
+[18:44] can the agent access, what are the
+[18:46] actions they are allowed to do, and as
+[18:48] we showed, how do we observe those
+[18:51] actions to make sure that they are
+[18:52] correct.
+[18:54] In general, we also believe that one of
+[18:56] the most important things for you as a
+[18:58] developer is to think about the concept
+[19:00] we call supervision,
+[19:02] which is that agents need to operate
+[19:04] with clear oversight. The user needs to
+[19:07] understand whether it is a
+[19:08] human-in-the-loop agent or a fully
+[19:11] autonomous agent, they need to be able
+[19:14] to trust what it can do. The most
+[19:16] important thing is that as an agent
+[19:18] becomes more and more autonomous, that
+[19:20] trust needs to be something that we
+[19:22] build upon to make sure the user
+[19:24] believes and IT believes they still have
+[19:27] operational control. We think you need
+[19:30] to think about how do you surface the
+[19:32] intent of your agent at natural
+[19:34] waypoints? Make sure that even though an
+[19:37] agent can do things fully autonomously,
+[19:39] it should still ensure that it's
+[19:41] notifying the user,
+[19:43] providing places for it to compensate if
+[19:45] there are problems. Why? Because agents
+[19:48] make mistakes. Assume that your agent is
+[19:50] not perfect and that you've designed it
+[19:52] in such a way that your agent can
+[19:54] compensate and bring the human user into
+[19:56] the loop to compensate for it. And make
+[19:59] sure that you think of consent as a
+[20:01] continuous thing. Not just as Patrick
+[20:04] said, one time you set it up this way
+[20:06] and it's perfect. Agents will evolve
+[20:08] policy and change and need to keep
+[20:10] asking the user. Why? Because we earn
+[20:13] autonomy with evidence. The more that we
+[20:15] can build confidence in our users to
+[20:17] trust the things that we do, that's
+[20:19] where we'll build more and stronger and
+[20:21] richer autonomous systems.
+[20:25] With that, we believe in Windows there's
+[20:27] a lot of features that are in the
+[20:28] platform and that we can add that help
+[20:30] you use the surfaces that are there. The
+[20:33] activity that your agent is running
+[20:35] under can surface that using Windows
+[20:37] channels. It can use notifications. It
+[20:39] can use many things that exist there as
+[20:41] well as the guardrails and safety
+[20:43] primitives that we helped you show
+[20:44] today. Further, if an agent has its own
+[20:47] identity, the providence of its code and
+[20:50] an audit of what it does is a natural
+[20:53] part of what the OS does.
+[20:56] So with that, I'll turn over to Patrick.
+[20:58] &gt;&gt; One form.
+[21:01] In the Copa CLI and SDK,
+[21:04] we started all the way over there. No
+[21:05] sandboxes, no controls, basic guardrails
+[21:08] in the application. If the user hit the
+[21:10] wrong prompt at the wrong point in time,
+[21:12] they ended up in a land where they could
+[21:13] do a lot more damage than they expected.
+[21:16] Today, we're happy to announce that the
+[21:18] Copilot CLI and SDK, through our
+[21:19] collaboration with the team over at
+[21:21] Windows, we're able to ship a sandbox
+[21:24] out of box, which is currently under the
+[21:26] experimental flag. Uh it will be moving
+[21:28] to GA in the future, so it will become a
+[21:30] default on solution.
+[21:32] In the future, we're moving to a fully
+[21:33] isolated state where you take the entire
+[21:35] agent host, shove it inside of a safe
+[21:37] environment, and allow it to execute
+[21:39] freely, enabling you to accomplish a
+[21:41] wider range of jobs end to ends without
+[21:44] supervi- supervising the agent directly
+[21:46] or worrying about what it's doing and
+[21:48] where it's going.
+[21:50] To look at this in a more practical
+[21:51] sense, let's break down a little bit of
+[21:53] what Stewart showed into three short
+[21:55] little demos.
+[21:57] Inside of the GitHub Copilot CLI, like I
+[21:59] mentioned, you can actually fire it open
+[22:00] today. Uh and if you've enabled the
+[22:02] experimental flag, you will be able to
+[22:05] make sure it's actually running.
+[22:09] Can you play on that one for me?
+[22:12] Perfect.
+[22:13] Um you will be able to access a {slash}
+[22:16] sandbox {slash} commands, which not only
+[22:19] will enable allow you to turn it on and
+[22:20] off, but as you see, you'll have some
+[22:22] quick handy out of the box options that
+[22:23] allow you to configure policy. You can
+[22:25] turn on and off the sandbox. You can set
+[22:27] the file system configuration. Notice
+[22:29] include working directory is already
+[22:31] there, and the policy will clear after
+[22:33] it's done.
+[22:34] If we just enable the file system
+[22:35] protections, and we ask the agent to
+[22:37] just go off and delete all the files on
+[22:39] our desktop, we probably don't really
+[22:41] want that to happen, but it's a good
+[22:42] test for the agent itself.
+[22:45] We experience our normal permissions
+[22:46] prompt, and we said, "Yes, go delete
+[22:47] everything on my desktop." Which
+[22:49] definitely don't want that to occur. I
+[22:51] have plenty there.
+[22:52] And you'll notice that the agent,
+[22:53] because it has the sandbox enabled, it's
+[22:55] able to one, block the deletion of all
+[22:58] the files in the desktop, protection
+[23:00] number one. Two, the agent's able to
+[23:02] identify that it's actually operating
+[23:04] with the sandbox on, so you're aware of
+[23:06] what's providing that protection, and
+[23:08] then three, there are some options there
+[23:10] and some next level guidance for what
+[23:12] you can do next to to move your way
+[23:13] around the sandbox if you need to.
+[23:16] If we look at the next piece
+[23:19] Go forward one for me over there.
+[23:21] Perfect.
+[23:22] We go forward to a restricting outbound
+[23:23] network access, you have a similar
+[23:25] opportunity just off of the file system
+[23:27] and towards the network ingress and
+[23:29] egress to system.
+[23:31] If you look at the network tab, you can
+[23:32] allow outbound connections, you can
+[23:34] allow local network, they're separate,
+[23:35] so you have a couple of different flex
+[23:37] options there.
+[23:38] But the beautiful thing is if you ask
+[23:40] the agent to do something as sketchy and
+[23:42] dangerous as turn your private
+[23:43] repository public, which might be
+[23:45] company IP,
+[23:47] the agent can actually use those filters
+[23:48] to block certain actions and prevent you
+[23:51] from making dangerous calls outside the
+[23:52] system. And while this might seem like a
+[23:55] basic demo of me asking it to do
+[23:57] something and expecting some guidance,
+[23:59] the thing to be aware of is agents are
+[24:00] still
+[24:02] exposed to prompt injection attacks in
+[24:03] the modern era, which means that any
+[24:05] context that enters its world sphere can
+[24:08] actually direct its guidance and force
+[24:09] it to accomplish or take care of actions
+[24:11] that you wouldn't necessarily expect it
+[24:13] to.
+[24:16] If we scale this up to the CLI and SDK
+[24:19] Perfect. Um you have an opportunity to
+[24:22] leverage all these capabilities in any
+[24:24] application that you integrate our
+[24:25] harness into. And so this is a personal
+[24:28] writing app that I use to hack on the
+[24:29] Copilot SDK itself. Um I'll go ahead and
+[24:32] I'll run a sandbox text. The way that I
+[24:34] actually deploy agents out of here is I
+[24:35] just write like I normally would in a
+[24:37] file and I can just at mention an agent
+[24:39] and it will deploy it. Um because I'm
+[24:41] actually using my at sandbox agent,
+[24:44] which comes with these policies enabled
+[24:46] by default, what I'm able to do is,
+[24:49] similar to the first demo, ask it to
+[24:51] delete my desktop files.
+[24:53] The sandbox will block the action, you
+[24:55] you see the calls failing in there, and
+[24:57] more importantly, you will see the agent
+[24:59] providing its final guidance saying the
+[25:01] sandbox blocked my action. It's
+[25:02] prevented me from doing this. You need
+[25:04] to find another way around.
+[25:06] Now, in a normal situation, I wouldn't
+[25:08] want to find another way around. I don't
+[25:10] want to delete files again on my
+[25:11] desktop. So, if we take a simpler,
+[25:14] easier to manage scenario such as
+[25:17] creating a hello.txt on my desktop, I
+[25:20] can show you what it's like to build
+[25:22] finer and greater experiences for
+[25:24] customers using the SDK. Again, all of
+[25:27] these scenarios are available and you
+[25:28] can think about how you want to
+[25:29] integrate them best into your solution.
+[25:31] What's important about this one is I
+[25:33] wanted to create a file. The sandbox
+[25:35] blocked it. But because this is
+[25:37] integrated in the SDK and you can not
+[25:38] only detect when the sandbox is in
+[25:40] action, but you have an opportunity to
+[25:42] perform other actions on behalf of the
+[25:44] user, you can simply hit disable the
+[25:46] sandbox, let it continue. I reviewed the
+[25:48] command, which allows it to operate
+[25:50] freely, create the file on the desktop.
+[25:53] You should see this thing minimize in a
+[25:54] seconds and you'll notice there's a file
+[25:56] there.
+[25:57] Allowing you to not only put the sandbox
+[25:59] in place as a great default out of the
+[26:01] box option, but put in user experiences
+[26:04] and other controls that allow users to
+[26:05] navigate safely around it when they run
+[26:07] into it and they expect the agent to be
+[26:09] successful.
+[26:11] &gt;&gt; Thank you, Patrick. So, as part of us
+[26:14] building all these platform
+[26:15] capabilities, we actually work very
+[26:16] closely with Patrick and the GitHub
+[26:17] Copilot team to design and validate the
+[26:20] design. But we also work very closely
+[26:22] with the broader ecosystem as well with
+[26:24] partners like OpenAI, Manifold, Hermes,
+[26:27] Nvidia, and OpenClaw. As Stewart gave a
+[26:29] great demo and at the keynote today, you
+[26:31] saw more about how Windows primitives
+[26:33] were helping OpenClaw run more securely.
+[26:37] So, we covered a lot of ground in this
+[26:40] talk. So, let me go ahead and summarize
+[26:41] the key things that you need to do to
+[26:43] make your agents run well on Windows.
+[26:46] First, every agent should be running
+[26:48] identified. Should have with identity
+[26:51] distinct from that of the human user,
+[26:53] with its own identity, permissions, and
+[26:55] audit trail.
+[26:56] It should run contained. Every action
+[26:58] runs in the right sandbox enforced by
+[27:01] policy.
+[27:02] And it also runs managed. Now, this is a
+[27:04] topic that's going to require a lot more
+[27:06] coverage, which we will cover in future
+[27:08] sessions and blog posts and videos. But,
+[27:10] what we will do is I give a very
+[27:11] high-level overview. You know, at a high
+[27:13] level, IT admin policies apply
+[27:16] consistently across devices with full
+[27:18] enforceability and observability. Now,
+[27:21] if we go one level deeper, here's an
+[27:23] extra feature you get as part of using
+[27:25] MXC to build your agents. You get Agent
+[27:28] 365 native integration. And this enables
+[27:31] your agents running in Windows to start
+[27:33] secure and stay secure. And this also
+[27:36] means you get the full ecosystem as
+[27:38] well. You get Defender, Entra, Intune,
+[27:41] and Preview. Their protections allow
+[27:43] your security and IT teams to constrain
+[27:46] and secure local agents to make them run
+[27:48] more securely in enterprise context. So,
+[27:52] that's really like a nice icing on top
+[27:53] of this to take it back to where we
+[27:55] started from. As agents move from
+[27:57] answering questions and to taking real
+[27:59] actions, their biggest challenge is in
+[28:02] ensuring they run well. Windows gives
+[28:05] you the foundation to handle that shift.
+[28:07] And Windows isn't just a place where
+[28:10] agents can run. It's a place where they
+[28:12] can run reliably, safely, and at scale.
+[28:16] And with that, if you haven't done so
+[28:18] yet, try MXC right now. What are you
+[28:20] waiting for? And if you have any
+[28:22] questions or want to talk to us further
+[28:23] about any of these topics, come find
+[28:25] Patrick Stewart and I at the Agentic
+[28:27] booth or some of our colleagues who'll
+[28:28] be there tomorrow to entertain more
+[28:31] about these topics. Thank you.
+[28:34] &gt;&gt; [applause]

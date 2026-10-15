@@ -1,0 +1,17 @@
+{
+ "stage": "verify-clean",
+ "runs_per_variant": 3,
+ "started": "2026-10-11T13:26:16-04:00",
+ "state": {
+  "fence_state": {
+   "sublayer": false,
+   "provider": false,
+   "filters": []
+  },
+  "fence_clean": true,
+  "loopback_exemption_present": false,
+  "appcontainer_profile_folder_present": false
+ },
+ "finished": "2026-10-11T13:26:18-04:00",
+ "rc": 0
+}

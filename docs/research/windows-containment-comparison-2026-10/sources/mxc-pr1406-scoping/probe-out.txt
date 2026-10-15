@@ -1,0 +1,29 @@
+{
+  "tier": "base-container",
+  "needsDaclAugmentation": false,
+  "warnings": [],
+  "probes": {
+    "baseContainerApiPresent": true,
+    "nativeCaptureAvailable": true,
+    "guardedCaptureAvailable": false,
+    "bfscfgPresent": false,
+    "bfsCompiledIn": false,
+    "baseContainerSupportsDenyPaths": true,
+    "baseContainerSupportsEnumeratePaths": false,
+    "baseContainerSupportsIngressHostLoopbackAllow": false,
+    "isolationSessionAvailable": false,
+    "hyperlightAvailable": true,
+    "uiCapabilities": {
+      "canBlockClipboardRead": true,
+      "canBlockClipboardWrite": true,
+      "canBlockInputInjection": true,
+      "canBlockInputMethodChanges": true,
+      "canBlockExternalUiObjects": true,
+      "canBlockGlobalUiNamespace": true,
+      "canBlockDesktopSwitching": true,
+      "canBlockLogoffOrShutdown": true,
+      "canBlockSystemParameterChanges": true,
+      "canBlockDisplaySettingsChanges": true
+    }
+  }
+}

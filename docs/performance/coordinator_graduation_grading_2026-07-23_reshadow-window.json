@@ -144,8 +144,8 @@
     ],
     "provenance": {
       "dev_mode": false,
-      "journal_path": "C:\\Users\\mrbla\\AppData\\Local\\BlarAI\\coordinator\\shadow-journal.db",
-      "runs_dir": "C:\\Users\\mrbla\\agentic-setup\\state\\fleet-runs",
+      "journal_path": "C:\\Users\\__USER__\\AppData\\Local\\BlarAI\\coordinator\\shadow-journal.db",
+      "runs_dir": "C:\\Users\\__USER__\\agentic-setup\\state\\fleet-runs",
       "since": "",
       "since_seq": 156
     },

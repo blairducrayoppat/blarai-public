@@ -143,7 +143,7 @@ if any pytest ran first, on AC power:
 
 ```
 .venv\Scripts\python.exe scripts\benchmark_vlm_longcontext.py \
-    --model-dir C:/Users/mrbla/models/qwen36-35b-a3b-int4-ov-OFFICIAL
+    --model-dir C:/Users/__USER__/models/qwen36-35b-a3b-int4-ov-OFFICIAL
 ```
 
 Overrides: `--bands 2048,8192,16384,32768` · `--runs 5 --warmup 2` ·

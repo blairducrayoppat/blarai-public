@@ -31,12 +31,17 @@ scanned for identity, e-mail and credential shapes before any subprocess runs.
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import identity_lock as _il  # noqa: E402  (digest recognition of this machine's names; works under any account)
 
 REPO = "blairducrayoppat/openvino-arc140v-lunarlake"
 DEFAULT_HF_EXE = str(Path.home() / ".local" / "bin" / "hf.exe")
@@ -45,9 +50,12 @@ DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 # Same bound as scripts/build_phase1_dataset.py SHORT_LABEL_MAX: a verdict label, never a generation.
 SHORT_LABEL_MAX = 24
 
-# Identity strings that must never reach the public repo (matched case-insensitively). The values of the
-# USERNAME / COMPUTERNAME environment variables of the machine running the preflight are added at call time.
-DENY_STRINGS = ("mrbla", "NORTHSTAR100")
+# Identity strings that must never reach the public repo (matched case-insensitively): the operator user name and the
+# host name, read from the machine at import (USERNAME / COMPUTERNAME, else getpass / platform) and again at call time.
+# Never hold them as literals: the gate lock tests/security/test_no_host_identity_in_tree.py scans every tracked file.
+DENY_STRINGS = tuple(s for s in _il.live_names() if s)
+# Recognition by digest (identity_lock.find_hits) runs beside the string list, so the preflight refuses this machine's
+# names under any account, not only the operator's.
 _ENV_IDENTITY_VARS = ("USERNAME", "COMPUTERNAME")
 _MIN_ENV_IDENTITY_LEN = 4
 
@@ -186,7 +194,20 @@ def _walk_json(node, rel: str, hits: list[str], where: str, allow: frozenset[str
             hits.append(f"{rel}: string of {n} chars under key '{key}' ({where}); free text outside the authored-note keys")
 
 
+def _scan_identity(rel: str, text: str, hits: list[str]) -> None:
+    hosts, users = _il.find_hits(text.encode('utf-8', 'surrogatepass'))
+    if hosts:
+        hits.append(f"{rel}: identity string (host name, digest match)")
+    if users:
+        hits.append(f"{rel}: identity string (operator name, digest match)")
+
+
 def _scan_text(rel: str, text: str, deny: tuple[str, ...], hits: list[str]) -> None:
+    _scan_text_patterns(rel, text, deny, hits)
+    _scan_identity(rel, text, hits)
+
+
+def _scan_text_patterns(rel: str, text: str, deny: tuple[str, ...], hits: list[str]) -> None:
     low = text.lower()
     for s in deny:
         if s.lower() in low:
@@ -239,6 +260,9 @@ def preflight(root: Path, max_bytes: int = DEFAULT_MAX_BYTES, extra_deny: tuple[
         for d in deny:  # the file NAME can leak too: identity strings and credential/e-mail shapes
             if d.lower() in rel.lower():
                 hits.append(f"{rel}: file name contains identity string '{d}'")
+        name_hosts, name_users = _il.find_hits(rel.encode("utf-8"))  # by digest: holds under any account
+        if name_hosts or name_users:
+            hits.append(f"{rel}: file name carries this machine's identity (digest match)")
         for label, pat in _SECRET_PATTERNS:
             if pat.search(rel):
                 hits.append(f"{rel}: file name matches a {label}")

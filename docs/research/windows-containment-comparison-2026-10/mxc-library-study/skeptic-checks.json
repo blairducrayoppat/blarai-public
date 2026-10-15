@@ -1,0 +1,115 @@
+[
+ {
+  "verdict": "holds_with_corrections",
+  "problems": [
+   {
+    "claim": "Hyperlight has no network, so it cannot serve job (a).",
+    "problem": "The quote is accurate but incomplete. The same table row (line 132) continues: 'The backend's host-proxied sockets take a host allow or block list; wiring the 1.1.0-alpha egress model onto them is the next step'. So per-host network filtering on Hyperlight is a stated roadmap item, which the study omits. Today this is still a no, but it is the one backend with a documented path to an allowlist. Hyperlight also has no git or Windows tools, so it still cannot run the coder.",
+    "evidence": "v1.0.0 docs/backends/hyperlight/hyperlight-backend.md line 132, re-fetched with curl."
+   },
+   {
+    "claim": "Process container tier 1 (BaseContainer) is a 25H2+ (26600+) capability, and this host (26200.9457) reports tier base-container.",
+    "problem": "The study does not reconcile its own evidence. The os-version-support.md table marks T1 as not available on 25H2 (build 26200: 'no processmodel.dll') and available only on 25H2+ (26600+). Yet probe.txt on this 26200 host reports tier base-container with baseContainerApiPresent true. Either the docs lag, or a servicing update on this host added the API. As written, the study cites a doc that the probe contradicts and does not say so.",
+    "evidence": "v1.0.0 os-version-support.md lines 20-21 and 38; probe.txt in study-backends shows tier base-container and baseContainerApiPresent true."
+   },
+   {
+    "claim": "WSLC: whether a container can reach a host service is 'not documented'.",
+    "problem": "Overstated. wslc-state-aware.md says allowing ingress/host-loopback 'does not create host port forwarding or promise reachability across NAT', and 'a host loopback listener is not made guest-reachable by spelling its host address localhost'. The getting-started doc says an external proxy 'must have an address routable from the container'. So the docs do speak to this: loopback is not reachable, and a host-routable address is the only route. The study should have quoted these and not left it as unknown. The only truly untested part is whether a host-routable address plus a host firewall rule works. It would also require all-allow (unrestricted, bridged) egress for the coder, which defeats the confinement goal.",
+    "evidence": "v1.0.0 wslc-state-aware.md lines 143-145 and 179-181; wsl-container-getting-started.md lines 358 and 392-396."
+   },
+   {
+    "claim": "The ~30 s IsolationSession StopSession delay is 'unquantified later'.",
+    "problem": "The citation is real (state-aware-rust.md line 339: 'Initially observed as ~30s on an...'). The study only partly read the sentence and did not check what the rest of it says about later measurements. Minor.",
+    "evidence": "v1.0.0 state-aware-rust.md line 339."
+   },
+   {
+    "claim": "The study's other load-bearing quotes at the pinned tag.",
+    "problem": "No problem found. I re-fetched with curl and confirmed these. README: experimental backends are windows_sandbox, microvm and hyperlight; wslc and isolation_session are stable. Windows Sandbox: 'Network access is block-only', 'full VM cold-boot cost on every invocation', one VM per logon session, no idle watchdog. Hyperlight: network 'Rejected at preflight', commandLine is guest source, workingDirectory rejected. NanVix: '~100 ms', 'Disabled networking prevents guest socket creation', private staging copy. WSLC: 'not reachable', 'does not pass stdin', 'expects the process to exit', WSL 2.9.9+, kernel 6.6.x example, portMappings. IsolationSession: 'no host-folder-sharing primitive', Win32k statement. Process container: 'AppContainer fallback unsupported', bfscfg 'can deadlock the host on 25H2'. host-prep: 'All subcommands require elevation'. LICENSE: MIT, Microsoft. Tag resolves to commit 7bf21024 (2026-10-06T22:42:43Z). Main is ahead by 20 commits. v1.0.0 is not a prerelease and v0.9.0 is. The Windows Home claim comes from a Learn page outside the repo and was not re-checked.",
+    "evidence": "All files in C:/blarai-spike-1740-mxc/verify-other-backends/ (curl at v1.0.0)."
+   }
+  ],
+  "missed": "1) Hyperlight's roadmap to host-proxied allow/block-list sockets (egress model 1.1.0-alpha) is the only documented path to a filtered-network micro-VM, and the study omitted it. 2) The study did not look for any MXC 'dynamic composition' term in these backend docs. I grepped the five backend docs plus README for 'dynamic compos' and 'composab' and found no hit. The grep covered only the files fetched, not the full 96-doc tree. 3) The study treats WSLC all-allow as 'unrestricted'. The docs also say the container lacks CAP_NET_ADMIN and per-host filtering is impossible, so a host-side firewall rule would be the only possible narrowing, and MXC would not enforce it. 4) A WSLC container shares one WSL system VM and daemon with other containers. That weakens WSLC as an Alpine VM analogue, and the study listed it as unknown. 5) Not read: the 0.7.0 'composing sandboxes' non-goal, the 20 post-tag main commits beyond five docs, and third-party licences (the study admitted the last two)."
+ },
+ {
+  "verdict": "holds_with_corrections",
+  "problems": [
+   {
+    "claim": "Study's term grep covered only 29 fetched files, not the whole tree; unknowns list says the 100-file result was not re-run.",
+    "problem": "Gap now closed, and it supports the study. A full-tree grep of the v1.0.0 tarball for 'composit|composable' finds no 'dynamic composition', 'dynamically compos' or 'composability' anywhere. The hits are the lifecycle sentence, the 'composable filesystem-policy fragment' comments (Node/.NET/Rust types.md, filesystem.ts, Filesystem.cs, policy.rs), and unrelated uses (macOS 'composite frames' in the schema, Rust learning-mode 'decode composition', schema.rs 'JSON Schema composition', a test string 'composable').",
+    "evidence": "grep -rIn -i 'composit|composable' over src/microsoft-mxc-* extracted from api.github.com/repos/microsoft/mxc/tarball/v1.0.0. The docs/ hits are api-reference/{dotnet,node,rust}/v1/types.md and development/architecture/container-lifecycle.md:52."
+   },
+   {
+    "claim": "PR #779 'closed 2026-09-25 by a maintainer'.",
+    "problem": "The closure is confirmed (state closed, merged false, closed_at 2026-09-25T16:12:40Z). The 'by a maintainer' part is unverified. The timeline names the closer as kanismohammed. The study did not establish that account's role.",
+    "evidence": "gh api repos/microsoft/mxc/issues/779/timeline returns closed by kanismohammed at 2026-09-25T16:12:40Z. pulls/779 returns merged false, merged_by null."
+   },
+   {
+    "claim": "'Composition' is described as appearing only in the lifecycle sentence, the fragment helpers and the 0.7.0 non-goal, with 'five release bodies searched'.",
+    "problem": "The citations are accurate. Issue search shows a larger composition-adjacent set that the study did not list: #651 'streaming and state-aware lifecycle to the C ABI and .NET SDK', #255 'IsolationSession state-aware lifecycle in wxc-exec', #1219 'State-aware: phase APIs', #172 'container policy design proposal'. These are lifecycle and policy-design history, not a dynamic-composition feature. The study's repo-wide issue search for the exact phrase is correct (only #1309). A one-line note that no composition-named feature exists in issue history would have been stronger.",
+    "evidence": "gh api search/issues?q=repo:microsoft/mxc+composition returned 8 hits (12 for 'dynamic composition' as separate words), none being a composition feature. The exact phrase 'dynamic composition' returned 0 total_count."
+   }
+  ],
+  "missed": "I re-opened 13 load-bearing citations. All hold; none was misquoted. Everything below is primary (raw files, API JSON, tarball) at tag v1.0.0, commit 7bf21024.\n\n1. Tag v1.0.0 is 7bf210247986cb73b1b314df60c2f1109c479c0b (api commits/v1.0.0). Compare v1.0.0...main shows ahead, ahead_by 20, with the last commit c6f301d5.\n2. container-lifecycle.md:52 reads \"`spawnSandbox` is the composition of the five phases into one call\", and line 58 reads \"retains no state between calls and does not become a sandbox orchestrator\".\n3. node/v1/types.md:389 reads `LifecycleContainmentKind = Extract<ContainmentBackend, 'isolation_session' | 'wslc'>`. api.md:22 reads \"Existing-container PTY support remains IsolationSession-only\". sdk/node/src/v1/lifecycle-types.ts has no windows_sandbox or processcontainer entry.\n4. state-aware-typescript.md:56 gives the IsolationSession network posture as `{ egress: { default: 'allow' }, ingress: { default: 'allow', hostLoopback: 'allow' } }`, and says rules, proxies, mixed postures and omission are rejected.\n5. README.md:28 reads \"`isolation_session`: 26340.9212 (Insider Preview)\". The local --probe result was not re-run.\n6. wslc-state-aware.md:99 reads \"The daemon runs one exec at a time\". Lines 132-151 give the Isolated deny/deny/deny and Bridged allow/allow/allow postures, and say mixed postures and per-host rules are rejected.\n7. windows-sandbox.md:9 reads \"It is experimental and requires `--experimental`\". schema-version.json:6 has stateAwareWindowsSandbox 1.1.0-alpha.\n8. filesystem.ts:19 reads \"A composable fragment of filesystem policy\". Lines 271-272 say the drive root (`C:\\`) is added to readonlyPaths when pwsh.exe is on PATH, and line 286 defaults the environment to process.env. This confirms the study's flag on the helper.\n9. 0.7.0 policy.md:44 reads \"Multi-container orchestration: Composing sandboxes or sandbox-to-sandbox communication.\"\n10. process-container/networking.md:121 at v1.0.0 reads \"`hostLoopback: \\\"allow\\\"` is rejected when the PSEC 1.1 ingress contract is unavailable\". On main, lines 119-123 add the identity-less loopback-proxy workaround for PSEC 1.0 hosts.\n11. PR #1309 is open, merged false, head 2c682f35, author ChazGo, opened 2026-09-28. MGudgin's review is CHANGES_REQUESTED with \"This doesn't belong in the mxc repository\". The head-commit doc says \"Not part of MXC 1.0; no later release...\" (line 4), \"Floors may broaden file...\" (line 8) and \"no dynamic fetching; that is a possible V2 capability\" (line 489).\n\nMinor additions worth recording:\n- docs/container-lifecycle.md, the consumer-facing page, shows the five-phase table with no backend qualifier. A reader of that page alone could assume every backend supports it. The type restriction to isolation_session and wslc, plus the per-backend guides, is what limits it. The study's conclusion is right, but this page is the one the LA is most likely to read, so the caveat should be explicit.\n- I did not independently verify the study's .NET / Rust in-process (mxc_ffi.dll) claim, the npm supply-chain details, the telemetry gates, or the Authenticode results. I also did not re-run --probe.\n- The study stays within the 'dynamic composition' question and does not claim any Microsoft blog, Build or Learn page uses the term (it lists this as an unknown). That unknown is still open."
+ },
+ {
+  "verdict": "holds_with_corrections",
+  "problems": [
+   {
+    "claim": "Tag v1.0.0 = 7bf21024, same commit as rc5; c6f301d5 is main HEAD, 20 commits ahead.",
+    "problem": "No problem. Confirmed.",
+    "evidence": "api.github.com commits/v1.0.0 sha 7bf210247986..., date 2026-10-06T22:42:43Z; commits/v1.0.0-rc5 same sha; compare v1.0.0...main ahead_by 20, behind_by 0."
+   },
+   {
+    "claim": "Schema retirement within 8 days, not listed as breaking in v1.0.0 notes.",
+    "problem": "Confirmed (primary). v0.9.0 notes published 2026-09-29: 'Existing policies using schema 0.6, 0.7, or 0.8 remain supported'; v0.9.0 schema-version min 0.6.0-alpha; v1.0.0 min 0.9.0-alpha, maxSupported 1.1.0-alpha. v1.0.0 'Breaking Changes' has exactly three bullets (V1 entrypoint, renamed request/lifecycle types, rebuild SDKs) and no schema retirement. Minor nuance: tag date was 09-28 and notes 09-29, so '8 days' is measured from the notes to the 2026-10-07 release.",
+    "evidence": "releases/tags/v0.9.0 and v1.0.0 body; raw schemas/schema-version.json at both tags."
+   },
+   {
+    "claim": "Audit mode is permissive: ungranted checks recorded and allowed; deny-by-default not enforced.",
+    "problem": "Confirmed. Quotes exist verbatim: diagnostics.md line 93 'Ungranted checks are recorded **and allowed**' and a security warning at line 188; logging-access-denied.md line 28 'Weakened — the container no longer enforces deny-by-default'. One nuance the study left out: diagnostics.md lines 193-194 say native capture needs no UAC, but a compatible legacy tier may use guarded-WPR, which does prompt for elevation. The study's 'no elevation prompt documented' is therefore true only for the native path the probe reported.",
+    "evidence": "v1.0.0 docs/development/guides/diagnostics.md lines 93, 188-194; docs/logging-access-denied.md line 28."
+   },
+   {
+    "claim": "Generated policy is exact-path grants; denied paths never promoted; symlink/junction aliasing is a documented limitation.",
+    "problem": "Confirmed. config.rs has 'arr.push(Value::String(ev.file_path.clone()))' at lines 617 and 660; unit tests 'write_to_denied_path_is_not_promoted' (line 1210) and 'write_to_sibling_does_not_bypass_denied_via_parent' (line 1299) exist; line 1620 'Documented limitation: junction/symlink reparse aliases are NOT resolved'. The study's over-grant and under-grant paragraph is labelled derived, which is correct: no run was done.",
+    "evidence": "v1.0.0 src/mxc-sdk/src/core/plm/config.rs lines 447-453, 595, 617, 1210, 1299, 1620."
+   },
+   {
+    "claim": "Recorder blind spots and caps (10,000 unique denials, 1,000,000 events, BaseNamedObjects unsupported, capability checks omitted).",
+    "problem": "Confirmed. logging-access-denied.md lines 209-210, 226, 300 and 328 carry these. The 4096 process-generation cap was not re-checked. Issue #1286 'Add network into capture denials' is open (filed 2026-09-25). On main, 'decode WFP Learning Mode network events (#1418)' is present.",
+    "evidence": "v1.0.0 docs/logging-access-denied.md; api issues/1286; main commit list."
+   },
+   {
+    "claim": "Open Windows bugs overlapping the coder's tools: #1061 git-bash, #1464 git cwd, #1455 drive-root grant, #1465 non-interactive, #1261 loopback.",
+    "problem": "All five are open and have the claimed titles and dates. #1061: the 09-14 comment is 'In OS, we will need true namespace virtualization support for BNO', and the 09-22 comment asks for an ETA. #1455 and #1465 were filed 2026-10-09 and 10-11. #1463 (fix PR for #1455) is open and unmerged, not merely 'not seen merged'. Correction on #1261: the repro uses egress deny AND ingress.hostLoopback deny, on v0.8.0 binaries and build 26200. The study's phrase 'with egress deny' leaves out the hostLoopback-deny condition. Whether #1261 applies to the coder depends on whether BlarAI would set hostLoopback to deny or allow.",
+    "evidence": "api issues 1061, 1261, 1455, 1464, 1465, pulls/1463 (state open, merged false), issues/1061/comments."
+   },
+   {
+    "claim": "Junction escape #462 closed with 'Junctions are hard-blocked in AppContainer'.",
+    "problem": "Confirmed (closed 2026-08-05, comment 'Completed with OS code work. Junctions are hard-blocked in AppContainer, per comments from Security team.'). The study should be read with this limit: the fix is stated as an OS-side change, so it depends on the Windows build and the study did not check which build includes it. The study's separate claim that a symlink/junction alias of a deny rule is a limitation of the audit-merge code is not in conflict.",
+    "evidence": "api issues/462 and issues/462/comments."
+   },
+   {
+    "claim": "No security advisories or CVEs for MXC itself.",
+    "problem": "Partly re-verified. The security-advisories endpoint returned an empty JSON array. The NVD searches were not repeated. The #1124 CVE mention in the changelog is a third-party dependency bump (fast-uri, anyhow), as claimed. SECURITY.md is the stock MSRC block. The study already says this is weak evidence; I agree.",
+    "evidence": "api.github.com/repos/microsoft/mxc/security-advisories -> []; v1.0.0 SECURITY.md; release body #1124."
+   },
+   {
+    "claim": "container-lifecycle.md says operation/nativeCode values are best-effort diagnostics that may change without a schema bump.",
+    "problem": "Confirmed (line 632). One caveat: the same sentence says branch logic should use 'code', which is a closed versioned enum, so the 'stability counter-signal' is narrower than the study's wording suggests.",
+    "evidence": "v1.0.0 docs/development/architecture/container-lifecycle.md line 632."
+   },
+   {
+    "claim": "Study omits post-tag loopback work on main.",
+    "problem": "MISSED, and it bears directly on the coder's need to reach its model on 127.0.0.1. PR #1406 'discover identity-less loopback proxy support' merged 2026-10-06T23:16Z, about 34 minutes after the v1.0.0 tag commit, so it is on main and not in v1.0.0. It requires runtimeConfig.networkProxy, network.ingress.hostLoopback 'allow', and no allowedProxyPeer. It adds a probe flag baseContainerSupportsIdentitylessLoopbackProxy that reports support on PSEC 1.0-only hosts. The study's probe was run against v1.0.0 and only looked at baseContainerSupportsIngressHostLoopbackAllow=false. Whether this laptop is a PSEC 1.0-only host is not known. Main also has 'Retire pre-v0.9 runtime compatibility vestiges (#1397)', which is relevant to the schema-churn theme.",
+    "evidence": "api pulls/1406 (merged_at 2026-10-06T23:16:41Z, body quoted); main commit list from api commits?sha=main."
+   },
+   {
+    "claim": "os-version-support.md disagrees with the probe about BaseContainer on 25H2.",
+    "problem": "Not independently confirmed. I read only the first 30 lines of the doc (product floor is build 26100 / 24H2, and README says the same). That floor line contradicts the study's phrase that the table 'shows BaseContainer unavailable on 24H2/25H2'. The table itself was not re-read, so that claim stays unverified. Note the docs file on main was also re-organised ('[docs] os version support (#1438)').",
+    "evidence": "v1.0.0 docs/backends/process-container/os-version-support.md lines 1-30."
+   }
+  ],
+  "missed": "Three omissions. (1) PR #1406, the identity-less loopback proxy mode merged to main 34 minutes after the tag, is the only main-branch change aimed at the coder's 127.0.0.1 problem; the study cites #1418 (network events) from main but not this. (2) #1261 requires hostLoopback deny, so whether it affects BlarAI is a configuration question. (3) The guarded-WPR fallback does prompt for elevation; the study's 'no UAC' holds only for the native capture path. Also not covered: the 4096 process-generation cap and the NVD searches were not re-run, and the os-version-support table row was not re-read. The question of whether 'dynamic composition' is a term used anywhere was out of this topic; a repo issue search for 'compos' returned 0 hits."
+ }
+]

@@ -1,7 +1,7 @@
 {
   "harness": "benchmark_prefill",
   "model_name": "8b",
-  "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-8b\\openvino-int4-gpu",
+  "model_dir": "C:\\Users\\__USER__\\BlarAI\\models\\qwen3-8b\\openvino-int4-gpu",
   "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
   "config": {

@@ -1,0 +1,37 @@
+{
+ "signature": "Valid|CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+ "signature_ok": true,
+ "zip_sha256": "0bb483b3592d0f663f2c5a7a2ae17db89cc04b82238684b0a1a9384b0fe828ed",
+ "zip_sha256_matches_published": true,
+ "probe_rc": 0,
+ "probe": {
+  "tier": "base-container",
+  "needsDaclAugmentation": false,
+  "warnings": [],
+  "probes": {
+   "baseContainerApiPresent": true,
+   "nativeCaptureAvailable": true,
+   "guardedCaptureAvailable": false,
+   "bfscfgPresent": false,
+   "bfsCompiledIn": false,
+   "baseContainerSupportsDenyPaths": true,
+   "baseContainerSupportsEnumeratePaths": false,
+   "baseContainerSupportsIngressHostLoopbackAllow": false,
+   "isolationSessionAvailable": false,
+   "hyperlightAvailable": true,
+   "uiCapabilities": {
+    "canBlockClipboardRead": true,
+    "canBlockClipboardWrite": true,
+    "canBlockInputInjection": true,
+    "canBlockInputMethodChanges": true,
+    "canBlockExternalUiObjects": true,
+    "canBlockGlobalUiNamespace": true,
+    "canBlockDesktopSwitching": true,
+    "canBlockLogoffOrShutdown": true,
+    "canBlockSystemParameterChanges": true,
+    "canBlockDisplaySettingsChanges": true
+   }
+  }
+ },
+ "tier_ok": true
+}

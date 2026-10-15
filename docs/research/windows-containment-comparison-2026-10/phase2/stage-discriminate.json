@@ -1,0 +1,190 @@
+{
+ "stage": "discriminate",
+ "runs_per_variant": 3,
+ "started": "2026-10-11T11:18:21-04:00",
+ "countdown_exit": 0,
+ "variants": [
+  {
+   "variant": "D-fixture-block-only",
+   "arm": "D",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "D",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-D-fixture-block-only",
+    "--label",
+    "D-fixture-block-only",
+    "--toolchain",
+    "fixture",
+    "--fence",
+    "discriminate:block-only"
+   ],
+   "started": "2026-10-11T11:20:23-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "D-20261011T112023-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 10.11, \"listener_accepts\": 1}",
+    "D-20261011T112036-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.923, \"listener_accepts\": 1}",
+    "D-20261011T112049-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.778, \"listener_accepts\": 1}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "B2-fixture-block-only",
+   "arm": "B2",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "B2",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-B2-fixture-block-only",
+    "--label",
+    "B2-fixture-block-only",
+    "--toolchain",
+    "fixture",
+    "--fence",
+    "discriminate:block-only"
+   ],
+   "started": "2026-10-11T11:21:01-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "B2-20261011T112101-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.968, \"listener_accepts\": 1}",
+    "B2-20261011T112114-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.604, \"listener_accepts\": 1}",
+    "B2-20261011T112126-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.149, \"listener_accepts\": 1}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "B3-fixture-block-only",
+   "arm": "B3",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "B3",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-B3-fixture-block-only",
+    "--label",
+    "B3-fixture-block-only",
+    "--toolchain",
+    "fixture",
+    "--fence",
+    "discriminate:block-only"
+   ],
+   "started": "2026-10-11T11:21:38-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "B3-20261011T112139-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.717, \"listener_accepts\": 1}",
+    "B3-20261011T112151-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.452, \"listener_accepts\": 1}",
+    "B3-20261011T112204-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.619, \"listener_accepts\": 1}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "D-fixture-block-permit",
+   "arm": "D",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "D",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-D-fixture-block-permit",
+    "--label",
+    "D-fixture-block-permit",
+    "--toolchain",
+    "fixture",
+    "--fence",
+    "discriminate:block-permit"
+   ],
+   "started": "2026-10-11T11:22:16-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "D-20261011T112216-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 10.044, \"listener_accepts\": 1}",
+    "D-20261011T112230-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 10.219, \"listener_accepts\": 1}",
+    "D-20261011T112244-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.991, \"listener_accepts\": 1}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "B2-fixture-block-permit",
+   "arm": "B2",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "B2",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-B2-fixture-block-permit",
+    "--label",
+    "B2-fixture-block-permit",
+    "--toolchain",
+    "fixture",
+    "--fence",
+    "discriminate:block-permit"
+   ],
+   "started": "2026-10-11T11:22:57-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "B2-20261011T112257-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.295, \"listener_accepts\": 1}",
+    "B2-20261011T112309-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.817, \"listener_accepts\": 1}",
+    "B2-20261011T112322-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 10.732, \"listener_accepts\": 1}"
+   ],
+   "stderr_tail": []
+  },
+  {
+   "variant": "B3-fixture-block-permit",
+   "arm": "B3",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "B3",
+    "--runs",
+    "3",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-B3-fixture-block-permit",
+    "--label",
+    "B3-fixture-block-permit",
+    "--toolchain",
+    "fixture",
+    "--fence",
+    "discriminate:block-permit"
+   ],
+   "started": "2026-10-11T11:23:36-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "B3-20261011T112336-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.692, \"listener_accepts\": 1}",
+    "B3-20261011T112349-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.501, \"listener_accepts\": 1}",
+    "B3-20261011T112402-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.191, \"listener_accepts\": 1}"
+   ],
+   "stderr_tail": []
+  }
+ ],
+ "finished": "2026-10-11T11:24:15-04:00",
+ "rc": 0
+}

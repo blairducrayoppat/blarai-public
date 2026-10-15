@@ -26,7 +26,7 @@ Every list item and prose line inside a rule-bearing section. In the fact and po
 `live_state_pointers`, `user_operator/facts`, `identity_split/facts`) an item is a rule only if it
 carries an imperative marker (never, always, must, do not, only, require, forbidden, keep,
 `USE`); the rest are facts. `status_snapshot` is volatile dated state and is never parsed.
-Current counts: 19 fact-section items included as rules, 31 fact items excluded, 14 snapshot
+Current counts: 19 fact-section items included as rules, 32 fact items excluded, 14 snapshot
 lines skipped (a test keeps these numbers true). The marker test is a heuristic: a few
 included items are facts that happen to say "never".
 

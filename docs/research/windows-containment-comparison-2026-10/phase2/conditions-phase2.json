@@ -1,0 +1,13 @@
+{
+    "measured":  "2026-10-11 11:00-11:25 -04:00",
+    "os":  "Microsoft Windows 11 Pro 10.0.26200 UBR 9457 25H2",
+    "ram_total_gb":  31.3,
+    "ram_free_gb_at_start":  19,
+    "cpu_load_pct_at_start":  59,
+    "elevated_session":  true,
+    "mxc":  "microsoft/mxc v1.0.0 wxc-exec.exe sha256 aa444c0f..., zip sha256 matches published 0bb483b3...; Microsoft Corporation signature valid; tier base-container per --probe (no DACL augmentation)",
+    "model_endpoints":  "127.0.0.1:8099 and :8000 not listening; opencode end-to-end task against a model not run",
+    "other_load":  "this session, background builder and reviewer agents (network and disk), operator desktop; four test-gate runs were NOT running",
+    "python":  "3.14.3",
+    "antivirus":  "Bitdefender (not re-checked)"
+}

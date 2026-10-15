@@ -24,7 +24,7 @@
   "models": {
     "qwen3.6-35b-a3b (MoE \u2014 the #3937/#36270 model)": {
       "gguf": "Qwen3.6-35B-A3B-UD-IQ4_XS.gguf",
-      "server_log": "C:\\Users\\mrbla\\models\\gguf-769\\results\\server_Qwen3.6-35B-A3B-UD-IQ4_XS.log",
+      "server_log": "C:\\Users\\__USER__\\models\\gguf-769\\results\\server_Qwen3.6-35B-A3B-UD-IQ4_XS.log",
       "offload_evidence": [
         "0.08.295.625 I load_tensors: offloading output layer to GPU",
         "0.08.295.655 I load_tensors: offloading 39 repeating layers to GPU",
@@ -71,7 +71,7 @@
     },
     "qwen3.6-27b (dense-hybrid)": {
       "gguf": "Qwen3.6-27B-IQ4_NL.gguf",
-      "server_log": "C:\\Users\\mrbla\\models\\gguf-769\\results\\server_Qwen3.6-27B-IQ4_NL.log",
+      "server_log": "C:\\Users\\__USER__\\models\\gguf-769\\results\\server_Qwen3.6-27B-IQ4_NL.log",
       "offload_evidence": [
         "0.06.809.840 I load_tensors: offloading output layer to GPU",
         "0.06.809.846 I load_tensors: offloading 63 repeating layers to GPU",

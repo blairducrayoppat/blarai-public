@@ -1,5 +1,44 @@
 # Egress Machinery — Activation & Allowlist Guide (ADR-027, STAGED/DORMANT)
 
+> **DATED HISTORY (2026-06-07, Sprint 17).** Everything below this block describes the egress
+> machinery as it stood when this guide was written: built, dormant, an empty external allowlist, no
+> screener registered, "do not do this in Sprint 17". It is kept as written. This block says what has
+> changed since.
+>
+> **Status as of 2026-10-11** (re-read in code on that date; the symbol is the pointer):
+>
+> - **All three activation gates in this guide now hold.** Gate 3 ("the first web feature ships", its
+>   endpoint added to the allowlist and the kill-switch armed, per the wording of egress_machinery.md section 5, which also requires the exfil screen to be wired) first held on **2026-07-02**: git
+>   `9a7eed8c` (the `LiveKagiAdapter` go-live build) and `0f578d83` (allowlist activation). Sequence
+>   before that, from git and the journal: the 2026-06-12 first sanctioned external fetch
+>   (`scripts/uc003_live_fetch_smoke.py`, commit `c64f7867`: one hard-registered host, `egress_guard`
+>   deliberately not armed, the Lead Architect (LA) present) ran under the separate four
+>   preconditions of ADR-027 Amendment 1, not under gate 3; the same day `c6fe7e97` (operator
+>   `/ingest` activation plus an armed-guard egress-door fix) and `f95c0350` (the `--go-live` flag and
+>   `scripts/run_winui_golive.bat`) built the operator path; on 2026-06-15 the operator ran
+>   `/ingest` in the production app (`docs/archive/journal/2026-06.md`, "The door that stayed shut
+>   when the wire went dead"), widening `www.bleepingcomputer.com:443` for one fetch and revoking it.
+>   So the paste path has run more than once, and not only in a disarmed harness.
+> - **The standing Policy Agent allowlist is not empty.** It is the class attribute
+>   `DeterministicPolicyChecker._EGRESS_ALLOWLIST` in `services/policy_agent/src/gpu_inference.py`;
+>   read the symbol for its contents. The live scope is `web_search`
+>   (`docs/runbooks/web_search_go_live.md`).
+> - **The socket-level allowlist is separate and empty at rest.** `egress_guard.external_allowlist()`
+>   starts empty and the only non-test caller of `allow_external_endpoint` is
+>   `shared/security/guarded_fetch.py`, which widens for one host and port per fetch and revokes in a
+>   `finally`. The `allow_external_endpoint("kagi.com", 443)` example in this guide is not how the
+>   live scope is wired.
+> - **The exfil screen is wired at every boot** (`_arm_egress_guard` in `launcher/__main__.py`) but
+>   screens plaintext sockets only and is never invoked for HTTPS (encrypted web traffic) (claim-register row 12).
+> - **The operator-pasted URL class** is closed at rest because a normal boot never starts the guest
+>   parser (`--go-live` is the only path to `_maybe_start_guest_parser`), so
+>   `ingest_coordinator._handle_url_ingest` refuses before any fetch. `[guest_parser] enabled = false`
+>   does not itself close it, because `--go-live` overrides it. The adjudicator for purpose
+>   `uc003-url-ingest` builds its allowlist from the request's own host and ignores the standing
+>   list; the door still refuses non-HTTPS URLs, userinfo, raw IP (Internet Protocol) hosts, ports other
+>   than 443 or 8443, and names that resolve to internal ranges. Detail: the 2026-10-11 block at the top of
+>   `docs/adrs/ADR-027-Egress-Policy-Network-Facing.md`. Design follow-up #1751; this fix #1749.
+
 **Scope:** the Tier-3 network-egress machinery built in Sprint 17 (Vikunja #628,
 criterion C3) to ADR-027. **Status: STAGED / DORMANT.** None of this enforces
 anything today — the air-gap stays welded. It activates only when the first web

@@ -1,8 +1,8 @@
 {
-  "python": "C:/Users/mrbla/BlarAI/.venv/Scripts/python.exe",
+  "python": "C:/Users/__USER__/BlarAI/.venv/Scripts/python.exe",
   "arms": {
-    "fixed": "C:/Users/mrbla/BlarAI-worktrees/gate-fixed-f407d2af",
-    "real": "C:/Users/mrbla/BlarAI"
+    "fixed": "C:/Users/__USER__/BlarAI-worktrees/gate-fixed-f407d2af",
+    "real": "C:/Users/__USER__/BlarAI"
   },
   "runs": [
     {
@@ -14,7 +14,7 @@
       "started": "2026-10-07 19:57:04 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 11193,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run01-fixed.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run01-fixed.log",
       "gate_pid": 19188,
       "gate_ctime": 1791417424.958732,
       "ended": "2026-10-07 20:19:56 -0400",
@@ -35,7 +35,7 @@
       "started": "2026-10-07 20:22:05 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 12693,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run02-real.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run02-real.log",
       "gate_pid": 10040,
       "gate_ctime": 1791418925.043116,
       "ended": "2026-10-07 20:46:14 -0400",
@@ -54,7 +54,7 @@
       "started": "2026-10-07 20:47:04 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 14193,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run03-fixed.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run03-fixed.log",
       "gate_pid": 13888,
       "gate_ctime": 1791420424.825084,
       "ended": "2026-10-07 21:10:44 -0400",
@@ -75,7 +75,7 @@
       "started": "2026-10-07 21:12:04 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 15693,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run04-real.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run04-real.log",
       "gate_pid": 23008,
       "gate_ctime": 1791421924.8468869,
       "ended": "2026-10-07 21:37:03 -0400",

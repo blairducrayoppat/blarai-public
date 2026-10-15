@@ -40,7 +40,7 @@ Run:
       powershell.exe -File <scratch>/bund/wfp-coder-egress-spike.ps1 -SelfTest  -> Exception calling "Build" with "1" argument(s): "refusing SID (not an account-domain user ..."
 
 - Incidence: 12 literals across 5 of the 8 scripts. Every bundled reproduction path that builds a plan is affected.
-- Fix direction: sanitise only real SIDs (the domains `4125655822-2918122917-2734753367` and `76345465-...`), leave the fabricated literals alone, and make the README's "nothing else" true. A bundle test that runs the WFP `-SelfTest` would lock it.
+- Fix direction: sanitise only real SIDs (the domains `1000000001-1000000002-1000000003` and `76345465-...`), leave the fabricated literals alone, and make the README's "nothing else" true. A bundle test that runs the WFP `-SelfTest` would lock it.
 
 ### V4. SHOULD-FIX: the status column softens two negative results
 - C6f's evidence column says "Contradicted for the research models", yet the status is `NOT ESTABLISHED`.

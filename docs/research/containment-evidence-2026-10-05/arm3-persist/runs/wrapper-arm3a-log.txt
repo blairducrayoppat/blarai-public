@@ -1,0 +1,23 @@
+2026-10-11T16:51:27.778-04:00 inner run started
+2026-10-11T16:52:05.388-04:00 | == 0 preflight (proof valid, SID safe, fence ABSENT) + wsl --shutdown ==
+2026-10-11T16:52:05.390-04:00 | ROLLBACK FACT: these objects are PERSISTENT. Closing the engine or exiting does NOT remove them. Removal is by key (-Remove); the dead-man task and the finally block below both run it.
+2026-10-11T16:52:05.395-04:00 | == 1 baselines and the absence check on an empty fence ==
+2026-10-11T16:52:05.399-04:00 | gate on an empty fence: allowed=False (ABSENT)
+2026-10-11T16:52:05.402-04:00 | operator baseline 3/3; account baseline: valid=True sid_ok=True egress_open=True
+2026-10-11T16:52:05.407-04:00 | == 2 add the persistent set (one transaction, NON-dynamic session) ==
+2026-10-11T16:52:05.407-04:00 | added; flags: filter:block-account-v4=0x1 filter:block-account-v6=0x1 sublayer:sublayer=0x1 provider:provider=0x1
+2026-10-11T16:52:05.407-04:00 | == 3 the account through the gate (watchdog every 2 s) ==
+2026-10-11T16:52:05.407-04:00 | under the fence: gate started the task=True; valid=True; outbound blocked=True (code 10013)
+2026-10-11T16:52:05.407-04:00 | == 4 remove by key, verify, and the gate must now refuse ==
+2026-10-11T16:52:05.407-04:00 | removal: objects gone=True; operator connect after ok=True; account after-run valid=True; egress open again=True
+2026-10-11T16:52:05.423-04:00 | report: C:\Users\_OPERATOR_\blarai-research-data\arm3-persist\arm3a-20261011-165130.json
+2026-10-11T16:52:05.429-04:00 | RESULT: exit 0: persistent fence enforced (account blocked), the absence check refused when the fence was absent, removal by key verified
+2026-10-11T16:52:05.432-04:00 target exit code: 0
+2026-10-11T16:52:07.086-04:00 |   filter    f1300003-0000-4d8e-9a31-2b6d4c8e3f21  not_found
+2026-10-11T16:52:07.090-04:00 |   filter    f1300004-0000-4d8e-9a31-2b6d4c8e3f22  not_found
+2026-10-11T16:52:07.094-04:00 |   sublayer  7e1f6a10-5c0b-4d8e-9a31-2b6d4c8e3f02  not_found
+2026-10-11T16:52:07.097-04:00 |   provider  7e1f6a10-5c0b-4d8e-9a31-2b6d4c8e3f01  not_found
+2026-10-11T16:52:07.101-04:00 | REMOVED: all four objects absent (read back).
+2026-10-11T16:52:07.101-04:00 follow-up exit code: 0
+2026-10-11T16:52:07.101-04:00 unregistering this task (last act)
+2026-10-11T16:52:08.462-04:00 task unregistered

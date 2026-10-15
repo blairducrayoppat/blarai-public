@@ -1,0 +1,212 @@
+--- a/src/sandbox/windows-sandbox-utils.ts
++++ b/src/sandbox/windows-sandbox-utils.ts
+@@ -192,6 +192,11 @@
+  */
+ export interface WindowsWfpVerifyResult {
+   target: string
++  /**
++   * The IPv6 loopback target verified alongside `target`. Set only
++   * when the listeners were bound locally (no `opts.target`).
++   */
++  targetV6?: string
+   /** Runner's stderr (carries the `BLOCKED (…)` diagnostic line). */
+   stderr: string
+ }
+@@ -939,7 +944,9 @@
+  * at session start instead of running every exec with full egress.
+  *
+  * @param opts.target overrides the probe target (skips the local
+- *   listener bind).
++ *   listener binds). Without it, an IPv4 (`127.0.0.1`) and an IPv6
++ *   (`[::1]`) listener are each probed; an unbindable family throws
++ *   `wfp_verify_bind_failed`.
+  * @param opts.proxyPortRange the WFP loopback-permit range the
+  *   listener must avoid. Default
+  *   {@link DEFAULT_WINDOWS_PROXY_PORT_RANGE}.
+@@ -952,82 +959,119 @@
+     srtWin?: SrtWinSpawn
+   } = {},
+ ): Promise<WindowsWfpVerifyResult> {
+-  let target = opts.target
+-  let server: net.Server | undefined
+-  if (!target) {
+-    // Bind ephemeral; retry if it lands inside the WFP
+-    // loopback-permit range (a port in-range would be PERMITted
+-    // even with the fence active → false `connected`).
++  const servers: net.Server[] = []
++  const targets: string[] = []
++  if (opts.target) {
++    targets.push(opts.target)
++  } else {
++    // The fence has separate V4 and V6 block filters, so each family
++    // gets its own listener and its own probe.
+     const [lo, hi] = opts.proxyPortRange ?? DEFAULT_WINDOWS_PROXY_PORT_RANGE
+-    for (let i = 0; i < 5; i++) {
+-      const s = net.createServer()
+-      s.listen(0, '127.0.0.1')
+-      await once(s, 'listening')
+-      const p = (s.address() as net.AddressInfo).port
+-      if (p < lo || p > hi) {
+-        server = s
+-        target = `127.0.0.1:${p}`
+-        break
++    try {
++      for (const [host, label] of [
++        ['127.0.0.1', 'IPv4'],
++        ['::1', 'IPv6'],
++      ] as const) {
++        // Bind ephemeral; retry if it lands inside the WFP
++        // loopback-permit range (a port in-range would be PERMITted
++        // even with the fence active → false `connected`).
++        let target: string | undefined
++        for (let i = 0; i < 5; i++) {
++          const s = net.createServer()
++          try {
++            s.listen(0, host)
++            await once(s, 'listening')
++          } catch (e) {
++            s.close()
++            // An unbindable family cannot be probed; skipping it
++            // would leave that family's block filter unverified.
++            throw new WindowsSandboxError(
++              'wfp_verify_bind_failed',
++              `verifyWindowsWfpEgress: could not bind an ${label} ` +
++                `loopback listener (${host}): ${(e as Error).message}`,
++            )
++          }
++          const p = (s.address() as net.AddressInfo).port
++          if (p < lo || p > hi) {
++            servers.push(s)
++            target = host === '::1' ? `[::1]:${p}` : `${host}:${p}`
++            break
++          }
++          s.close()
++        }
++        if (!target) {
++          throw new WindowsSandboxError(
++            'wfp_verify_bind_failed',
++            `verifyWindowsWfpEgress: could not bind an ${label} ` +
++              `loopback listener outside the WFP permit range ` +
++              `[${lo},${hi}] in 5 attempts`,
++          )
++        }
++        targets.push(target)
+       }
+-      s.close()
+-    }
+-    if (!target) {
+-      throw new WindowsSandboxError(
+-        'wfp_verify_bind_failed',
+-        `verifyWindowsWfpEgress: could not bind a loopback ` +
+-          `listener outside the WFP permit range [${lo},${hi}] in ` +
+-          `5 attempts`,
+-      )
++    } catch (e) {
++      for (const s of servers) s.close()
++      throw e
+     }
+   }
+   try {
+-    // 30s: first call after install may create the sandbox user's
+-    // profile (LOGON_WITH_PROFILE) via CreateProcessWithLogonW, and
+-    // the runner allows itself 2s to connect (runner.rs).
+-    const r = runSrtWin(['wfp', 'verify', '--target', target], {
+-      timeoutMs: 30_000,
+-      srtWin: opts.srtWin,
+-    })
+-    logForDebugging(
+-      `[Sandbox Windows] wfp verify exit=${r.status}: ${r.stderr || r.stdout}`,
+-    )
+-    let raw: { egress_probe: string; target: string }
+-    try {
+-      raw = JSON.parse(r.stdout)
+-    } catch {
+-      // Timeout is thrown as `srt_win_timeout` by `runSrtWin` before
+-      // this parse; status=null here means an external signal.
+-      // Include signal + stderr so the CI log self-explains instead
+-      // of just `exited null with unparseable output ""`.
+-      throw new WindowsSandboxError(
+-        'wfp_verify_unparseable',
+-        `WFP egress fence could not be verified — \`srt-win wfp ` +
+-          `verify\` exited ${r.status}` +
+-          (r.signal ? ` (signal ${r.signal})` : '') +
+-          ` with unparseable output ${JSON.stringify(r.stdout)} ` +
+-          `(stderr: ${JSON.stringify(r.stderr)})`,
+-      )
+-    }
+-    if (r.status === 3) {
+-      throw new WindowsSandboxError(
+-        'wfp_fence_inactive',
+-        `WFP egress fence is not active — direct outbound from the ` +
+-          `sandbox user to ${raw.target} succeeded. Re-run ` +
+-          `\`srt-win install\` (one UAC prompt). (${r.stderr})`,
++    const raws: { egress_probe: string; target: string }[] = []
++    let stderr = ''
++    for (const target of targets) {
++      // 30s: first call after install may create the sandbox user's
++      // profile (LOGON_WITH_PROFILE) via CreateProcessWithLogonW, and
++      // the runner allows itself 2s to connect (runner.rs).
++      const r = runSrtWin(['wfp', 'verify', '--target', target], {
++        timeoutMs: 30_000,
++        srtWin: opts.srtWin,
++      })
++      logForDebugging(
++        `[Sandbox Windows] wfp verify exit=${r.status}: ${r.stderr || r.stdout}`,
+       )
++      let raw: { egress_probe: string; target: string }
++      try {
++        raw = JSON.parse(r.stdout)
++      } catch {
++        // Timeout is thrown as `srt_win_timeout` by `runSrtWin` before
++        // this parse; status=null here means an external signal.
++        // Include signal + stderr so the CI log self-explains instead
++        // of just `exited null with unparseable output ""`.
++        throw new WindowsSandboxError(
++          'wfp_verify_unparseable',
++          `WFP egress fence could not be verified — \`srt-win wfp ` +
++            `verify\` exited ${r.status}` +
++            (r.signal ? ` (signal ${r.signal})` : '') +
++            ` with unparseable output ${JSON.stringify(r.stdout)} ` +
++            `(stderr: ${JSON.stringify(r.stderr)})`,
++        )
++      }
++      if (r.status === 3) {
++        throw new WindowsSandboxError(
++          'wfp_fence_inactive',
++          `WFP egress fence is not active — direct outbound from the ` +
++            `sandbox user to ${raw.target} succeeded. Re-run ` +
++            `\`srt-win install\` (one UAC prompt). (${r.stderr})`,
++        )
++      }
++      if (r.status !== 0) {
++        throw new WindowsSandboxError(
++          'wfp_verify_inconclusive',
++          `WFP egress fence could not be verified — probe to ` +
++            `${raw.target} was '${raw.egress_probe}' (exit ` +
++            `${r.status}). The fence may be absent. Re-run \`srt-win ` +
++            `install\`. (${r.stderr})`,
++        )
++      }
++      raws.push(raw)
++      stderr = r.stderr
+     }
+-    if (r.status !== 0) {
+-      throw new WindowsSandboxError(
+-        'wfp_verify_inconclusive',
+-        `WFP egress fence could not be verified — probe to ` +
+-          `${raw.target} was '${raw.egress_probe}' (exit ` +
+-          `${r.status}). The fence may be absent. Re-run \`srt-win ` +
+-          `install\`. (${r.stderr})`,
+-      )
++    return {
++      target: raws[0].target,
++      ...(raws.length > 1 ? { targetV6: raws[1].target } : {}),
++      stderr,
+     }
+-    return { target: raw.target, stderr: r.stderr }
+   } finally {
+-    server?.close()
++    for (const s of servers) s.close()
+   }
+ }
+ 

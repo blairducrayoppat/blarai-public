@@ -177,7 +177,7 @@ the exception type only, never key material).
 > strong. RULE 3 is allowlist-*parameterised*, not a fixed block: the `/ingest`
 > path supplies its own one-entry allowlist built from the URL you pasted, so for
 > that path RULE 3 approves the host you chose. That is the design, and it is
-> dormant at rest (`[guest_parser].enabled = false`). The universal-deny statement
+> dormant at rest (a normal boot never starts the guest parser; only `--go-live` does). The universal-deny statement
 > above is therefore about the `web_search` path specifically.
 >
 > **The key is necessary but not sufficient.** A third, independent lock sits in
@@ -207,7 +207,7 @@ the exception type only, never key material).
 > operator-typed egress (`/ingest <url>`) is consented by the act of pasting the
 > URL, not by a fingerprint (ADR-027 Amendment 1 rejected a Hello prompt there as
 > merely re-confirming intent you already expressed). That path is dormant at
-> rest behind `[guest_parser].enabled = false`. The `--probe` diagnostic also
+> rest because a normal boot never starts the guest parser (only `--go-live` does). The `--probe` diagnostic also
 > reaches Kagi without the envelope; it is operator-run. Those three — the
 > envelope-gated `web_search`, `/ingest`, and `--probe` — are the only paths in
 > shipped runtime code that reach the network.

@@ -1,0 +1,47 @@
+{
+  "exit_code": 2,
+  "exit_reason": "refused: the script folder is writable by non-administrators, so the SYSTEM tasks would run attacker-editable code: output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it); output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\arm3a-20261011-165130-filters-after-removal.xml: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it); output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\arm3a-20261011-165130-filters-before-removal.xml: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it). Nothing added",
+  "steps": {
+    "restart_decision": {
+      "Ok": true,
+      "Reason": "decision recorded by Lead Architect at 2026-10-12T00:00:00.0000000-04:00 (Vikunja #1682 comment 4065 (2026-10-12))"
+    },
+    "proof": {
+      "ok": true,
+      "problems": []
+    },
+    "fence_before": {
+      "State": "ABSENT",
+      "Present": [],
+      "Missing": [
+        "filter:block-account-v4",
+        "filter:block-account-v6",
+        "sublayer:sublayer",
+        "provider:provider"
+      ],
+      "AllPersistent": false,
+      "Flags": {},
+      "Error": null
+    },
+    "admin_only_folder": {
+      "Ok": false,
+      "Problems": [
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\arm3a-20261011-165130-filters-after-removal.xml: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\arm3a-20261011-165130-filters-before-removal.xml: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\arm3a-20261011-165130-filters-present.xml: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\arm3a-20261011-165130.json: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\remove-20261011-165206.json: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\rollback-selftest-proof.json: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\wrapper-arm3a.log: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\wrapper-arm3b-log.txt: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data\\arm3-persist\\wrapper-arm3b-log2.txt: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data is owned by S-1-5-21-1000000001-1000000002-1000000003-1001 (an owner can change its permissions)",
+        "output folder: C:\\Users\\_OPERATOR_\\blarai-research-data: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on an ancestor)",
+        "output folder: C:\\Users\\_OPERATOR_: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on an ancestor)"
+      ],
+      "Checked": 41
+    }
+  },
+  "finished": "2026-10-12T14:38:57.659-04:00"
+}

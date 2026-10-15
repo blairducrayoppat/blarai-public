@@ -6,7 +6,7 @@
   "environment": {
     "openvino_genai_baseline": "2026.2.1.0-3123-7dea0459b2a (win_amd64 cp311 wheel, stock/unpatched)",
     "openvino_genai_source_commit": "7dea045 (releases/2026/2) -- the exact commit the baseline wheel was built from",
-    "openvino_source_dir": "C:/Users/mrbla/oss/openvino (build-x86_64/RelWithDebInfo, local dev build, CPU plugin linked; GPU plugin not linked in this local checkout)",
+    "openvino_source_dir": "C:/Users/__USER__/oss/openvino (build-x86_64/RelWithDebInfo, local dev build, CPU plugin linked; GPU plugin not linked in this local checkout)",
     "python": "3.11.9",
     "os": "Windows 11 Pro (build 26200)",
     "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",

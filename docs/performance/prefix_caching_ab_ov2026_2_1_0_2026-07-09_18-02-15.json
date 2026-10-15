@@ -52,8 +52,8 @@
     "prefix_tokens": 3072,
     "cooldown_s": 120.0,
     "steady_state": false,
-    "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
-    "draft_model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu"
+    "model_dir": "C:\\Users\\__USER__\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+    "draft_model_dir": "C:\\Users\\__USER__\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu"
   },
   "steady_state_warmup": null,
   "results": [

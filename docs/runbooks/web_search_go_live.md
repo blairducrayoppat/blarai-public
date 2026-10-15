@@ -336,9 +336,12 @@ forgeries. If that lock is ever weakened, this design is what it was protecting.
 **One thing the old framing got wrong in the other direction, now stated here.**
 "Empty allowlist = every URL denied" was cited as a third lock on URL ingest. It
 never bound the paste path in any process — paste-is-consent does not consult the
-standing allowlist, by definition. The locks that actually hold URL ingest shut
-are adjudicator-not-registered, `[guest_parser].enabled = false`, and the ingest
-coordinator's refusal before the fetch when the guest parser is not ready.
+standing allowlist, by definition. The lock that actually holds URL ingest shut
+at rest is the ingest coordinator's refusal before the fetch when the guest parser
+is not ready, which follows from a normal launcher boot never starting the guest
+parser (only a `--go-live` boot does, and it overrides `[guest_parser].enabled =
+false`). The adjudicator is not a lock: the request-keyed adjudicator is
+registered whenever `web_search` is live.
 `test_the_empty_standing_allowlist_does_NOT_bind_the_paste_path` exists so nobody
 re-derives the stronger claim.
 

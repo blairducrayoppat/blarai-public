@@ -106,7 +106,7 @@ This writes your Anthropic API key to a protected file so scheduled `claude -p` 
 ```
 icacls 'C:\Users\mrbla\.blarai-fleet\credentials.env'
 ```
-Expect one row with `NORTHSTAR100\mrbla:(F)` and no other principals.
+Expect one row with `__HOST__\mrbla:(F)` and no other principals.
 
 ---
 
@@ -289,7 +289,7 @@ notepad 'C:\Users\mrbla\.blarai-fleet\credentials.env'
 ```
 icacls 'C:\Users\mrbla\.blarai-fleet\credentials.env'
 ```
-Expect still-and-only `NORTHSTAR100\mrbla:(F)`.
+Expect still-and-only `__HOST__\mrbla:(F)`.
 7. Smoke test:
 ```
 $env:ANTHROPIC_API_KEY = ((Get-Content 'C:\Users\mrbla\.blarai-fleet\credentials.env') -split '=', 2)[1]; & 'C:\Users\mrbla\AppData\Roaming\Claude\claude-code\2.1.111\claude.exe' --bare -p 'echo rotate'; $env:ANTHROPIC_API_KEY = ''

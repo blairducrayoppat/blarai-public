@@ -2,7 +2,7 @@
   "label": "warm",
   "model": "gemma-4-26B-A4B-it-int4-ov",
   "device": "GPU",
-  "cache_dir": "C:/Users/mrbla/AppData/Local/Temp/claude/C--Users-mrbla-BlarAI/c2208ed6-8634-48d8-8d40-16120e76f595/scratchpad/gemma4probe/ovcache",
+  "cache_dir": "C:/Users/__USER__/AppData/Local/Temp/claude/C--Users-__USER__-BlarAI/c2208ed6-8634-48d8-8d40-16120e76f595/scratchpad/gemma4probe/ovcache",
   "cache_bytes_before_gb": 14.279,
   "baseline_host_in_use_gb": 6.334,
   "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",

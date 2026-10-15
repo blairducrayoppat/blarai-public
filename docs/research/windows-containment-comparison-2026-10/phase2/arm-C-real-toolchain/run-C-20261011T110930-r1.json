@@ -1,0 +1,18 @@
+{
+ "launch": {
+  "exit_code": 3221225781,
+  "timed_out": false,
+  "wall_secs": 0.061,
+  "listener_accepts": 0
+ },
+ "cmdline": "\"C:/Python314/python.exe\" -I \"C:\\blarai-spike-1740\\payload\\arm_payload.py\" --arm C --tag C-20261011T110930-r1 --out \"C:\\blarai-spike-1740\\worktree\\result-C-20261011T110930-r1.json\" --tools \"C:\\blarai-spike-1740\\payload\\tools.json\" --listener-port 49468",
+ "variant": {
+  "label": "C-real-toolchain",
+  "fence": "",
+  "toolchain": "real",
+  "capabilities": [],
+  "loopback_exempt": false
+ },
+ "fence_report": null,
+ "payload": null
+}

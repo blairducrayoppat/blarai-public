@@ -1,0 +1,6 @@
+measured 2026-10-10 ~22:25 -04:00, PowerShell 7 elevated, read-only (codex_fw.ps1)
+CodexSandboxOffline | codex_sandbox_offline_block_loopback_udp | Outbound Block | enabled=True | remote=127.0.0.0/255.0.0.0,::/127 ports=Any | LocalUser=O:LSD:(A;;CC;;;<CodexSandboxOffline SID -1007>)
+CodexSandboxOffline | codex_sandbox_offline_block_loopback_tcp | Outbound Block | enabled=True | remote=127.0.0.0/255.0.0.0,::/127 ports=1-65535 | LocalUser=O:LSD:(A;;CC;;;<CodexSandboxOffline SID -1007>)
+(no other firewall rule names either Codex account; no rule blocks CodexSandboxOffline's non-loopback egress)
+group CodexSandboxUsers: CodexSandboxOffline, CodexSandboxOnline
+group Users: CodexSandboxOffline, CodexSandboxOnline

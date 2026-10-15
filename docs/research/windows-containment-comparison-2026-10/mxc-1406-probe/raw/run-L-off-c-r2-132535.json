@@ -1,0 +1,259 @@
+{
+ "condition": "L-off-c",
+ "tag": "L-off-c-r2-132535",
+ "run": 2,
+ "launcher": "C:\\blarai-spike-1740-mxc\\build1406\\target\\x86_64-pc-windows-msvc\\release\\wxc-exec.exe",
+ "config": {
+  "version": "1.0.0",
+  "containment": "processcontainer",
+  "lifecycle": {
+   "destroyOnExit": true
+  },
+  "fallback": {
+   "allowDaclMutation": false
+  },
+  "process": {
+   "commandLine": "\"C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe\" -I \"C:\\blarai-spike-1740-mxc\\probe1406\\payload\\net_payload.py\" --tag L-off-c-r2-132535 --out \"C:\\blarai-spike-1740-mxc\\probe1406\\work\\result-L-off-c-r2-132535.json\" --lan-ip 10.0.10.12 --port 18099 --other-port 18100",
+   "cwd": "C:\\blarai-spike-1740-mxc\\probe1406\\work",
+   "inheritDefaultEnv": true,
+   "timeout": 150000
+  },
+  "filesystem": {
+   "readwritePaths": [
+    "C:\\blarai-spike-1740-mxc\\probe1406\\work"
+   ],
+   "readonlyPaths": [
+    "C:\\blarai-spike-1740\\toolchain",
+    "C:\\blarai-spike-1740-mxc\\probe1406\\payload"
+   ]
+  },
+  "network": {
+   "egress": {
+    "default": "deny"
+   },
+   "ingress": {
+    "default": "deny",
+    "hostLoopback": "deny"
+   }
+  },
+  "ui": {
+   "disable": false,
+   "clipboard": "none",
+   "injection": false
+  }
+ },
+ "machine": {
+  "battery": [
+   {
+    "BatteryStatus": 2,
+    "EstimatedChargeRemaining": 80
+   }
+  ],
+  "top_cpu": [
+   "bdservicehost=118",
+   "pwsh#4=112",
+   "pwsh#5=96",
+   "SearchIndexer=80",
+   "System=53"
+  ],
+  "cpu_total": 55,
+  "bitdefender": [
+   "bdagent/18888",
+   "bdntwrk/10320",
+   "bdredline/4112",
+   "bdredline/18824",
+   "bdservicehost/2912",
+   "bdservicehost/2920",
+   "bdservicehost/4040",
+   "bdservicehost/4060",
+   "bdservicehost/6440",
+   "bduserhost/11852",
+   "bduserhost/14112",
+   "bduserhost/15676",
+   "bduserhost/18448",
+   "updatesrv/7436"
+  ],
+  "thermal_c": [
+   60.1
+  ]
+ },
+ "snapshot_before": {
+  "acl": {
+   "C:\\blarai-spike-1740-mxc\\probe1406": "5fd817deffa4b4fc",
+   "C:\\blarai-spike-1740-mxc\\probe1406\\payload": "5fd817deffa4b4fc",
+   "C:\\blarai-spike-1740-mxc\\probe1406\\work": "5fd817deffa4b4fc",
+   "C:\\blarai-spike-1740\\toolchain": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe": "ca7c61792557ae4f"
+  },
+  "process_sandboxes": [
+   "<absent>"
+  ],
+  "appcontainer_mappings": 217,
+  "state_dir": []
+ },
+ "host_control": {
+  "loop18099": "HTTP/1.0 200 OK",
+  "loop18100": "HTTP/1.0 200 OK",
+  "lan18099": "HTTP/1.0 200 OK"
+ },
+ "dry_run": {
+  "rc": 0,
+  "stdout": "SECTION: Request simplified\nScript code length: 270\nWorking directory: C:\\blarai-spike-1740-mxc\\probe1406\\work\nScript timeout: 150000\nContainer name: CLI\nselected isolation tier: base-container\nRunner completed in 0ms\nDry run completed. Result: validation passed",
+  "stderr": ""
+ },
+ "launch": {
+  "exit_code": 0,
+  "wall_secs": 0.58,
+  "started": "2026-10-11T13:25:37.461-04:00",
+  "stdout": "{\"tag\": \"L-off-c-r2-132535\", \"tcp\": [[\"127.0.0.1:18099\", false, \"PermissionError\"], [\"127.0.0.1:18100\", false, \"PermissionError\"], [\"10.0.10.12:18099\", false, \"PermissionError\"], [\"1.1.1.1:443\", false, \"PermissionError\"], [\"example.com:443\", false, \"gaierror\"]]}",
+  "stderr": "Failed to find real location of C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe"
+ },
+ "mxc_log_tail": "1739537]       \"systemSettings\": \"none\",\n[1791739537]       \"ime\": false\n[1791739537]     },\n[1791739537]     \"capture_denials\": null\n[1791739537]   },\n[1791739537]   \"lxc_config\": {\n[1791739537]     \"distribution\": \"\",\n[1791739537]     \"release\": \"\"\n[1791739537]   },\n[1791739537]   \"wslc\": null,\n[1791739537]   \"seatbelt\": null,\n[1791739537]   \"telemetry\": null,\n[1791739537]   \"test_feature\": null,\n[1791739537]   \"windows_sandbox\": null,\n[1791739537]   \"hyperlight\": null,\n[1791739537]   \"experimental_enabled\": false,\n[1791739537]   \"testing_features_enabled\": false,\n[1791739537]   \"dry_run\": false\n[1791739537] }\n[1791739537] [network_proxy: disabled][1791739537] \n[1791739537] {\"event\":\"mxc.PolicyHash\",\"backend\":\"processcontainer\",\"policy_hash\":\"sha256:c2e8dcb4c8fe7ddeb4edc00d5dec0a9ccf0e88fedf651c443578fa699c3249da\",\"config_schema_version\":\"1.0.0\"}\n[1791739537] selected isolation tier: [1791739537] base-container[1791739537] \n[1791739537] \u25b6[1791739537]  SECTION: Backend runner 'BaseContainer'\n[1791739537] \u25b6[1791739537]  SECTION: Build sandbox spec\n[1791739537] process security environment spec built (PSEC [1791739537] 1[1791739537] .[1791739537] 0[1791739537] , [1791739537] 232[1791739537]  bytes)\n[1791739537] \u25b6[1791739537]  SECTION: Load API\n[1791739537] \u25b6[1791739537]  SECTION: Launch process\n[1791739537] working directory: [1791739537] C:\\blarai-spike-1740-mxc\\probe1406\\work (from process.cwd)[1791739537] \n[1791739537] STDIO mode: passthrough (forwarding parent handles to child)\n[1791739537] launching: [1791739537] \"C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe\" -I \"C:\\blarai-spike-1740-mxc\\probe1406\\payload\\net_payload.py\" --tag L-off-c-r2-132535 --out \"C:\\blarai-spike-1740-mxc\\probe1406\\work\\result-L-off-c-r2-132535.json\" --lan-ip 10.0.10.12 --port 18099 --other-port 18100[1791739537] \n[1791739537] identity: [1791739537] <process-security-environment>[1791739537] \n[1791739537] process security environment created (processmodel.dll)\n[1791739537] process created (PID: [1791739537] 8860[1791739537] )\n[1791739537] {\"event\":\"mxc.NetworkPolicyApplied\",\"backend\":\"processcontainer\",\"identity\":\"redacted\",\"tier\":\"base-container\",\"enforcement_mode\":\"capabilities\",\"default_policy\":\"block\",\"proxy_port\":0,\"firewall_rules_created\":0,\"firewall_applied\":false,\"status\":\"success\"}\n[1791739538] {\"event\":\"mxc.ProcessExited\",\"backend\":\"processcontainer\",\"identity\":\"redacted\",\"tier\":\"base-container\",\"pid\":8860,\"exit_code\":0}\n[1791739538] {\"event\":\"mxc.SandboxTornDown\",\"backend\":\"processcontainer\",\"identity\":\"redacted\",\"tier\":\"base-container\",\"pid\":8860,\"status\":\"success\",\"firewall_rules_removed\":0,\"firewall_removal_ok\":true,\"bfs_removed\":false,\"proxy_stopped\":false,\"preserve_policy\":false,\"container_released\":false}\n[1791739538] Runner completed in [1791739538] 511[1791739538] ms\n[1791739538] Exit code: [1791739538] 0[1791739538]  (0x[1791739538] 0[1791739538] 0[1791739538] 0[1791739538] 0[1791739538] 0[1791739538] 0[1791739538] 0[1791739538] 0[1791739538] )\n",
+ "payload": {
+  "tag": "L-off-c-r2-132535",
+  "env_proxy": {},
+  "tcp": [
+   {
+    "target": "127.0.0.1:18099",
+    "connected": false,
+    "error": "PermissionError",
+    "winerror": 10013,
+    "detail": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+    "secs": 0.006
+   },
+   {
+    "target": "127.0.0.1:18100",
+    "connected": false,
+    "error": "PermissionError",
+    "winerror": 10013,
+    "detail": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+    "secs": 0.012
+   },
+   {
+    "target": "10.0.10.12:18099",
+    "connected": false,
+    "error": "PermissionError",
+    "winerror": 10013,
+    "detail": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+    "secs": 0.016
+   },
+   {
+    "target": "1.1.1.1:443",
+    "connected": false,
+    "error": "PermissionError",
+    "winerror": 10013,
+    "detail": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+    "secs": 0.016
+   },
+   {
+    "target": "example.com:443",
+    "connected": false,
+    "error": "gaierror",
+    "winerror": null,
+    "detail": "[Errno 11001] getaddrinfo failed",
+    "secs": 0.002
+   }
+  ],
+  "dns": {
+   "name": "example.com",
+   "resolved": null,
+   "error": "gaierror",
+   "winerror": null,
+   "secs": 0.012
+  },
+  "urllib_env_proxy": {
+   "url": "http://mxc-proxy-probe.invalid/L-off-c-r2-132535-urllib",
+   "error": "URLError",
+   "detail": "<urlopen error [Errno 11001] getaddrinfo failed>",
+   "secs": 0.034
+  },
+  "curl": {
+   "url": "http://mxc-proxy-probe.invalid/L-off-c-r2-132535-curl",
+   "rc": 6,
+   "out": "",
+   "err": "curl: (6) Could not resolve host: mxc-proxy-probe.invalid\n",
+   "secs": 0.086
+  },
+  "winhttp_default": {
+   "host": "mxc-proxy-probe.invalid",
+   "path": "/L-off-c-r2-132535-winhttp0",
+   "access_type": 0,
+   "error": "WinHttpSendRequest 12007",
+   "secs": 0.016
+  },
+  "winhttp_automatic": {
+   "host": "mxc-proxy-probe.invalid",
+   "path": "/L-off-c-r2-132535-winhttp4",
+   "access_type": 4,
+   "error": "WinHttpSendRequest 12007",
+   "secs": 0.009
+  },
+  "total_secs": 0.208
+ },
+ "listener_log_all": [
+  {
+   "ts": "2026-10-11T13:25:37.383-04:00",
+   "listener": "loop18099",
+   "bind": "127.0.0.1:18099",
+   "peer": "127.0.0.1:57344",
+   "request_line": "GET /host-control-loop18099 HTTP/1.0",
+   "marker": "host-control-loop18099",
+   "bytes": 80
+  },
+  {
+   "ts": "2026-10-11T13:25:37.386-04:00",
+   "listener": "loop18100",
+   "bind": "127.0.0.1:18100",
+   "peer": "127.0.0.1:57345",
+   "request_line": "GET /host-control-loop18100 HTTP/1.0",
+   "marker": "host-control-loop18100",
+   "bytes": 80
+  },
+  {
+   "ts": "2026-10-11T13:25:37.389-04:00",
+   "listener": "lan18099",
+   "bind": "10.0.10.12:18099",
+   "peer": "10.0.10.12:57346",
+   "request_line": "GET /host-control-lan18099 HTTP/1.0",
+   "marker": "host-control-lan18099",
+   "bytes": 78
+  }
+ ],
+ "container_attributed_log": [],
+ "verdict": {
+  "loop18099_hits": 0,
+  "loop18099_direct_marker": false,
+  "loop18099_proxied_request_lines": [],
+  "loop18100_hits": 0,
+  "lan18099_hits": 0
+ },
+ "snapshot_after": {
+  "acl": {
+   "C:\\blarai-spike-1740-mxc\\probe1406": "5fd817deffa4b4fc",
+   "C:\\blarai-spike-1740-mxc\\probe1406\\payload": "5fd817deffa4b4fc",
+   "C:\\blarai-spike-1740-mxc\\probe1406\\work": "5fd817deffa4b4fc",
+   "C:\\blarai-spike-1740\\toolchain": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe": "ca7c61792557ae4f"
+  },
+  "process_sandboxes": [
+   "<absent>"
+  ],
+  "appcontainer_mappings": 217,
+  "state_dir": []
+ },
+ "verify_clean": {
+  "rc": 0,
+  "state": {
+   "fence_state": {
+    "sublayer": false,
+    "provider": false,
+    "filters": []
+   },
+   "fence_clean": true,
+   "loopback_exemption_present": false,
+   "appcontainer_profile_folder_present": false
+  },
+  "stderr": ""
+ },
+ "state_changed_by_run": {}
+}

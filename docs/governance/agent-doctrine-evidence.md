@@ -186,3 +186,14 @@ The incidents behind rules whose inline stories were converted to one-clause rea
   hook, because Claude Code silently loads a file with unparseable frontmatter in EVERY session.
   The delivery hook warns the model on failure and never blocks a tool call: blocking every Read
   would also block the repair.
+- 2026-10-14 (#1765, #1741): the independent review of the NEP-0005 evidence write-up (unposted) found the study records a
+  public snapshot would publish carried the host name (10 files), the operator account name (82 files) and
+  the paths of the operator's credential stores with their access lists (5 records); 11 tracked files already
+  named the host on the mirror. The question was put to the LA; his ruling was that it is never his question:
+  a deterministic script removes the identifiers and a gate lock keeps them out, at the publish seam, every
+  time. Hence `scripts/scrub_public_identifiers.py`, `tests/security/test_no_host_identity_in_tree.py`, the
+  host-name line in the publisher's private leak-gate pattern file, and the performance.md rule.
+  Round 3 of the review (same day) measured that 78 new files had carried the account name in 30 days, 38 of
+  them under docs/reviews and docs/research where performance.md is never delivered; the two bullets moved to
+  `.claude/rules/identity.md`, delivered on docs/reviews, docs/research, docs/adrs, docs/archive and docs/handoffs.
+  Round 4 (same day) measured that the delivery list covered 46 of 67 new carrying files and that a partial clean left headroom a later branch could refill; identity.md is now delivered on docs, scripts, tools and tests, and a listed count that exceeds the file's own count is a finding (the count follows the file down).

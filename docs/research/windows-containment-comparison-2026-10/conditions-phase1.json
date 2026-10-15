@@ -1,0 +1,13 @@
+{
+    "measured":  "2026-10-10 22:11-22:13 -04:00",
+    "host_cpu":  "Intel(R) Core(TM) Ultra 7 258V",
+    "os":  "Microsoft Windows 11 Pro 10.0.26200",
+    "ram_total_gb":  31.3,
+    "ram_free_gb_at_start":  12.2,
+    "cpu_load_pct_at_start":  11,
+    "elevated_session":  true,
+    "model_endpoints":  "127.0.0.1:8099 and :8000 not listening (OVMS and the model proxy down); the LLM end-to-end opencode task was not run",
+    "other_load":  "this Claude Code session, 4 background research subagents (network-bound), the operator desktop; no GPU work, no test gate running",
+    "python":  "3.14.3",
+    "antivirus":  "Bitdefender (per #1671 record; not re-checked)"
+}

@@ -72,30 +72,35 @@ and flagged in the sprawl notes; they are **not** listed here individually.)
 ## 3. `docs/` subdirectory map
 
 Ordered roughly by how often you need them. Counts are git-tracked files
-(2026-07-11).
+(2026-10-11). The topic-by-topic map across all of these is `research/KNOWLEDGE_MAP.md`; where each kind of knowledge lives is `research/KNOWLEDGE_FOLDER_CATALOGUE.md`.
 
 | Directory | Files | What it holds | When to read |
 |-----------|------:|---------------|--------------|
-| `adrs/` | 34 | Architecture Decision Records **ADR-005 … ADR-038** (rationale + trade-offs for every locked decision). Indexed by `DECISION_REGISTER.md`. | To read the *why* behind a locked architectural/security decision. |
+| `adrs/` | 46 | Architecture Decision Records **ADR-005 … ADR-049** (rationale + trade-offs for every locked decision). Indexed by `DECISION_REGISTER.md`. | To read the *why* behind a locked architectural/security decision. |
 | `ledger/` | 31 | Per-entry maturation ledger (Q1-1 format, 2026-04-22 onward) — the **live** successor to the frozen monolithic ledger. Has `README.md`. | Recording or reading a Phase-5+ milestone entry. |
 | `sprints/` | ~10 | `ACTIVE_SPRINT.md` (the ≤30-line live pointer), `_templates/`, and `sprint_18/` (moves at the next quiet pass). Sprints 8–17 → `archive/sprints/` (2026-07-19). | The live sprint pointer; historic sprints via `archive/sprints/INDEX.md`. |
-| `runbooks/` | 23 | Operator/LA runbooks — go-live ceremonies, reboot checklist, disaster recovery, MCP sync, VM lifecycle. `LA_OPERATIONS_INDEX.md` indexes them. | Running an operational ceremony or recovery. |
-| `governance/` | 17 | Fleet governance doctrine — rule-engine, circuit-breaker, IPC protocol, session-state, observability, PII-redaction, AIGP study plan, `handoff-brief-template.md`. `README.md` is the landing page. | Governance/doctrine work. Out of #267 scope (Sprint 9 rebuilt it). |
-| `research/` | 16 | Dated research studies — agent protocols, the Coordinator program (#841), dispatch leverage, assistant memory, Kagi key handling. Design-only. | Grounding a design decision in prior research. |
-| `security/` | 54 | Security audits, the capstone presentation deck, egress machinery/activation records, `DATA_MAP.md`, guest-parser/oracle provisioning records, PCR-seal & trust-root POCs, UC-003 live-fetch proofs. | Security review, egress posture, capstone. **See sprawl note on node_modules bloat.** |
-| `performance/` | 140 | Machine-readable perf JSON + `perf_history` — the dataset feeding OpenVINO/HuggingFace community contribution. `README_coresident_ut.md` explains the co-resident harness. | Recording or citing benchmark data (pairs with root `PERFORMANCE_LOG.md`). |
-| `journal_fragments/` | 6 | Parallel-safe inbox for `BUILD_JOURNAL.md` entries — one file per session, folded in at quiet points. `README.md` has the SOP. | When appending a journal entry during parallel/multi-session work. |
-| `handoffs/` | 0 (gitignored) | Context-exhaustion handoff briefs — a gitignored working-tree dir. | When authoring/consuming a session handoff brief. |
+| `runbooks/` | 32 | Operator/LA runbooks — go-live ceremonies, reboot checklist, disaster recovery, MCP sync, VM lifecycle. `LA_OPERATIONS_INDEX.md` indexes them. | Running an operational ceremony or recovery. |
+| `governance/` | 45 | Fleet governance doctrine — rule-engine, circuit-breaker, IPC protocol, session-state, observability, PII-redaction, AIGP study plan, `handoff-brief-template.md`. `README.md` is the landing page. | Governance/doctrine work. Out of #267 scope (Sprint 9 rebuilt it). |
+| `research/` | 298 | Dated research studies — agent protocols, the Coordinator program (#841), dispatch leverage, assistant memory, Kagi key handling, containment (the #1740 study and its sources), agent-governance landscapes. Start at `KNOWLEDGE_MAP.md`. | Grounding a design decision in prior research. |
+| `security/` | 59 | Security audits, the capstone presentation deck, egress machinery/activation records, `DATA_MAP.md`, guest-parser/oracle provisioning records, PCR-seal & trust-root POCs, UC-003 live-fetch proofs. | Security review, egress posture, capstone. **See sprawl note on node_modules bloat.** |
+| `performance/` | 741 | Machine-readable perf JSON + `perf_history` — the dataset feeding OpenVINO/HuggingFace community contribution. `README_coresident_ut.md` explains the co-resident harness. | Recording or citing benchmark data (pairs with root `PERFORMANCE_LOG.md`). |
+| `journal_fragments/` | 27 | Parallel-safe inbox for `BUILD_JOURNAL.md` entries — one file per session, folded in at quiet points. `README.md` has the SOP. | When appending a journal entry during parallel/multi-session work. |
+| `handoffs/` | ~220 on disk (gitignored) | Context-exhaustion handoff briefs — a gitignored working-tree dir. | When authoring/consuming a session handoff brief. |
 | `reports/` | 38 | Dated SDO / co-lead / EA completion + firing-exit reports. Historical fleet-process records. | Fleet-process history. Out of #267 scope (already organized). |
 | `scheduled/` | 0 | Emptied 2026-07-19 — the executed scheduler-queue XMLs moved to `archive/scheduled/`. | Historical only (via the archive). |
 | `learning/` | 25 | Presentation decks (`fable5_deck/`, `lessons_deck/`) — portfolio/learning artifacts with speaker notes. | Portfolio deck work. |
-| `guide-workstreams/` | 18 | Guide-role workstream trackers (OpenVINO contribution, upstream shepherding). Each has a `README.md`. | Tracking a Guide-role external-contribution workstream. |
-| `upstream/` | 10 | OpenVINO upstream-contribution working sets (e.g. `725_xgrammar_stop_token/`) + GPU-from-source build plan. | External OSS contribution work. |
+| `guide-workstreams/` | 37 | Guide-role workstream trackers (OpenVINO contribution, upstream shepherding). Each has a `README.md`. | Tracking a Guide-role external-contribution workstream. |
+| `upstream/` | 17 | OpenVINO upstream-contribution working sets (e.g. `725_xgrammar_stop_token/`) + GPU-from-source build plan. | External OSS contribution work. |
 | `claude_projects/` | 0 | RETIRED-WORLD manuals — moved to `archive/2026/retired_fleet_instructions/` 2026-07-19 (do not read as current guidance). | Historical only. |
 | `archive/` | ~700 | The archive wing: `journal/` + `lessons/` + `sprints/` + `scheduled/` + `testing/` + `ledger/` + `2026/` clusters + `platform_separation/`, each with an INDEX/README. **Index → volume: any entry in ≤2 reads.** | Recovering any archived entry or superseded doc. |
 | `design/` | 17 | Engineering design docs (swap-driver increment 2; `CODER_CONTAINMENT_DESIGN_OVERVIEW.md`, the self-contained design of the restricted coder account, #775, ADR-045). | Design deep-dive; the containment overview is the entry point for outside readers. |
 | `battery/` | 1 | Battery-campaign prescope. | Overnight battery-campaign context. |
 | `claude_cowork/` | 0 | RETIRED-WORLD manual — moved to `archive/2026/retired_fleet_instructions/` 2026-07-19. | Historical only. |
+| `reviews/` | 193 | Independent-review dispositions (`*-disposition-<date>.md`, one row per finding: FIXED / DEFERRED / REJECTED) and gate reviews. Checked by `scripts/verify_disposition.py`. | Finding what a review concluded and how each finding was settled. |
+| `evidence/` | 5 | Evidence artifacts for specific tickets. | Checking proof behind a ticket closure. |
+| `quality/` | 1 | Quality-gate notes. | Quality-gate context. |
+| `validation/` | 1 | Validation notes. | Validation context. |
+| `blairproweb/` | 1 | The blairproweb fleet-validation exercise. | That exercise only. |
 | `demo/` | 0 (gitignored) | Demo capture assets. | Demo prep. |
 
 ---

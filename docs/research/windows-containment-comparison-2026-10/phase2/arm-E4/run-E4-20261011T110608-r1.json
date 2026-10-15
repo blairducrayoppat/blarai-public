@@ -1,0 +1,72 @@
+{
+ "variant": "E4",
+ "description": "UI lockdown off, proxy mode: container pinned to the loopback listener's address and port",
+ "tag": "E4-20261011T110608-r1",
+ "config": {
+  "version": "1.0.0",
+  "containment": "processcontainer",
+  "lifecycle": {
+   "destroyOnExit": true
+  },
+  "fallback": {
+   "allowDaclMutation": false
+  },
+  "process": {
+   "commandLine": "\"C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe\" -I \"C:\\blarai-spike-1740\\payload\\arm_payload.py\" --arm E --tag E4-20261011T110608-r1 --out \"C:\\blarai-spike-1740\\worktree\\result-E4-20261011T110608-r1.json\" --tools \"C:\\blarai-spike-1740\\payload\\tools.json\" --listener-port 49270",
+   "cwd": "C:\\blarai-spike-1740\\worktree",
+   "inheritDefaultEnv": true,
+   "timeout": 240000
+  },
+  "filesystem": {
+   "readwritePaths": [
+    "C:\\blarai-spike-1740\\worktree"
+   ],
+   "readonlyPaths": [
+    "C:\\blarai-spike-1740\\toolchain",
+    "C:\\blarai-spike-1740\\payload"
+   ]
+  },
+  "network": {
+   "egress": {
+    "default": "deny"
+   },
+   "ingress": {
+    "default": "allow",
+    "hostLoopback": "allow"
+   }
+  },
+  "ui": {
+   "disable": false,
+   "clipboard": "none",
+   "injection": false
+  },
+  "runtimeConfig": {
+   "networkProxy": "http://127.0.0.1:49270"
+  }
+ },
+ "dry_run": {
+  "rc": 1,
+  "stdout": "",
+  "stderr": "error: network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support\nSECTION: Request simplified\nScript code length: 282\nWorking directory: C:\\blarai-spike-1740\\worktree\nScript timeout: 240000\nContainer name: CLI"
+ },
+ "snapshot_before": {
+  "acl": {
+   "C:\\blarai-spike-1740": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\payload": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\worktree": "eed43a1d6e9b65c0",
+   "C:\\blarai-spike-1740\\leak": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\instrument": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe": "ca7c61792557ae4f",
+   "C:\\blarai-spike-1740\\toolchain\\Git\\cmd\\git.exe": "ca7c61792557ae4f"
+  },
+  "process_sandboxes": [
+   "<absent>"
+  ],
+  "appcontainer_mappings": 217,
+  "state_dir": []
+ },
+ "launch": {
+  "skipped": "dry-run validation failed"
+ }
+}

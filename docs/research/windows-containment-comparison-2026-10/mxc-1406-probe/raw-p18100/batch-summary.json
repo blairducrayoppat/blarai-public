@@ -1,0 +1,44 @@
+[
+ {
+  "tag": "P-18100-r1-132648",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 5,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "P-18100-r2-132653",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 5,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "P-18100-r3-132658",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 5,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ }
+]

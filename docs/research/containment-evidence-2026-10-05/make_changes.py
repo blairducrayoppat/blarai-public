@@ -23,6 +23,8 @@ META = {"README.md", "CHANGES.md", "make_changes.py"}
 AS_RUN = "confined-model-spike/as-run"
 HARDENED = "confined-model-spike/post-run-hardened"
 ARM1 = "arm1-permit/scripts"
+ARM2 = "arm2-hold/scripts"
+ARM3 = "arm3-persist/scripts"
 MANIFEST = f"{AS_RUN}/MANIFEST.sha256"
 
 MANIFEST_HEADER = """# SHA-256 of the as-run scripts, computed on LF-normalised bytes (CRLF converted to LF before hashing), so the value does not depend on the
@@ -45,6 +47,10 @@ account writes, private temp files, a password self-check; about 16:44 to 16:50)
 - `{HARDENED}/`: the current versions. The table below gives the line changes between the two sets.
 - `{ARM1}/`: the scripts as changed for arm 1 (the permit filter's role; the account as loopback client), beside that
   arm's results in `arm1-permit/runs/`. The table gives their line changes against the hardened set.
+- `{ARM2}/`: the scripts as changed for arm 2 (the long hold), beside that arm's results in `arm2-hold/runs/` (result JSON, the per-sample
+  line files and the self-test results; the raw filter exports are not bundled). The table gives their line changes against the arm 1 set.
+- `{ARM3}/`: the arm 3 scripts (a persistent filter set, a restart, fail-closed on absence), beside `arm3-persist/DESIGN.md` (written before
+  them) and that arm's results in `arm3-persist/runs/`. Files that exist in the arm 2 folder are compared with it; the rest are new.
 
 Provenance and limits of the as-run set: it was recovered from the first bundle commit `9adcafc4` (committed 16:36, after the
 runs and before the hardening). The unsanitised originals were overwritten by the hardening: in the research-data folder the
@@ -110,7 +116,7 @@ def render_manifest(root: Path = ROOT) -> str:
 
 def render_changes(root: Path = ROOT) -> str:
     lines = [
-        "| File | Kind | User-name | Machine-name | SID-domain | Model-text cut | Hardened vs as-run (arm 1 vs hardened) |",
+        "| File | Kind | User-name | Machine-name | SID-domain | Model-text cut | Hardened vs as-run (arm 1 vs hardened, arm 2 vs arm 1, arm 3 vs arm 2) |",
         "|---|---|---|---|---|---|---|",
     ]
     files = _files(root)
@@ -126,6 +132,12 @@ def render_changes(root: Path = ROOT) -> str:
         elif rel.startswith(ARM1 + "/"):
             twin = files.get(f"{HARDENED}/{rel[len(ARM1) + 1:]}")
             diff = ("arm 1 vs hardened: " + _diffstat(twin, p)) if twin else "arm 1 (new file)"
+        elif rel.startswith(ARM2 + "/"):
+            twin = files.get(f"{ARM1}/{rel[len(ARM2) + 1:]}")
+            diff = ("arm 2 vs arm 1: " + _diffstat(twin, p)) if twin else "arm 2 (new file)"
+        elif rel.startswith(ARM3 + "/"):
+            twin = files.get(f"{ARM2}/{rel[len(ARM3) + 1:]}")
+            diff = ("arm 3 vs arm 2: " + _diffstat(twin, p)) if twin else "arm 3 (new file)"
         lines.append(
             f"| `{rel}` | {kind} | {text.count(USER_PH)} | {text.count(MACH_PH)} | "
             f"{sum(text.count(d) for d in PH_DOMAINS)} | {text.count(MARKER)} | {diff or '-'} |"

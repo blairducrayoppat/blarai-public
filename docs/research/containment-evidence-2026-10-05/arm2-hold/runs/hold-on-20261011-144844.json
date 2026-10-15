@@ -1,0 +1,2215 @@
+{
+  "spike": "#1689 arm 2: does the SID-keyed block stay enforced for a long hold while Bitdefender runs",
+  "run_id": "hold-on-20261011-144844",
+  "filter_set": "permit_on",
+  "started": "2026-10-11T14:48:44.319-04:00",
+  "hold_seconds": 7200,
+  "sample_seconds": 60,
+  "samples_expected": 120,
+  "dead_man_seconds": 7230,
+  "watchdog_seconds": 2,
+  "samples_file": "C:\\Users\\_OPERATOR_\\blarai-research-data\\arm2-hold\\hold-on-20261011-144844-samples.txt",
+  "env": {
+    "machine_clock": "2026-10-11 14:48:46 -04:00",
+    "uptime_hours": 43.37,
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "ps_version": "5.1.26100.9444",
+    "process_64bit": true,
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ],
+    "firewall_profiles": [
+      {
+        "name": "Domain",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      }
+    ],
+    "svc_mpssvc": "Running/Automatic",
+    "svc_BFE": "Running/Automatic",
+    "windows_build": "26200.9457 (25H2)",
+    "ps_host": "ConsoleHost 5.1.26100.9444 (Desktop)",
+    "wsl_state": [
+      "NAME STATE VERSION",
+      "* Ubuntu-24.04 Stopped 2",
+      "nono-try Stopped 2"
+    ]
+  },
+  "wsl_shutdown": {
+    "at": "2026-10-11T14:48:44.327-04:00",
+    "before": [
+      "NAME STATE VERSION",
+      "* Ubuntu-24.04 Stopped 2",
+      "nono-try Stopped 2"
+    ],
+    "exit_code": 0,
+    "after": [
+      "NAME STATE VERSION",
+      "* Ubuntu-24.04 Stopped 2",
+      "nono-try Stopped 2"
+    ],
+    "error": null
+  },
+  "steps": {
+    "preflight": {
+      "spike_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+      "sd_sddl": "D:(A;;CC;;;S-1-5-21-1000000001-1000000002-1000000003-1271)",
+      "objects_absent_before": true,
+      "filter_set": "permit_on",
+      "filters_planned": [
+        "BlarAI #1671 spike: permit-loopback-coder-v4 f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+        "BlarAI #1671 spike: permit-loopback-coder-v6 f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+        "BlarAI #1671 spike: block-coder-v4 f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+        "BlarAI #1671 spike: block-coder-v6 f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+      ]
+    },
+    "operator_baseline": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 55,
+        "error": "",
+        "t": "2026-10-11T14:48:50.7029688-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-11T14:48:50.7207472-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-11T14:48:50.7524882-04:00"
+      }
+    ],
+    "account_baseline": {
+      "run_id": "hold-on-20261011-144844-base",
+      "expected_blocked": false,
+      "started": "2026-10-11T14:48:50.752-04:00",
+      "task_ready": true,
+      "task_started": true,
+      "task_start": {
+        "Started": true,
+        "Detail": "state=Running"
+      },
+      "valid": true,
+      "schema_violations": [],
+      "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+      "outbound_probe": {
+        "probe": {
+          "target": "1.1.1.1:443",
+          "connected": true,
+          "ms": 55,
+          "error": "",
+          "error_code": 0,
+          "t": "2026-10-11T14:48:55.012-04:00"
+        },
+        "blocked": false,
+        "expected_blocked": false
+      },
+      "finished": "2026-10-11T14:48:56.475-04:00"
+    },
+    "bitdefender_start": {
+      "taken": "2026-10-11T14:48:56.570-04:00",
+      "processes": [
+        {
+          "name": "bdagent",
+          "id": 18888,
+          "start": "2026-10-09T19:27:22.8564201-04:00"
+        },
+        {
+          "name": "bdntwrk",
+          "id": 10320,
+          "start": "2026-10-09T19:26:48.7274130-04:00"
+        },
+        {
+          "name": "bdredline",
+          "id": 4112,
+          "start": "2026-10-09T19:28:53.4169903-04:00"
+        },
+        {
+          "name": "bdredline",
+          "id": 18824,
+          "start": "2026-10-09T19:28:53.5769550-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 2912,
+          "start": "2026-10-09T19:26:45.3456264-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 2920,
+          "start": "2026-10-09T19:26:45.3456439-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 4040,
+          "start": "2026-10-09T19:26:45.6274899-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 4060,
+          "start": "2026-10-09T19:26:45.6294021-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 6440,
+          "start": "2026-10-09T19:26:46.4772724-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 11852,
+          "start": "2026-10-09T19:26:51.5859134-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 14112,
+          "start": "2026-10-09T19:26:51.5261970-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 15676,
+          "start": "2026-10-09T19:26:57.7726875-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 18448,
+          "start": "2026-10-09T19:27:17.9857375-04:00"
+        }
+      ],
+      "folders": [
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security",
+          "last_write": "2026-10-11T14:42:15.4072484-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\antispam32",
+          "last_write": "2026-10-08T03:21:27.4351413-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\aph",
+          "last_write": "2026-10-07T02:22:00.3864256-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\aspam",
+          "last_write": "2026-09-23T03:10:48.0002991-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\atc",
+          "last_write": "2026-10-11T12:42:11.7136231-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\atcuf",
+          "last_write": "2026-10-09T19:26:55.4432759-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdamsi",
+          "last_write": "2026-10-09T19:27:00.9176182-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdhkm",
+          "last_write": "2026-10-09T19:26:55.7168386-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdnc",
+          "last_write": "2026-07-29T07:10:11.4391290-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdwer",
+          "last_write": "2026-10-09T19:26:47.9382747-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bsodhandler",
+          "last_write": "2026-08-25T17:41:19.2134611-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\cryptoStorage",
+          "last_write": "2026-10-11T12:26:05.3037628-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\cstsdk_install",
+          "last_write": "2026-10-09T19:26:47.3218949-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\ctc2",
+          "last_write": "2026-10-09T19:26:49.4845408-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\eol",
+          "last_write": "2026-08-25T17:41:19.2271271-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\gemma",
+          "last_write": "2026-09-15T06:27:58.2030313-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\gemmauf",
+          "last_write": "2026-10-09T19:26:56.0743291-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\guster",
+          "last_write": "2026-10-09T19:27:00.5498888-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\installer",
+          "last_write": "2026-10-11T14:42:13.7320055-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\lang",
+          "last_write": "2026-07-02T03:50:12.5735428-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\mitm_cache",
+          "last_write": "2026-07-08T17:06:15.2058424-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\oteng",
+          "last_write": "2026-07-02T03:50:19.8335652-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\ProfilesData",
+          "last_write": "2026-07-15T12:48:14.1823550-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\secure_efs",
+          "last_write": "2026-07-08T16:33:08.0616796-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\services",
+          "last_write": "2026-10-08T03:21:27.6001717-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\settings",
+          "last_write": "2026-10-11T12:42:11.7136231-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\skin",
+          "last_write": "2026-07-02T03:51:28.3893139-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\ui",
+          "last_write": "2026-07-02T03:50:12.8105428-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\updcenter",
+          "last_write": "2026-10-11T14:42:15.5601172-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\urlskip",
+          "last_write": "2026-10-09T10:09:21.7386305-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\_enHTML",
+          "last_write": "2026-07-08T16:32:46.0027170-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App",
+          "last_write": "2026-10-11T14:27:17.8894298-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\antispam32",
+          "last_write": "2026-10-08T03:21:27.4351413-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\bdnc",
+          "last_write": "2026-09-10T13:15:51.7328825-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\bdtbext",
+          "last_write": "2026-07-02T03:48:22.0297191-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\events",
+          "last_write": "2026-10-11T12:42:12.1679697-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\lang",
+          "last_write": "2026-07-02T03:48:17.2726965-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\ProfilesData",
+          "last_write": "2026-10-08T03:20:24.7568820-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\Safepay",
+          "last_write": "2026-10-09T19:26:45.6293560-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\services",
+          "last_write": "2026-10-08T03:21:27.5984243-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\settings",
+          "last_write": "2026-10-09T19:26:45.9127120-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\skin",
+          "last_write": "2026-07-02T03:48:20.4907053-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\ui",
+          "last_write": "2026-07-02T03:49:35.0741048-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender",
+          "last_write": "2026-07-09T04:48:07.3310919-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Atc",
+          "last_write": "2026-07-08T16:33:05.3693897-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Bitdefender Safepay",
+          "last_write": "2026-07-08T16:31:53.4841975-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Bitdefender Security App",
+          "last_write": "2026-07-08T16:33:00.7648942-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Desktop",
+          "last_write": "2026-10-04T20:51:19.7725730-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\DTrace",
+          "last_write": "2026-10-08T03:19:37.2659677-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Gemma",
+          "last_write": "2026-07-08T16:33:05.4906932-04:00"
+        }
+      ],
+      "services": [
+        "UPDATESRV=Running",
+        "VSSERV=Running"
+      ]
+    },
+    "filters_added": {
+      "at": "2026-10-11T14:48:56.633-04:00",
+      "filter_set": "permit_on",
+      "filter_ids": [
+        456486,
+        456487,
+        456488,
+        456489
+      ],
+      "filters": [
+        "BlarAI #1671 spike: permit-loopback-coder-v4 f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+        "BlarAI #1671 spike: permit-loopback-coder-v6 f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+        "BlarAI #1671 spike: block-coder-v4 f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+        "BlarAI #1671 spike: block-coder-v6 f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+      ]
+    },
+    "watchdog": {
+      "interval_seconds": 2,
+      "connects": 3421,
+      "failures": 0,
+      "max_consecutive_failures": 0,
+      "max_gap_between_ticks_seconds": 5,
+      "aborted": false,
+      "failure_events": [],
+      "note": "isolated failures (never two in a row) are recorded here and do not change the verdict; two in a row abort the run"
+    },
+    "operator_during": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-11T16:48:57.4117147-04:00"
+      },
+      {
+        "target": "8.8.8.8:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-11T16:48:57.4472692-04:00"
+      }
+    ],
+    "bitdefender_end": {
+      "taken": "2026-10-11T16:48:57.477-04:00",
+      "processes": [
+        {
+          "name": "bdagent",
+          "id": 18888,
+          "start": "2026-10-09T19:27:22.8564201-04:00"
+        },
+        {
+          "name": "bdntwrk",
+          "id": 10320,
+          "start": "2026-10-09T19:26:48.7274130-04:00"
+        },
+        {
+          "name": "bdredline",
+          "id": 4112,
+          "start": "2026-10-09T19:28:53.4169903-04:00"
+        },
+        {
+          "name": "bdredline",
+          "id": 18824,
+          "start": "2026-10-09T19:28:53.5769550-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 2912,
+          "start": "2026-10-09T19:26:45.3456264-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 2920,
+          "start": "2026-10-09T19:26:45.3456439-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 4040,
+          "start": "2026-10-09T19:26:45.6274899-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 4060,
+          "start": "2026-10-09T19:26:45.6294021-04:00"
+        },
+        {
+          "name": "bdservicehost",
+          "id": 6440,
+          "start": "2026-10-09T19:26:46.4772724-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 11852,
+          "start": "2026-10-09T19:26:51.5859134-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 14112,
+          "start": "2026-10-09T19:26:51.5261970-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 15676,
+          "start": "2026-10-09T19:26:57.7726875-04:00"
+        },
+        {
+          "name": "bduserhost",
+          "id": 18448,
+          "start": "2026-10-09T19:27:17.9857375-04:00"
+        }
+      ],
+      "folders": [
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security",
+          "last_write": "2026-10-11T16:42:15.2821375-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\antispam32",
+          "last_write": "2026-10-08T03:21:27.4351413-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\aph",
+          "last_write": "2026-10-07T02:22:00.3864256-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\aspam",
+          "last_write": "2026-09-23T03:10:48.0002991-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\atc",
+          "last_write": "2026-10-11T12:42:11.7136231-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\atcuf",
+          "last_write": "2026-10-09T19:26:55.4432759-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdamsi",
+          "last_write": "2026-10-09T19:27:00.9176182-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdhkm",
+          "last_write": "2026-10-09T19:26:55.7168386-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdnc",
+          "last_write": "2026-07-29T07:10:11.4391290-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bdwer",
+          "last_write": "2026-10-09T19:26:47.9382747-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\bsodhandler",
+          "last_write": "2026-08-25T17:41:19.2134611-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\cryptoStorage",
+          "last_write": "2026-10-11T12:26:05.3037628-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\cstsdk_install",
+          "last_write": "2026-10-09T19:26:47.3218949-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\ctc2",
+          "last_write": "2026-10-09T19:26:49.4845408-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\eol",
+          "last_write": "2026-08-25T17:41:19.2271271-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\gemma",
+          "last_write": "2026-09-15T06:27:58.2030313-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\gemmauf",
+          "last_write": "2026-10-09T19:26:56.0743291-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\guster",
+          "last_write": "2026-10-09T19:27:00.5498888-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\installer",
+          "last_write": "2026-10-11T16:42:13.9147758-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\lang",
+          "last_write": "2026-07-02T03:50:12.5735428-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\mitm_cache",
+          "last_write": "2026-07-08T17:06:15.2058424-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\oteng",
+          "last_write": "2026-07-02T03:50:19.8335652-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\ProfilesData",
+          "last_write": "2026-07-15T12:48:14.1823550-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\secure_efs",
+          "last_write": "2026-07-08T16:33:08.0616796-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\services",
+          "last_write": "2026-10-08T03:21:27.6001717-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\settings",
+          "last_write": "2026-10-11T12:42:11.7136231-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\skin",
+          "last_write": "2026-07-02T03:51:28.3893139-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\ui",
+          "last_write": "2026-07-02T03:50:12.8105428-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\updcenter",
+          "last_write": "2026-10-11T16:42:15.3982669-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\urlskip",
+          "last_write": "2026-10-09T10:09:21.7386305-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security\\_enHTML",
+          "last_write": "2026-07-08T16:32:46.0027170-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App",
+          "last_write": "2026-10-11T16:27:18.3139084-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\antispam32",
+          "last_write": "2026-10-08T03:21:27.4351413-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\bdnc",
+          "last_write": "2026-09-10T13:15:51.7328825-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\bdtbext",
+          "last_write": "2026-07-02T03:48:22.0297191-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\events",
+          "last_write": "2026-10-11T15:42:45.1786266-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\lang",
+          "last_write": "2026-07-02T03:48:17.2726965-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\ProfilesData",
+          "last_write": "2026-10-08T03:20:24.7568820-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\Safepay",
+          "last_write": "2026-10-09T19:26:45.6293560-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\services",
+          "last_write": "2026-10-08T03:21:27.5984243-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\settings",
+          "last_write": "2026-10-09T19:26:45.9127120-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\skin",
+          "last_write": "2026-07-02T03:48:20.4907053-04:00"
+        },
+        {
+          "path": "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\ui",
+          "last_write": "2026-07-02T03:49:35.0741048-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender",
+          "last_write": "2026-07-09T04:48:07.3310919-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Atc",
+          "last_write": "2026-07-08T16:33:05.3693897-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Bitdefender Safepay",
+          "last_write": "2026-07-08T16:31:53.4841975-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Bitdefender Security App",
+          "last_write": "2026-07-08T16:33:00.7648942-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Desktop",
+          "last_write": "2026-10-04T20:51:19.7725730-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\DTrace",
+          "last_write": "2026-10-08T03:19:37.2659677-04:00"
+        },
+        {
+          "path": "C:\\ProgramData\\Bitdefender\\Gemma",
+          "last_write": "2026-07-08T16:33:05.4906932-04:00"
+        }
+      ],
+      "services": [
+        "UPDATESRV=Running",
+        "VSSERV=Running"
+      ]
+    },
+    "bitdefender_update": {
+      "processes_added": [],
+      "processes_removed": [],
+      "update_named_processes_started": [],
+      "folders_changed": [
+        "C:\\Program Files\\Bitdefender\\Bitdefender Security: 2026-10-11T14:42:15.4072484-04:00 -> 2026-10-11T16:42:15.2821375-04:00",
+        "C:\\Program Files\\Bitdefender\\Bitdefender Security\\installer: 2026-10-11T14:42:13.7320055-04:00 -> 2026-10-11T16:42:13.9147758-04:00",
+        "C:\\Program Files\\Bitdefender\\Bitdefender Security\\updcenter: 2026-10-11T14:42:15.5601172-04:00 -> 2026-10-11T16:42:15.3982669-04:00",
+        "C:\\Program Files\\Bitdefender\\Bitdefender Security App: 2026-10-11T14:27:17.8894298-04:00 -> 2026-10-11T16:27:18.3139084-04:00",
+        "C:\\Program Files\\Bitdefender\\Bitdefender Security App\\events: 2026-10-11T12:42:12.1679697-04:00 -> 2026-10-11T15:42:45.1786266-04:00"
+      ],
+      "signal": "bitdefender_folder_timestamps_changed",
+      "caveat": "a weak signal: process names and folder timestamps only; the suite's own logs were not read; none_observed does not show that no update ran"
+    },
+    "bitdefender_processes_first_seen_during_hold": [],
+    "engine_closed_at": "2026-10-11T16:48:57.550-04:00",
+    "filters_stood_seconds": 7200.9,
+    "engine_close_status": "0x00000000",
+    "removal_engine_check": {
+      "sublayer_present": false,
+      "provider_present": false,
+      "filters_present": []
+    },
+    "operator_after_removal": {
+      "target": "1.1.1.1:443",
+      "ok": true,
+      "ms": 21,
+      "error": "",
+      "t": "2026-10-11T16:48:57.5800343-04:00"
+    },
+    "account_after_removal": {
+      "run_id": "hold-on-20261011-144844-after",
+      "expected_blocked": false,
+      "started": "2026-10-11T16:48:57.580-04:00",
+      "task_ready": true,
+      "task_started": true,
+      "task_start": {
+        "Started": true,
+        "Detail": "state=Running"
+      },
+      "valid": true,
+      "schema_violations": [],
+      "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+      "outbound_probe": {
+        "probe": {
+          "target": "1.1.1.1:443",
+          "connected": true,
+          "ms": 88,
+          "error": "",
+          "error_code": 0,
+          "t": "2026-10-11T16:49:00.055-04:00"
+        },
+        "blocked": false,
+        "expected_blocked": false
+      },
+      "finished": "2026-10-11T16:49:01.270-04:00"
+    }
+  },
+  "samples": [
+    {
+      "n": 1,
+      "t": "2026-10-11T14:49:01.441-04:00",
+      "offset_s": 4.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 61,
+      "run_id": "hold-on-20261011-144844-s0001",
+      "task": "state=Running"
+    },
+    {
+      "n": 2,
+      "t": "2026-10-11T14:50:00.815-04:00",
+      "offset_s": 64.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0002",
+      "task": "state=Running"
+    },
+    {
+      "n": 3,
+      "t": "2026-10-11T14:51:01.223-04:00",
+      "offset_s": 124.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 47,
+      "run_id": "hold-on-20261011-144844-s0003",
+      "task": "state=Running"
+    },
+    {
+      "n": 4,
+      "t": "2026-10-11T14:52:00.746-04:00",
+      "offset_s": 184.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 54,
+      "run_id": "hold-on-20261011-144844-s0004",
+      "task": "state=Running"
+    },
+    {
+      "n": 5,
+      "t": "2026-10-11T14:53:01.101-04:00",
+      "offset_s": 244.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 31,
+      "run_id": "hold-on-20261011-144844-s0005",
+      "task": "state=Running"
+    },
+    {
+      "n": 6,
+      "t": "2026-10-11T14:54:02.189-04:00",
+      "offset_s": 305.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 85,
+      "run_id": "hold-on-20261011-144844-s0006",
+      "task": "state=Running"
+    },
+    {
+      "n": 7,
+      "t": "2026-10-11T14:55:00.954-04:00",
+      "offset_s": 364.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 36,
+      "run_id": "hold-on-20261011-144844-s0007",
+      "task": "state=Running"
+    },
+    {
+      "n": 8,
+      "t": "2026-10-11T14:56:00.766-04:00",
+      "offset_s": 424.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 45,
+      "run_id": "hold-on-20261011-144844-s0008",
+      "task": "state=Running"
+    },
+    {
+      "n": 9,
+      "t": "2026-10-11T14:57:01.136-04:00",
+      "offset_s": 484.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 60,
+      "run_id": "hold-on-20261011-144844-s0009",
+      "task": "state=Running"
+    },
+    {
+      "n": 10,
+      "t": "2026-10-11T14:58:00.891-04:00",
+      "offset_s": 544.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 50,
+      "run_id": "hold-on-20261011-144844-s0010",
+      "task": "state=Running"
+    },
+    {
+      "n": 11,
+      "t": "2026-10-11T14:59:00.641-04:00",
+      "offset_s": 604,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 56,
+      "run_id": "hold-on-20261011-144844-s0011",
+      "task": "state=Running"
+    },
+    {
+      "n": 12,
+      "t": "2026-10-11T15:00:00.918-04:00",
+      "offset_s": 664.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 44,
+      "run_id": "hold-on-20261011-144844-s0012",
+      "task": "state=Running"
+    },
+    {
+      "n": 13,
+      "t": "2026-10-11T15:01:00.749-04:00",
+      "offset_s": 724.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 35,
+      "run_id": "hold-on-20261011-144844-s0013",
+      "task": "state=Running"
+    },
+    {
+      "n": 14,
+      "t": "2026-10-11T15:02:00.702-04:00",
+      "offset_s": 784.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 55,
+      "run_id": "hold-on-20261011-144844-s0014",
+      "task": "state=Running"
+    },
+    {
+      "n": 15,
+      "t": "2026-10-11T15:03:00.691-04:00",
+      "offset_s": 844.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 33,
+      "run_id": "hold-on-20261011-144844-s0015",
+      "task": "state=Running"
+    },
+    {
+      "n": 16,
+      "t": "2026-10-11T15:04:00.340-04:00",
+      "offset_s": 903.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 42,
+      "run_id": "hold-on-20261011-144844-s0016",
+      "task": "state=Running"
+    },
+    {
+      "n": 17,
+      "t": "2026-10-11T15:05:01.946-04:00",
+      "offset_s": 965.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 69,
+      "run_id": "hold-on-20261011-144844-s0017",
+      "task": "state=Running"
+    },
+    {
+      "n": 18,
+      "t": "2026-10-11T15:06:03.799-04:00",
+      "offset_s": 1027.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 57,
+      "run_id": "hold-on-20261011-144844-s0018",
+      "task": "state=Running"
+    },
+    {
+      "n": 19,
+      "t": "2026-10-11T15:07:02.017-04:00",
+      "offset_s": 1085.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 102,
+      "run_id": "hold-on-20261011-144844-s0019",
+      "task": "state=Running"
+    },
+    {
+      "n": 20,
+      "t": "2026-10-11T15:08:01.803-04:00",
+      "offset_s": 1145.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 67,
+      "run_id": "hold-on-20261011-144844-s0020",
+      "task": "state=Running"
+    },
+    {
+      "n": 21,
+      "t": "2026-10-11T15:09:01.809-04:00",
+      "offset_s": 1205.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 82,
+      "run_id": "hold-on-20261011-144844-s0021",
+      "task": "state=Running"
+    },
+    {
+      "n": 22,
+      "t": "2026-10-11T15:10:02.473-04:00",
+      "offset_s": 1265.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 72,
+      "run_id": "hold-on-20261011-144844-s0022",
+      "task": "state=Running"
+    },
+    {
+      "n": 23,
+      "t": "2026-10-11T15:11:01.430-04:00",
+      "offset_s": 1324.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 52,
+      "run_id": "hold-on-20261011-144844-s0023",
+      "task": "state=Running"
+    },
+    {
+      "n": 24,
+      "t": "2026-10-11T15:12:01.791-04:00",
+      "offset_s": 1385.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 44,
+      "run_id": "hold-on-20261011-144844-s0024",
+      "task": "state=Running"
+    },
+    {
+      "n": 25,
+      "t": "2026-10-11T15:13:03.184-04:00",
+      "offset_s": 1446.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 61,
+      "run_id": "hold-on-20261011-144844-s0025",
+      "task": "state=Running"
+    },
+    {
+      "n": 26,
+      "t": "2026-10-11T15:14:01.526-04:00",
+      "offset_s": 1504.9,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 67,
+      "run_id": "hold-on-20261011-144844-s0026",
+      "task": "state=Running"
+    },
+    {
+      "n": 27,
+      "t": "2026-10-11T15:15:01.801-04:00",
+      "offset_s": 1565.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 77,
+      "run_id": "hold-on-20261011-144844-s0027",
+      "task": "state=Running"
+    },
+    {
+      "n": 28,
+      "t": "2026-10-11T15:16:01.790-04:00",
+      "offset_s": 1625.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 46,
+      "run_id": "hold-on-20261011-144844-s0028",
+      "task": "state=Running"
+    },
+    {
+      "n": 29,
+      "t": "2026-10-11T15:17:01.929-04:00",
+      "offset_s": 1685.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 116,
+      "run_id": "hold-on-20261011-144844-s0029",
+      "task": "state=Running"
+    },
+    {
+      "n": 30,
+      "t": "2026-10-11T15:18:02.954-04:00",
+      "offset_s": 1746.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 71,
+      "run_id": "hold-on-20261011-144844-s0030",
+      "task": "state=Running"
+    },
+    {
+      "n": 31,
+      "t": "2026-10-11T15:19:01.466-04:00",
+      "offset_s": 1804.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 66,
+      "run_id": "hold-on-20261011-144844-s0031",
+      "task": "state=Running"
+    },
+    {
+      "n": 32,
+      "t": "2026-10-11T15:20:01.339-04:00",
+      "offset_s": 1864.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 61,
+      "run_id": "hold-on-20261011-144844-s0032",
+      "task": "state=Running"
+    },
+    {
+      "n": 33,
+      "t": "2026-10-11T15:21:02.630-04:00",
+      "offset_s": 1926,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 55,
+      "run_id": "hold-on-20261011-144844-s0033",
+      "task": "state=Running"
+    },
+    {
+      "n": 34,
+      "t": "2026-10-11T15:22:00.956-04:00",
+      "offset_s": 1984.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 58,
+      "run_id": "hold-on-20261011-144844-s0034",
+      "task": "state=Running"
+    },
+    {
+      "n": 35,
+      "t": "2026-10-11T15:23:02.640-04:00",
+      "offset_s": 2046,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0035",
+      "task": "state=Running"
+    },
+    {
+      "n": 36,
+      "t": "2026-10-11T15:24:00.932-04:00",
+      "offset_s": 2104.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0036",
+      "task": "state=Running"
+    },
+    {
+      "n": 37,
+      "t": "2026-10-11T15:25:01.121-04:00",
+      "offset_s": 2164.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 39,
+      "run_id": "hold-on-20261011-144844-s0037",
+      "task": "state=Running"
+    },
+    {
+      "n": 38,
+      "t": "2026-10-11T15:26:00.998-04:00",
+      "offset_s": 2224.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 64,
+      "run_id": "hold-on-20261011-144844-s0038",
+      "task": "state=Running"
+    },
+    {
+      "n": 39,
+      "t": "2026-10-11T15:27:03.021-04:00",
+      "offset_s": 2286.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 74,
+      "run_id": "hold-on-20261011-144844-s0039",
+      "task": "state=Running"
+    },
+    {
+      "n": 40,
+      "t": "2026-10-11T15:28:02.308-04:00",
+      "offset_s": 2345.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 66,
+      "run_id": "hold-on-20261011-144844-s0040",
+      "task": "state=Running"
+    },
+    {
+      "n": 41,
+      "t": "2026-10-11T15:29:01.072-04:00",
+      "offset_s": 2404.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 77,
+      "run_id": "hold-on-20261011-144844-s0041",
+      "task": "state=Running"
+    },
+    {
+      "n": 42,
+      "t": "2026-10-11T15:30:03.100-04:00",
+      "offset_s": 2466.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0042",
+      "task": "state=Running"
+    },
+    {
+      "n": 43,
+      "t": "2026-10-11T15:31:01.196-04:00",
+      "offset_s": 2524.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 55,
+      "run_id": "hold-on-20261011-144844-s0043",
+      "task": "state=Running"
+    },
+    {
+      "n": 44,
+      "t": "2026-10-11T15:32:00.677-04:00",
+      "offset_s": 2584,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 41,
+      "run_id": "hold-on-20261011-144844-s0044",
+      "task": "state=Running"
+    },
+    {
+      "n": 45,
+      "t": "2026-10-11T15:33:00.030-04:00",
+      "offset_s": 2643.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 55,
+      "run_id": "hold-on-20261011-144844-s0045",
+      "task": "state=Running"
+    },
+    {
+      "n": 46,
+      "t": "2026-10-11T15:34:00.216-04:00",
+      "offset_s": 2703.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0046",
+      "task": "state=Running"
+    },
+    {
+      "n": 47,
+      "t": "2026-10-11T15:34:59.872-04:00",
+      "offset_s": 2763.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 25,
+      "run_id": "hold-on-20261011-144844-s0047",
+      "task": "state=Ready"
+    },
+    {
+      "n": 48,
+      "t": "2026-10-11T15:36:00.412-04:00",
+      "offset_s": 2823.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 24,
+      "run_id": "hold-on-20261011-144844-s0048",
+      "task": "state=Ready"
+    },
+    {
+      "n": 49,
+      "t": "2026-10-11T15:37:01.243-04:00",
+      "offset_s": 2884.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 52,
+      "run_id": "hold-on-20261011-144844-s0049",
+      "task": "state=Running"
+    },
+    {
+      "n": 50,
+      "t": "2026-10-11T15:38:00.361-04:00",
+      "offset_s": 2943.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 45,
+      "run_id": "hold-on-20261011-144844-s0050",
+      "task": "state=Running"
+    },
+    {
+      "n": 51,
+      "t": "2026-10-11T15:39:00.298-04:00",
+      "offset_s": 3003.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 33,
+      "run_id": "hold-on-20261011-144844-s0051",
+      "task": "state=Ready"
+    },
+    {
+      "n": 52,
+      "t": "2026-10-11T15:40:00.218-04:00",
+      "offset_s": 3063.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 30,
+      "run_id": "hold-on-20261011-144844-s0052",
+      "task": "state=Ready"
+    },
+    {
+      "n": 53,
+      "t": "2026-10-11T15:41:01.355-04:00",
+      "offset_s": 3124.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 40,
+      "run_id": "hold-on-20261011-144844-s0053",
+      "task": "state=Running"
+    },
+    {
+      "n": 54,
+      "t": "2026-10-11T15:42:01.988-04:00",
+      "offset_s": 3185.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 42,
+      "run_id": "hold-on-20261011-144844-s0054",
+      "task": "state=Running"
+    },
+    {
+      "n": 55,
+      "t": "2026-10-11T15:43:01.217-04:00",
+      "offset_s": 3244.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 41,
+      "run_id": "hold-on-20261011-144844-s0055",
+      "task": "state=Running"
+    },
+    {
+      "n": 56,
+      "t": "2026-10-11T15:44:02.068-04:00",
+      "offset_s": 3305.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 40,
+      "run_id": "hold-on-20261011-144844-s0056",
+      "task": "state=Running"
+    },
+    {
+      "n": 57,
+      "t": "2026-10-11T15:45:01.373-04:00",
+      "offset_s": 3364.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 33,
+      "run_id": "hold-on-20261011-144844-s0057",
+      "task": "state=Ready"
+    },
+    {
+      "n": 58,
+      "t": "2026-10-11T15:46:02.475-04:00",
+      "offset_s": 3425.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 50,
+      "run_id": "hold-on-20261011-144844-s0058",
+      "task": "state=Running"
+    },
+    {
+      "n": 59,
+      "t": "2026-10-11T15:47:01.316-04:00",
+      "offset_s": 3484.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 55,
+      "run_id": "hold-on-20261011-144844-s0059",
+      "task": "state=Running"
+    },
+    {
+      "n": 60,
+      "t": "2026-10-11T15:48:02.748-04:00",
+      "offset_s": 3546.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 63,
+      "run_id": "hold-on-20261011-144844-s0060",
+      "task": "state=Running"
+    },
+    {
+      "n": 61,
+      "t": "2026-10-11T15:49:02.555-04:00",
+      "offset_s": 3605.9,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 48,
+      "run_id": "hold-on-20261011-144844-s0061",
+      "task": "state=Running"
+    },
+    {
+      "n": 62,
+      "t": "2026-10-11T15:50:02.052-04:00",
+      "offset_s": 3665.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 38,
+      "run_id": "hold-on-20261011-144844-s0062",
+      "task": "state=Running"
+    },
+    {
+      "n": 63,
+      "t": "2026-10-11T15:51:02.981-04:00",
+      "offset_s": 3726.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 50,
+      "run_id": "hold-on-20261011-144844-s0063",
+      "task": "state=Running"
+    },
+    {
+      "n": 64,
+      "t": "2026-10-11T15:52:01.209-04:00",
+      "offset_s": 3784.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 47,
+      "run_id": "hold-on-20261011-144844-s0064",
+      "task": "state=Running"
+    },
+    {
+      "n": 65,
+      "t": "2026-10-11T15:53:00.076-04:00",
+      "offset_s": 3843.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 44,
+      "run_id": "hold-on-20261011-144844-s0065",
+      "task": "state=Running"
+    },
+    {
+      "n": 66,
+      "t": "2026-10-11T15:54:00.186-04:00",
+      "offset_s": 3903.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 35,
+      "run_id": "hold-on-20261011-144844-s0066",
+      "task": "state=Running"
+    },
+    {
+      "n": 67,
+      "t": "2026-10-11T15:54:59.755-04:00",
+      "offset_s": 3963.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 43,
+      "run_id": "hold-on-20261011-144844-s0067",
+      "task": "state=Running"
+    },
+    {
+      "n": 68,
+      "t": "2026-10-11T15:56:00.493-04:00",
+      "offset_s": 4023.9,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 31,
+      "run_id": "hold-on-20261011-144844-s0068",
+      "task": "state=Ready"
+    },
+    {
+      "n": 69,
+      "t": "2026-10-11T15:57:00.021-04:00",
+      "offset_s": 4083.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 31,
+      "run_id": "hold-on-20261011-144844-s0069",
+      "task": "state=Running"
+    },
+    {
+      "n": 70,
+      "t": "2026-10-11T15:57:59.971-04:00",
+      "offset_s": 4143.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 28,
+      "run_id": "hold-on-20261011-144844-s0070",
+      "task": "state=Ready"
+    },
+    {
+      "n": 71,
+      "t": "2026-10-11T15:58:59.917-04:00",
+      "offset_s": 4203.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 49,
+      "run_id": "hold-on-20261011-144844-s0071",
+      "task": "state=Running"
+    },
+    {
+      "n": 72,
+      "t": "2026-10-11T16:00:00.004-04:00",
+      "offset_s": 4263.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 30,
+      "run_id": "hold-on-20261011-144844-s0072",
+      "task": "state=Ready"
+    },
+    {
+      "n": 73,
+      "t": "2026-10-11T16:01:00.626-04:00",
+      "offset_s": 4324,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 52,
+      "run_id": "hold-on-20261011-144844-s0073",
+      "task": "state=Running"
+    },
+    {
+      "n": 74,
+      "t": "2026-10-11T16:02:00.572-04:00",
+      "offset_s": 4383.9,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 28,
+      "run_id": "hold-on-20261011-144844-s0074",
+      "task": "state=Ready"
+    },
+    {
+      "n": 75,
+      "t": "2026-10-11T16:03:00.280-04:00",
+      "offset_s": 4443.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 35,
+      "run_id": "hold-on-20261011-144844-s0075",
+      "task": "state=Running"
+    },
+    {
+      "n": 76,
+      "t": "2026-10-11T16:04:00.952-04:00",
+      "offset_s": 4504.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 47,
+      "run_id": "hold-on-20261011-144844-s0076",
+      "task": "state=Ready"
+    },
+    {
+      "n": 77,
+      "t": "2026-10-11T16:05:01.687-04:00",
+      "offset_s": 4565.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 57,
+      "run_id": "hold-on-20261011-144844-s0077",
+      "task": "state=Running"
+    },
+    {
+      "n": 78,
+      "t": "2026-10-11T16:06:01.336-04:00",
+      "offset_s": 4624.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 39,
+      "run_id": "hold-on-20261011-144844-s0078",
+      "task": "state=Running"
+    },
+    {
+      "n": 79,
+      "t": "2026-10-11T16:07:02.049-04:00",
+      "offset_s": 4685.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0079",
+      "task": "state=Running"
+    },
+    {
+      "n": 80,
+      "t": "2026-10-11T16:08:01.239-04:00",
+      "offset_s": 4744.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 43,
+      "run_id": "hold-on-20261011-144844-s0080",
+      "task": "state=Running"
+    },
+    {
+      "n": 81,
+      "t": "2026-10-11T16:09:02.380-04:00",
+      "offset_s": 4805.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 57,
+      "run_id": "hold-on-20261011-144844-s0081",
+      "task": "state=Running"
+    },
+    {
+      "n": 82,
+      "t": "2026-10-11T16:10:01.108-04:00",
+      "offset_s": 4864.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 80,
+      "run_id": "hold-on-20261011-144844-s0082",
+      "task": "state=Running"
+    },
+    {
+      "n": 83,
+      "t": "2026-10-11T16:11:02.272-04:00",
+      "offset_s": 4925.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 43,
+      "run_id": "hold-on-20261011-144844-s0083",
+      "task": "state=Running"
+    },
+    {
+      "n": 84,
+      "t": "2026-10-11T16:12:01.231-04:00",
+      "offset_s": 4984.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0084",
+      "task": "state=Running"
+    },
+    {
+      "n": 85,
+      "t": "2026-10-11T16:13:02.653-04:00",
+      "offset_s": 5046,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 61,
+      "run_id": "hold-on-20261011-144844-s0085",
+      "task": "state=Running"
+    },
+    {
+      "n": 86,
+      "t": "2026-10-11T16:14:00.552-04:00",
+      "offset_s": 5103.9,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 47,
+      "run_id": "hold-on-20261011-144844-s0086",
+      "task": "state=Running"
+    },
+    {
+      "n": 87,
+      "t": "2026-10-11T16:15:00.590-04:00",
+      "offset_s": 5164,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 49,
+      "run_id": "hold-on-20261011-144844-s0087",
+      "task": "state=Ready"
+    },
+    {
+      "n": 88,
+      "t": "2026-10-11T16:16:00.384-04:00",
+      "offset_s": 5223.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 39,
+      "run_id": "hold-on-20261011-144844-s0088",
+      "task": "state=Running"
+    },
+    {
+      "n": 89,
+      "t": "2026-10-11T16:17:00.022-04:00",
+      "offset_s": 5283.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 40,
+      "run_id": "hold-on-20261011-144844-s0089",
+      "task": "state=Running"
+    },
+    {
+      "n": 90,
+      "t": "2026-10-11T16:18:00.288-04:00",
+      "offset_s": 5343.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 47,
+      "run_id": "hold-on-20261011-144844-s0090",
+      "task": "state=Ready"
+    },
+    {
+      "n": 91,
+      "t": "2026-10-11T16:19:01.133-04:00",
+      "offset_s": 5404.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 39,
+      "run_id": "hold-on-20261011-144844-s0091",
+      "task": "state=Running"
+    },
+    {
+      "n": 92,
+      "t": "2026-10-11T16:19:59.984-04:00",
+      "offset_s": 5463.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 46,
+      "run_id": "hold-on-20261011-144844-s0092",
+      "task": "state=Running"
+    },
+    {
+      "n": 93,
+      "t": "2026-10-11T16:20:59.863-04:00",
+      "offset_s": 5523.2,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 31,
+      "run_id": "hold-on-20261011-144844-s0093",
+      "task": "state=Ready"
+    },
+    {
+      "n": 94,
+      "t": "2026-10-11T16:22:00.151-04:00",
+      "offset_s": 5583.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 43,
+      "run_id": "hold-on-20261011-144844-s0094",
+      "task": "state=Running"
+    },
+    {
+      "n": 95,
+      "t": "2026-10-11T16:23:00.651-04:00",
+      "offset_s": 5644,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 67,
+      "run_id": "hold-on-20261011-144844-s0095",
+      "task": "state=Running"
+    },
+    {
+      "n": 96,
+      "t": "2026-10-11T16:24:00.219-04:00",
+      "offset_s": 5703.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 29,
+      "run_id": "hold-on-20261011-144844-s0096",
+      "task": "state=Ready"
+    },
+    {
+      "n": 97,
+      "t": "2026-10-11T16:25:00.174-04:00",
+      "offset_s": 5763.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 31,
+      "run_id": "hold-on-20261011-144844-s0097",
+      "task": "state=Ready"
+    },
+    {
+      "n": 98,
+      "t": "2026-10-11T16:26:01.014-04:00",
+      "offset_s": 5824.4,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 48,
+      "run_id": "hold-on-20261011-144844-s0098",
+      "task": "state=Running"
+    },
+    {
+      "n": 99,
+      "t": "2026-10-11T16:27:02.329-04:00",
+      "offset_s": 5885.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0099",
+      "task": "state=Running"
+    },
+    {
+      "n": 100,
+      "t": "2026-10-11T16:28:01.264-04:00",
+      "offset_s": 5944.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 66,
+      "run_id": "hold-on-20261011-144844-s0100",
+      "task": "state=Running"
+    },
+    {
+      "n": 101,
+      "t": "2026-10-11T16:29:01.179-04:00",
+      "offset_s": 6004.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 43,
+      "run_id": "hold-on-20261011-144844-s0101",
+      "task": "state=Running"
+    },
+    {
+      "n": 102,
+      "t": "2026-10-11T16:30:01.298-04:00",
+      "offset_s": 6064.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 49,
+      "run_id": "hold-on-20261011-144844-s0102",
+      "task": "state=Running"
+    },
+    {
+      "n": 103,
+      "t": "2026-10-11T16:31:01.291-04:00",
+      "offset_s": 6124.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 71,
+      "run_id": "hold-on-20261011-144844-s0103",
+      "task": "state=Running"
+    },
+    {
+      "n": 104,
+      "t": "2026-10-11T16:32:02.382-04:00",
+      "offset_s": 6185.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 54,
+      "run_id": "hold-on-20261011-144844-s0104",
+      "task": "state=Running"
+    },
+    {
+      "n": 105,
+      "t": "2026-10-11T16:33:01.272-04:00",
+      "offset_s": 6244.6,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0105",
+      "task": "state=Running"
+    },
+    {
+      "n": 106,
+      "t": "2026-10-11T16:34:02.616-04:00",
+      "offset_s": 6306,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 39,
+      "run_id": "hold-on-20261011-144844-s0106",
+      "task": "state=Running"
+    },
+    {
+      "n": 107,
+      "t": "2026-10-11T16:35:01.770-04:00",
+      "offset_s": 6365.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 38,
+      "run_id": "hold-on-20261011-144844-s0107",
+      "task": "state=Running"
+    },
+    {
+      "n": 108,
+      "t": "2026-10-11T16:36:02.744-04:00",
+      "offset_s": 6426.1,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 47,
+      "run_id": "hold-on-20261011-144844-s0108",
+      "task": "state=Running"
+    },
+    {
+      "n": 109,
+      "t": "2026-10-11T16:37:02.468-04:00",
+      "offset_s": 6485.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 52,
+      "run_id": "hold-on-20261011-144844-s0109",
+      "task": "state=Running"
+    },
+    {
+      "n": 110,
+      "t": "2026-10-11T16:38:01.977-04:00",
+      "offset_s": 6545.3,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 46,
+      "run_id": "hold-on-20261011-144844-s0110",
+      "task": "state=Running"
+    },
+    {
+      "n": 111,
+      "t": "2026-10-11T16:39:00.443-04:00",
+      "offset_s": 6603.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 53,
+      "run_id": "hold-on-20261011-144844-s0111",
+      "task": "state=Running"
+    },
+    {
+      "n": 112,
+      "t": "2026-10-11T16:40:00.457-04:00",
+      "offset_s": 6663.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 38,
+      "run_id": "hold-on-20261011-144844-s0112",
+      "task": "state=Running"
+    },
+    {
+      "n": 113,
+      "t": "2026-10-11T16:41:00.434-04:00",
+      "offset_s": 6723.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 35,
+      "run_id": "hold-on-20261011-144844-s0113",
+      "task": "state=Running"
+    },
+    {
+      "n": 114,
+      "t": "2026-10-11T16:42:00.477-04:00",
+      "offset_s": 6783.8,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 45,
+      "run_id": "hold-on-20261011-144844-s0114",
+      "task": "state=Ready"
+    },
+    {
+      "n": 115,
+      "t": "2026-10-11T16:43:01.600-04:00",
+      "offset_s": 6845,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 62,
+      "run_id": "hold-on-20261011-144844-s0115",
+      "task": "state=Running"
+    },
+    {
+      "n": 116,
+      "t": "2026-10-11T16:44:00.364-04:00",
+      "offset_s": 6903.7,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 44,
+      "run_id": "hold-on-20261011-144844-s0116",
+      "task": "state=Ready"
+    },
+    {
+      "n": 117,
+      "t": "2026-10-11T16:45:00.592-04:00",
+      "offset_s": 6964,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 51,
+      "run_id": "hold-on-20261011-144844-s0117",
+      "task": "state=Running"
+    },
+    {
+      "n": 118,
+      "t": "2026-10-11T16:46:00.116-04:00",
+      "offset_s": 7023.5,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 46,
+      "run_id": "hold-on-20261011-144844-s0118",
+      "task": "state=Running"
+    },
+    {
+      "n": 119,
+      "t": "2026-10-11T16:47:00.543-04:00",
+      "offset_s": 7083.9,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 35,
+      "run_id": "hold-on-20261011-144844-s0119",
+      "task": "state=Running"
+    },
+    {
+      "n": 120,
+      "t": "2026-10-11T16:48:00.526-04:00",
+      "offset_s": 7143.9,
+      "outcome": "blocked",
+      "error_code": 10013,
+      "error": "Exception calling \"BeginConnect\" with \"4\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+      "probe_ms": 44,
+      "run_id": "hold-on-20261011-144844-s0120",
+      "task": "state=Ready"
+    }
+  ],
+  "exports": [
+    {
+      "label": "start",
+      "at": "2026-10-11T14:48:56.649-04:00",
+      "path": "C:\\Users\\_OPERATOR_\\blarai-research-data\\arm2-hold\\hold-on-20261011-144844-filters-start.xml",
+      "ok": true,
+      "bytes": 3550029,
+      "sha256": "DDFF10EDF571DF01EEC69CE63FD4F1D2FD68250FC6C895EE903F8F63D030067D",
+      "summary": {
+        "marker": "BlarAI #1671",
+        "marker_count": 5,
+        "keys_expected": [
+          "f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+          "f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+          "f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+          "f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+        ],
+        "keys_found": [
+          "f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+          "f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+          "f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+          "f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+        ],
+        "keys_missing": [],
+        "ok": true
+      },
+      "error": null,
+      "seconds": 0.4
+    },
+    {
+      "label": "mid",
+      "at": "2026-10-11T15:48:56.663-04:00",
+      "path": "C:\\Users\\_OPERATOR_\\blarai-research-data\\arm2-hold\\hold-on-20261011-144844-filters-mid.xml",
+      "ok": true,
+      "bytes": 3520269,
+      "sha256": "293F1E63FDB3023CDEEF0C0B1F2E98424BBC4D3FCD6D626467ACC9986586F713",
+      "summary": {
+        "marker": "BlarAI #1671",
+        "marker_count": 5,
+        "keys_expected": [
+          "f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+          "f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+          "f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+          "f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+        ],
+        "keys_found": [
+          "f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+          "f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+          "f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+          "f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+        ],
+        "keys_missing": [],
+        "ok": true
+      },
+      "error": null,
+      "seconds": 0.4
+    },
+    {
+      "label": "end",
+      "at": "2026-10-11T16:48:56.891-04:00",
+      "path": "C:\\Users\\_OPERATOR_\\blarai-research-data\\arm2-hold\\hold-on-20261011-144844-filters-end.xml",
+      "ok": true,
+      "bytes": 3520269,
+      "sha256": "293F1E63FDB3023CDEEF0C0B1F2E98424BBC4D3FCD6D626467ACC9986586F713",
+      "summary": {
+        "marker": "BlarAI #1671",
+        "marker_count": 5,
+        "keys_expected": [
+          "f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+          "f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+          "f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+          "f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+        ],
+        "keys_found": [
+          "f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+          "f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+          "f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+          "f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+        ],
+        "keys_missing": [],
+        "ok": true
+      },
+      "error": null,
+      "seconds": 0.5
+    }
+  ],
+  "sample_stats": {
+    "total": 120,
+    "blocked": 120,
+    "open": 0,
+    "no_result": 0,
+    "wrong_sid": 0,
+    "blocked_error_codes": {
+      "10013": 120
+    },
+    "first_open": null
+  },
+  "keep_awake": "SetThreadExecutionState(ES_CONTINUOUS|ES_SYSTEM_REQUIRED) previous state 0x80000000; released in finally",
+  "finished": "2026-10-11T16:49:01.298-04:00",
+  "decision_inputs": {
+    "EngineClosedEarly": false,
+    "SamplesExpected": 120,
+    "OperatorAbort": false,
+    "BaselineOk": true,
+    "SamplesBlocked": 120,
+    "RemovalVerified": true,
+    "ExportsOk": true,
+    "SamplesOpen": 0
+  },
+  "exit_code": 0,
+  "exit_reason": "block held for the whole hold: 120 of 120 samples blocked, filters in every export, removal verified"
+}

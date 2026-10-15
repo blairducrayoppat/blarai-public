@@ -1,0 +1,19 @@
+{
+  "armed_at": "2026-10-12T14:49:23.412-04:00",
+  "boot_time_at_arm": "2026-10-12T12:05:40.5000000-04:00",
+  "filters_added_at": "2026-10-12T14:49:23.911-04:00",
+  "post_task": "blarai-arm3b-post-reboot",
+  "veto_task": "blarai-arm3b-veto",
+  "wrapper_task": "blarai-arm3b-arm-run",
+  "veto_fires_at": "2026-10-12T15:19:23.4120917-04:00",
+  "shutdown_command": "shutdown.exe /r /t 600 /c arm 3b",
+  "shutdown_delay_seconds": 600,
+  "out_dir": "C:\\ProgramData\\BlarAI\\arm3b-out",
+  "account_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+  "flags": {
+    "filter:block-account-v4": "0x1",
+    "filter:block-account-v6": "0x1",
+    "sublayer:sublayer": "0x1",
+    "provider:provider": "0x1"
+  }
+}

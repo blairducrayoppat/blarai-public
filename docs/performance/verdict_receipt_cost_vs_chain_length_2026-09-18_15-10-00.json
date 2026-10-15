@@ -15,7 +15,7 @@
   "software": {
     "python": "3.11.9 (.venv)",
     "repo_measured": "the worktree the probe is in, derived from the probe's own location",
-    "note": "The first version of these probes hardcoded REPO = C:/Users/mrbla/BlarAI, so a doubter running them from a branch measured main and was told nothing about it. Fixed; BLARAI_REPO overrides deliberately."
+    "note": "The first version of these probes hardcoded REPO = C:/Users/__USER__/BlarAI, so a doubter running them from a branch measured main and was told nothing about it. Fixed; BLARAI_REPO overrides deliberately."
   },
   "conditions": {
     "ram_in_use_gb": 14.7,
@@ -147,7 +147,7 @@
     "The #1543 corroboration was hedged as 'low end of the range'; it is mid-range.",
     "conditions.elevated was a LITERAL `True` in the probe rather than a measurement, and repo_commit was hand-asserted. Both are read from the system now.",
     "The filter-driver stack, which explains 87.8% of the software figure, was not recorded at all.",
-    "The committed probes hardcoded REPO = C:/Users/mrbla/BlarAI, so running them from a branch silently measured main."
+    "The committed probes hardcoded REPO = C:/Users/__USER__/BlarAI, so running them from a branch silently measured main."
   ],
   "not_measured": [
     "Sealed-segment anchor verification. _verify_segment_index sha256s each sealed .jsonl.gz and does one chip verify per segment at EVERY boot, and segments accumulate for the life of the system. The 8.2-9.6 s figure covers the ACTIVE chain only, so real startup on an old install is higher by an amount nobody has measured.",

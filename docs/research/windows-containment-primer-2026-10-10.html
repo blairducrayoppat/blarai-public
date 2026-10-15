@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows containment primer</title>
+<style>
+  :root { --bg:#fbfaf7; --fg:#1d1d1b; --muted:#5d5d57; --card:#ffffff; --line:#dcd9cf; --accent:#1f5f8b; --warn:#8a4b00; --ok:#1d6b3a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16171a; --fg:#ecebe6; --muted:#a3a29a; --card:#1f2024; --line:#3a3b40; --accent:#7ab6e0; --warn:#e0a24f; --ok:#6fcf91; }
+  }
+  body { margin:0; background:var(--bg); color:var(--fg); font:17px/1.6 Georgia, "Times New Roman", serif; }
+  main { max-width:780px; margin:0 auto; padding:32px 20px 80px; }
+  h1 { font-size:2rem; line-height:1.2; margin:0 0 6px; }
+  h2 { font-size:1.35rem; margin:2.2rem 0 .4rem; border-top:1px solid var(--line); padding-top:1.2rem; }
+  p, li { max-width:68ch; }
+  .sub { color:var(--muted); margin:0 0 1.5rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin:14px 0; }
+  .card b.tag { color:var(--accent); font-family:system-ui, sans-serif; font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; }
+  .warn b.tag { color:var(--warn); }
+  .ok b.tag { color:var(--ok); }
+  table { border-collapse:collapse; width:100%; font:15px/1.45 system-ui, sans-serif; margin:12px 0; }
+  th, td { border:1px solid var(--line); padding:8px 10px; vertical-align:top; text-align:left; }
+  th { background:var(--card); }
+  code { font-family:ui-monospace, Consolas, monospace; font-size:.9em; background:var(--card); padding:1px 5px; border-radius:4px; border:1px solid var(--line); }
+  .scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<main>
+<h1>How Windows keeps a program in its box</h1>
+<p class="sub">A plain-language primer for the coder-containment decision. Written 2026-10-10 for the Lead Architect and updated 2026-10-11 with the measured results (#1740). Reading time about 15 minutes.</p>
+
+<div class="card">
+  <b class="tag">The short version</b>
+  <p>Windows has one lock system for files, called <strong>access control lists</strong>, and several ways to give a running program an identity those locks can recognise: a <strong>dedicated user account</strong> (what BlarAI uses today), a <strong>restricted token</strong>, an <strong>AppContainer</strong>, and Microsoft's new agent container (<strong>MXC</strong>), which is built on the AppContainer idea. They are not rivals. The locks are the same; the three differ in what the program is allowed to touch <em>before anyone writes a lock for it</em>. A dedicated account starts with everything ordinary accounts can reach and has to be narrowed. An AppContainer starts with very little: it can read Windows and Program Files through a built-in group, and everything else has to be granted. That single difference is why another project, nono, prefers AppContainer, and why BlarAI has spent weeks closing folders that a plain account could write.</p>
+</div>
+
+<h2>1. The building</h2>
+<p>Picture Windows as an office building. Every program that runs is a person walking around inside it. Two things decide where that person can go:</p>
+<ul>
+  <li><strong>The badge they carry.</strong> Windows calls it an <em>access token</em>. It says who the person is (their <em>security identifier</em>, or SID, an internal name tag), which groups they belong to, and which special powers they hold.</li>
+  <li><strong>The guest list on each door.</strong> Every file and folder has one. Windows calls it an <em>access control list</em> (ACL). Each line on it is an <em>entry</em> that says "this identity may read" or "this identity may write" or "this identity is refused".</li>
+</ul>
+<p>When a program tries to open a file, Windows itself (not the program) compares the badge to the guest list. The program cannot skip the check, argue with it, or crash its way past it. That is the whole reason BlarAI's containment work uses these mechanisms: the study of earlier ideas found that protections the agent's own software runs can be skipped, and these cannot.</p>
+<p>A child program started by a program carries a copy of the parent's badge. So a badge is a way to bind everything a program starts, including build tools the agent launches.</p>
+
+<h2>2. NTFS access control lists (the locks)</h2>
+<p><strong>NTFS</strong> (New Technology File System) is the format of your C: drive. It is what stores a guest list on every file and folder.</p>
+<ul>
+  <li><strong>Allow and refuse lines.</strong> Windows reads the lines in order and the first one that matches decides. The standard order is: refusals written on the folder itself, then allows written on the folder itself, then the lines inherited from above, nearest level first, with refusals before allows at each level. So a refusal written on the folder beats an allow, but an allow written on the folder comes before a refusal inherited from above. A refusal is reliable when it is written on the folder itself.</li>
+  <li><strong>Inheritance.</strong> A folder's lines flow down into everything created inside it. This is convenient, and it is also how a broad line at the top of a drive reaches a folder you thought was private. BlarAI found exactly this: <code>C:\blarai-fleet</code> inherited a line letting every signed-in local account modify it (ticket #1686).</li>
+  <li><strong>What they cover.</strong> Every object Windows protects: files, folders, the registry, processes, pipes, shared memory. They do <em>not</em> stop a program from connecting to the internet. That needs a different tool: BlarAI's network block uses the <em>Windows Filtering Platform</em> (WFP), a rule engine inside Windows that can say "connections from this identity are refused".</li>
+</ul>
+<div class="card ok"><b class="tag">How BlarAI uses them</b>
+  <p>The coder account has no allow line on your secrets (your SSH keys, BlarAI's keystores), so Windows refuses it. That was tested and passed on 2026-07-10 (check 2).</p></div>
+
+<h2>3. Dedicated user account (the design BlarAI chose)</h2>
+<p>Create a separate Windows login, <code>blarai-coder</code>, and run the coder under it. Its badge carries a different name tag from yours, so every guest list that names only you refuses it. Anything it starts carries its tag, which is also what lets the network rule single it out without touching your own traffic.</p>
+<p><strong>Strength:</strong> everything normal software expects (a profile folder, a temp folder, a registry) still exists, so the coding tools just work. It is cheap and well understood.</p>
+<p><strong>Weakness:</strong> a new account is not empty-handed. It belongs to broad groups such as <em>Users</em> and <em>Authenticated Users</em>, and every place that lets those groups in, lets it in. BlarAI has already found these on record: a throwaway restricted account could write the model folder <code>B:\models</code> and <code>C:\Windows\Temp</code> on 2026-10-05 (#1689, #1692). <code>C:\Windows\Temp</code> has carried a protected list naming only SYSTEM and Administrators since some time after 2026-10-08 21:59 and still does (ticket #1742); the folder itself cannot say when it was locked. Also found: the fleet folder as above (#1686), and the coder held write rights on all of your <code>projects</code> folder (#1678). Containment here means finding and closing each one. It also does not hold against an attack on Windows itself.</p>
+
+<h2>4. Restricted token (your badge, with parts crossed out)</h2>
+<p>Instead of a new identity, you run the program as <em>you</em> but hand it a weakened copy of your badge. Windows lets you do three things to the copy: switch a group off so it can only be used to refuse, strip special powers (for example administrator powers), and add a second, shorter list so that every door must pass <em>both</em> the normal check and the short list.</p>
+<p><strong>Strength:</strong> no extra account, no login, can be made per launch.</p>
+<p><strong>Weakness:</strong> it is still you. The simple form (what the 2026-09-17 study measured) removes administrator powers and little else: the process could still write freely to the user folders. Measured in #1740 with the same test program in every setup:</p>
+<ul>
+  <li><strong>Write-restricted form</strong> (the second list is checked only when the program writes; this is what OpenAI's Codex uses). It confined writes to the one folder named in the list and refused every folder that broad groups can write (all 6 such folders, in each of 3 runs; the predictions matched 48 of 48 over all 16 folders). It does nothing for reads: your secrets stayed readable, and the internet stayed open.</li>
+  <li><strong>Fully restricted form</strong> (the second list is checked on reads too, with a broad list as Chromium uses). It refused all five secret paths, because only your own account is allowed to read them, but it still read what broad groups can read and still wrote where broad groups can write (<code>B:\models</code>, the fleet folders).</li>
+  <li><strong>Network rule.</strong> A write-restricted token looks exactly like you to a network rule and cannot be singled out. A fully restricted token <em>can</em>: a rule that blocks "you plus the extra identity" and a higher-priority rule that permits "you alone" blocked only the fully restricted program (three of three runs; the rule was limited to one test program so it could not touch your own traffic). OpenAI's statement that Windows Firewall rules cannot do this concerns firewall rules; the lower-level filter can.</li>
+  <li><strong>Tools.</strong> node, git and Python start under both forms. git-bash does not (its runtime creates an object in a shared Windows namespace that a restricted token is refused), and opencode's launcher failed under the fully restricted form.</li>
+  <li><strong>Getting it to start at all.</strong> A restricted token only launches when it is made in one step from the launching program's own token, and its own default access list must name the extra identities; without that the program dies in a twentieth of a second.</li>
+</ul>
+
+<h2>5. AppContainer (the sealed room)</h2>
+<p>AppContainer was built for Microsoft Store apps, but any program can be started inside one. Instead of "a person plus a list of rooms to refuse", it is "a person who starts in a sealed room that has a window onto Windows and Program Files, and is handed keys one at a time".</p>
+<ul>
+  <li><strong>Default deny.</strong> Windows checks the usual badge <em>and</em> a second identity belonging to the container. A folder that merely allows "all signed-in users" does not admit it; the folder has to name the container, or the built-in group "ALL APPLICATION PACKAGES" (for the stricter low-privilege container, "ALL RESTRICTED APPLICATION PACKAGES"). Windows grants that group on its own folders and Program Files: on this machine it covers <code>C:\Windows</code>, most of Program Files and System32, so a folder that grants it admits the container. A regular container can read what that group is granted and nothing else unless granted by name. On this machine that group can read <code>C:\Program Files\Git</code> but not <code>C:\Python314</code> or <code>C:\Program Files\nodejs</code>, and a launched container could not start Python or node from their real folders.</li>
+  <li><strong>Refusals cannot carve it out.</strong> A refusal line naming the container, the group "ALL APPLICATION PACKAGES" or one of the container's capabilities does not refuse the container, while a refusal naming your own account still does. Lines that name the container can only add access. No Microsoft page states this; the container-naming refusal held in Windows' access check, in a real file open, and in 12 of 12 launched containers; the group and capability forms were checked in the access check only.</li>
+  <li><strong>Network is a permission.</strong> No internet unless granted (measured: blocked until the <code>internetClient</code> permission was added). Connections to your own machine (<code>localhost</code>, which is how the coder reaches the model) are also blocked unless a special exemption is set; the exemption worked from an administrator console and was removed afterwards. A network rule can single out one container by its identity (measured: it closed the internet again after <code>internetClient</code> opened it).</li>
+  <li><strong>Lower trust level and its own private corner</strong> of the registry and of Windows' internal object names.</li>
+</ul>
+<p><strong>Strength:</strong> it removes the "everything the broad groups can reach" problem at the start: in the tests only the folders granted by name were writable, and secrets were refused. It needs no extra account.</p>
+<p><strong>Weakness:</strong> most developer tools were not written for it. With copies of the tool folders made readable to it, node, git and Python started; git-bash did not (under a restricted token it failed with a different recorded error than the container's shared-namespace one) and opencode's launcher script failed. Every folder the tools need must be granted or copied (so it still relies on the access lists above). A container profile is kept per user until deleted; the tests created and deleted it each time.</p>
+
+<h2>6. Microsoft's agent container (MXC)</h2>
+<p>MXC is Microsoft's open-source container for running agents' code on Windows (version 1.0.0, released 2026-10-07; OpenAI's Codex documentation now recommends it over its own sandbox). Its first tier uses an operating-system container API: no administrator preparation, a separate network rule per container made by Windows itself, and a signed launcher. Measured on this machine (Windows build 26200.9457):</p>
+<ul>
+  <li>The launcher's signature is valid (Microsoft), its release archive matches the published checksum, and its self-check reports the operating-system container tier with no change to any access list.</li>
+  <li>The container is as strict as the AppContainer: secrets refused, only the work folder writable (even the throwaway folders that grant broad groups write access were refused), no network unless allowed.</li>
+  <li>Its default turns off Windows' graphics layer, which stopped node, git and Python's <code>ctypes</code>; with that setting relaxed node, git and Python started. git-bash and opencode's launcher failed.</li>
+  <li><strong>It cannot reach <code>localhost</code> on this Windows build:</strong> the launcher refused the setting ("not supported by this version of Windows"), including the proxy form. The coder reaches its model over localhost, so this build cannot use it for the coder.</li>
+  <li>Granting folders did not change their access lists, and each run left no registry key behind.</li>
+</ul>
+
+<h2>7. Side by side</h2>
+<div class="scroll"><table>
+  <tr><th></th><th>Dedicated account (BlarAI today)</th><th>Restricted token (write-restricted)</th><th>Restricted token (fully)</th><th>AppContainer</th><th>Microsoft container</th></tr>
+  <tr><th>Your secrets</th><td>refused (proven 2026-07-10)</td><td>readable</td><td>refused</td><td>refused</td><td>refused</td></tr>
+  <tr><th>Folders broad groups can write</th><td>writable until each is narrowed</td><td>refused</td><td>writable</td><td>refused</td><td>refused</td></tr>
+  <tr><th>Network by default</th><td>open until the account's rule is applied</td><td>open</td><td>open</td><td>blocked</td><td>blocked</td></tr>
+  <tr><th>A network rule aimed at it alone</th><td>yes (#1671)</td><td>no (it acts as you)</td><td>yes, with a block plus a permit for you</td><td>yes (its package identity)</td><td>built in</td></tr>
+  <tr><th>The coder's local model over localhost</th><td>works</td><td>works</td><td>works</td><td>blocked until an exemption</td><td>refused on this build</td></tr>
+  <tr><th>node, git, Python</th><td>not checked on the account</td><td>work</td><td>work</td><td>work with copies</td><td>work (graphics layer relaxed)</td></tr>
+  <tr><th>git-bash</th><td>not checked on the account</td><td>fails</td><td>fails</td><td>fails</td><td>fails</td></tr>
+  <tr><th>Setup step</th><td>yes, once (account, folder lists, network rules)</td><td>none per launch</td><td>none per launch</td><td>a profile per launch; an administrator step for localhost</td><td>none</td></tr>
+  <tr><th>Stops a Windows exploit</th><td>no</td><td>no</td><td>no</td><td>no</td><td>no (a virtual machine is the stronger option)</td></tr>
+  <tr><th>Microsoft fixes breaks as security bugs</th><td>yes ("user boundary")</td><td>no (not a named boundary)</td><td>no</td><td>yes ("AppContainer sandbox boundary")</td><td>not stated for MXC itself</td></tr>
+</table></div>
+
+<h2>8. What this means for the decision</h2>
+<div class="card warn"><b class="tag">Be clear about the limits</b>
+  <p>The coder's tools have not been run inside any of these setups with the model in the loop, and the dedicated account itself has not been run on the same test program (only you can run that; the script is <code>arm_a_operator.cmd</code>). The numbers come from one machine, one Windows build, one antivirus, three runs per setup.</p></div>
+<ul>
+  <li><strong>nono's proposal</strong> (a draft, number NEP-0005) says: network block first, then AppContainer as the main way to confine files and processes, with a dedicated user plus restricted token plus file locks as the documented fallback. Its open question 1 is "Does AppContainer hold up?"; its open question 3 is uninstall and repair of persistent state. BlarAI's design is that fallback plus that first phase. This was read from the raw file at commit 62bb720b on 2026-10-10. Measured here: an AppContainer holds on files and network, and does not run the coder's git-bash.</li>
+  <li><strong>The practical question</strong> was whether the coder's tools can run inside an AppContainer or Microsoft's container here, reaching the model over localhost with only the work folder granted. Answer so far: node, git and Python can; git-bash and opencode's launcher cannot; the model cannot be reached from Microsoft's container on this build and needs an administrator exemption from an AppContainer. The recommendation is in <code>docs/research/windows-containment-comparison-2026-10-10.md</code>.</li>
+  <li><strong>The ceremony is not waiting</strong> for this. Flipping containment on is still the next step and is strictly better than today, where the coder runs as you.</li>
+</ul>
+
+<h2>9. What was read and what was not</h2>
+<p>Read on disk: the containment decision records, the 2026-07-09 research brief, the 2026-09-17 study, and the tickets named above. nono's proposal was read from the raw file. 2026-10-10: the Windows descriptions in this primer were checked against Microsoft documentation under #1740 (about twenty Microsoft Learn pages and the Microsoft Security Servicing Criteria). 2026-10-11: the measured statements come from the runs banked under <code>docs/research/windows-containment-comparison-2026-10/</code>.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,5 @@
+Verification after arm 3a, run by the independent reviewer (not by the run itself), 2026-10-11 16:52:29 -04:00:
+  spike-wfp-persist.ps1 -Check : fence ABSENT (all four objects missing), exit 20
+  netsh wfp search for "BlarAI #16" and "#1682" in a fresh export : 0 hits
+  scheduled tasks named blarai-arm* : 0
+The run's own record (arm3a-20261011-165130.json) has no later -Check; this file is the only record of it.

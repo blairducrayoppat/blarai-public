@@ -24,7 +24,7 @@
       "seconds": 20.7
     },
     "C_reasoning_budget_32": {
-      "error": "Check 'thinking_start_token_id >= 0 && thinking_end_token_id >= 0' failed at C:\\Users\\mrbla\\builds\\genai-pr4139\\src\\cpp\\src\\generation_config.cpp:321:\nthinking_start_token_id and thinking_end_token_id must both be set when reasoning_budget_tokens is enabled (>= 0).\n"
+      "error": "Check 'thinking_start_token_id >= 0 && thinking_end_token_id >= 0' failed at C:\\Users\\__USER__\\builds\\genai-pr4139\\src\\cpp\\src\\generation_config.cpp:321:\nthinking_start_token_id and thinking_end_token_id must both be set when reasoning_budget_tokens is enabled (>= 0).\n"
     }
   },
   "generation_config_thinking_fields": [

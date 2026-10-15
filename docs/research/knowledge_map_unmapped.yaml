@@ -1,0 +1,7 @@
+# Studies in docs/research/ that no KNOWLEDGE_MAP*.md file cites yet.
+# Checked by scripts/check_knowledge_map_coverage.py (#1744).
+# Rules: one entry per study (file name, or folder name for a sub-folder);
+# a one-line reason; optional ticket. Remove an entry when the study is cited
+# in a map (the checker fails on an entry that is both listed and cited).
+# Never fake coverage by adding a citation without a real card.
+unmapped: []

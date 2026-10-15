@@ -1,0 +1,239 @@
+[00:02] Today,
+[00:03] uh we are really thrilled uh to announce
+[00:06] that Open Claw runs on Windows
+[00:08] leveraging MXC.
+[00:14] Yeah, we are very deeply engaged uh with
+[00:17] the team to make Open Claw run super
+[00:19] well on Windows. And so, to let me hand
+[00:22] it over to my colleagues uh Scott and
+[00:24] Samantha to show you Open Claw on
+[00:26] Windows. Scott, Samantha.
+[00:34] &gt;&gt; Hey friends. You know, Open Claw came
+[00:37] out in November of last year and it took
+[00:38] the world by storm. And for the last
+[00:41] several months, I've been using my Open
+[00:42] Claw to stay on top of my health.
+[00:44] My Claw can help me manage my blood
+[00:47] sugar and it gives me even proactive
+[00:49] notifications via heartbeat. I've got
+[00:52] mine triaging my personal email, it's
+[00:54] doing my GitHub issues, and tracking
+[00:56] packages, and it even buys me movie
+[00:57] tickets. So, Samantha, what are you
+[00:59] using your Claw for?
+[01:00] &gt;&gt; That's cool, Scott. I turned my Open
+[01:02] Claw agent into my triathlon coach. I'm
+[01:05] nowhere near ready for my race in
+[01:07] September, but coach Claw developed a
+[01:09] work back plan for me and is using my
+[01:11] Strava data to notify me on how I'm
+[01:14] progressing and to keep me accountable
+[01:16] when I'm slacking.
+[01:17] &gt;&gt; Now, we've both found our Claws to be
+[01:19] super useful and that's why we're
+[01:21] working closely with Open Claw to make
+[01:22] them successful and even more successful
+[01:25] on Windows. We've been collaborating in
+[01:27] the open on GitHub to bring you all an
+[01:29] Open Claw Windows companion app. It's
+[01:31] going to help you set up your own Claws
+[01:33] or connect to existing ones, whether
+[01:35] they're hosted in Windows or in WSL. And
+[01:37] the Windows companion, we're going to
+[01:39] sandbox the Open Claw tool calls to keep
+[01:42] you and your system safe.
+[01:45] &gt;&gt; Yeah, you'll see the Open Claw Windows
+[01:46] companion app running right now in the
+[01:48] background. Go ahead and right click on
+[01:50] it, Scott.
+[01:51] &gt;&gt; All right.
+[01:54] &gt;&gt; That looks awesome. You'll notice
+[01:56] immediately it looks like a native
+[01:57] Windows app because it is. It's written
+[02:00] in WinUI 3. It's got all kinds of
+[02:02] information about my gateway, other
+[02:04] machines that are participating in my
+[02:06] claw, my sessions, and my usage. I've
+[02:09] also got quick access to things like
+[02:11] chat, canvas, the main dashboard, and
+[02:14] more.
+[02:15] Let's jump into companion settings.
+[02:18] Within the app, we've got full chat
+[02:20] support with tool calling. And you'll
+[02:22] notice down here in the corner,
+[02:24] we've got lots of permissions options
+[02:26] along with our sandbox configuration.
+[02:29] &gt;&gt; Now, the sandbox is really interesting
+[02:31] because this is using MXC, the Microsoft
+[02:33] execution containers. And for this,
+[02:35] we're going to be using process
+[02:36] isolation. Now, newer versions of
+[02:38] Windows are going to have even more
+[02:39] containment options. So, you're going to
+[02:40] want to keep an eye out for more news
+[02:42] with MXC in the future. Now, I can see
+[02:44] that I've got one-click security option
+[02:47] settings. But, Samantha, talk to me
+[02:49] about custom folders.
+[02:51] &gt;&gt; Yeah, you've got full support about what
+[02:53] files and folders you want Open Claw to
+[02:56] have access to. And really granular
+[02:58] security features like clipboard access
+[03:00] or talking to the internet itself.
+[03:02] Now, I've given it read-only desktop
+[03:06] read access to your desktop folder.
+[03:08] Open Claw already has a rich safety
+[03:10] layer, and that layer is only augmented
+[03:12] more by appropriate containment that can
+[03:14] be managed by me or policies applied by
+[03:17] IT.
+[03:18] Now, for the purposes of this demo, I'm
+[03:20] going to do something really scary and
+[03:22] ask Open Claw to delete all the files on
+[03:25] your desktop.
+[03:26] &gt;&gt; That's cool cuz I might have a nice
+[03:27] clean desktop.
+[03:28] &gt;&gt; Um I think you're keeping a secret. You
+[03:31] hid all your icons from the audience
+[03:33] while we were on stage.
+[03:34] &gt;&gt; That is
+[03:34] &gt;&gt; I think we need to show the audience who
+[03:37] you really are.
+[03:38] &gt;&gt; So disrespectful.
+[03:39] I know where everything is.
+[03:42] Just don't touch my stuff. I know where
+[03:45] they are. You know, Sam, I need to make
+[03:47] sure that you're clear that a messy
+[03:48] desktop is an organized mind. I'm pretty
+[03:50] sure that that's the That's the quote,
+[03:53] right? So, what we've done is we've
+[03:54] asked Open Claws to delete those files
+[03:56] from the Windows node, and the only
+[03:58] thing that is going to keep from
+[03:59] happening is MXC because we've turned
+[04:01] off all of the many layers that Open
+[04:03] Claws offers, but our IT, in this case
+[04:05] Samantha, has set it to read only. So,
+[04:08] it's trying to go and delete all of
+[04:09] those files. We can actually see the
+[04:11] different attempts where it's going and
+[04:12] deleting and then checking the directory
+[04:14] and then deleting again, because it's
+[04:16] very persistent. It wants these files
+[04:18] gone, and I want I want them to stay.
+[04:20] &gt;&gt; Oh.
+[04:22] &gt;&gt; Nope. Nope.
+[04:23] The read-only sandbox is there. 94 JPEGs
+[04:26] are still on the desktop. Absolutely. My
+[04:28] desktop icons are safe from Samantha's
+[04:31] reign of terror.
+[04:33] &gt;&gt; Foiled again.
+[04:34] &gt;&gt; Oh my goodness. So bad.
+[04:36] &gt;&gt; Today we've seen security sandboxing,
+[04:38] WinUI3, and open source brought together
+[04:41] all in this alpha release of a Windows
+[04:43] companion app. We think this app is a
+[04:45] great opportunity to showcase Open Claws
+[04:48] on Windows, and it's only going to get
+[04:49] better in the coming months.
+[04:51] &gt;&gt; That is right. And by the way, I want to
+[04:53] note that we're doing all this
+[04:53] development work on this calm Windows
+[04:56] development machine with all the tools
+[04:58] that I love, like WSL,
+[05:01] uh containers, and containment. And I've
+[05:04] even got GitHub Copilot with multimodal
+[05:06] support ready to go. Now, this is
+[05:08] literally how the team and I have been
+[05:10] working on the Open Claws app on GitHub.
+[05:13] Now, people might wonder how all of this
+[05:15] came together. Turns out that over the
+[05:18] holidays, I got a DM from this random
+[05:20] guy on on the internet, and it took me a
+[05:23] couple of days to get back to him. Uh
+[05:26] and then when I did, I we just had this
+[05:28] kind of cool idea that maybe he should
+[05:30] come to
+[05:31] to to Microsoft Build. Now, I think
+[05:33] there's one more person that we all want
+[05:34] to thank for bringing the next
+[05:35] generation of agents to world. Everybody
+[05:37] put your hands together for the Claw
+[05:39] Father himself, Peter Steinberger.
+[05:44] &gt;&gt; That's
+[05:46] Samantha.
+[05:48] I'm just showing off my secret DMs.
+[05:51] Um
+[05:53] I'm so excited to see Open Claw native
+[05:56] on Windows. You know, watching a Claw
+[05:59] try to delete all your desktop file and
+[06:02] just fail
+[06:03] made me really happy.
+[06:05] Because 6 months ago that would totally
+[06:07] would have worked.
+[06:09] You know, I built Open Claw to have
+[06:12] access to everything. You know, my
+[06:14] files, my machines, my chats, always on
+[06:17] and fully open source. That's what makes
+[06:19] it so powerful.
+[06:21] And that's what also makes companies a
+[06:23] bit nervous.
+[06:24] You know, what I kept hearing was Peter,
+[06:27] I love my Claw.
+[06:29] Can I use this at work?
+[06:31] And that's what we spent the last few
+[06:33] months on with Microsoft, GitHub,
+[06:36] OpenAI, Nvidia, just to name a few.
+[06:39] We added observability. We added auto
+[06:42] mode for permissions. We changed how
+[06:45] access works. It's not all or nothing
+[06:46] anymore. You can pick which folder
+[06:48] should be read only, which one should be
+[06:50] write off or hidden.
+[06:53] So, here's the news. You can totally run
+[06:56] Open Claw inside your company now.
+[07:02] And we even made the harness itself a
+[07:05] plugin. You can bring your own.
+[07:08] Copilot Codex, whatever you already
+[07:11] trust and your rules come right with it.
+[07:15] And then you put Open Claw on top of it.
+[07:17] You get persistent memory, heartbeats,
+[07:20] and you get a Claw right inside Slack or
+[07:23] Teams.
+[07:25] It's been really exciting to see Open
+[07:28] Claw
+[07:29] grow into something much bigger.
+[07:33] A global movement and a community.
+[07:36] And I started the Open Claw Foundation,
+[07:38] a real nonprofit so it stays open and
+[07:41] neutral.
+[07:42] Any model,
+[07:44] any operating system.
+[07:46] Because we are entering
+[07:48] a new era of building this agents. More
+[07:51] capability for the people who don't
+[07:53] code, and more power for those who do.
+[07:57] And we get to do this. We get to build
+[08:00] it together in the open.
+[08:02] So, my task is simple.
+[08:04] Come build with us. Thank you.
+[08:08] &gt;&gt; Fantastic.
+[08:10] Thank you very much to Peters. Thank you
+[08:12] to Samantha. Thank you to the Companion
+[08:15] App team for their hard work. Thank you
+[08:16] to the Open Claw community for giving
+[08:18] everyone here a crustacean of their own.
+[08:20] And as we walk out, I want to remind you
+[08:21] that that's the first time you've ever
+[08:23] seen Open Claw running on a Surface
+[08:24] Laptop Ultra.
+[08:26] Goodbye.
+[08:33] &gt;&gt; All right. Thank you so much, uh,
+[08:35] Samantha, Scott, and Peter. It's so
+[08:37] wonderful, uh, to see Open Claw come to
+[08:40] Windows,
+[08:42] um, and have all of that, uh, capability
+[08:45] in terms of the security and,
+[08:48] um, and that comfort to be able to have
+[08:50] these long-running agents and and
+[08:52] unmetered intelligence come together.

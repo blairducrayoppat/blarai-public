@@ -1,0 +1,151 @@
+{
+ "started": "2026-10-11T13:25:11.076-04:00",
+ "lan_ip": "10.0.10.12",
+ "host_python": "3.14.3 (tags/v3.14.3:323c59a, Feb  3 2026, 16:04:56) [MSC v.1944 64 bit (AMD64)]",
+ "main_launcher": {
+  "path": "C:\\blarai-spike-1740-mxc\\build1406\\target\\x86_64-pc-windows-msvc\\release\\wxc-exec.exe",
+  "sha256": "3cf91a4598a9acb657f8ca959a7393dab5b79ece2d993dfe3c392f2615279311",
+  "size": 5694976,
+  "signature": "NotSigned|",
+  "probe_rc": 0,
+  "probe": {
+   "tier": "base-container",
+   "needsDaclAugmentation": false,
+   "warnings": [],
+   "probes": {
+    "baseContainerApiPresent": true,
+    "nativeCaptureAvailable": true,
+    "guardedCaptureAvailable": false,
+    "bfscfgPresent": false,
+    "bfsCompiledIn": false,
+    "baseContainerSupportsDenyPaths": true,
+    "baseContainerSupportsEnumeratePaths": false,
+    "baseContainerSupportsIngressHostLoopbackAllow": false,
+    "baseContainerSupportsIdentitylessLoopbackProxy": true,
+    "isolationSessionAvailable": false,
+    "hyperlightAvailable": false,
+    "uiCapabilities": {
+     "canBlockClipboardRead": true,
+     "canBlockClipboardWrite": true,
+     "canBlockInputInjection": true,
+     "canBlockInputMethodChanges": true,
+     "canBlockExternalUiObjects": true,
+     "canBlockGlobalUiNamespace": true,
+     "canBlockDesktopSwitching": true,
+     "canBlockLogoffOrShutdown": true,
+     "canBlockSystemParameterChanges": true,
+     "canBlockDisplaySettingsChanges": true
+    }
+   }
+  }
+ },
+ "v100_launcher": {
+  "path": "C:\\blarai-spike-1740-mxc\\dl\\x64\\wxc-exec.exe",
+  "sha256": "aa444c0fc4b7f155fd8631068ffafb453d71d8b47fc47d417a74c9545a344031",
+  "size": 12003128,
+  "signature": "Valid|CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+  "probe_rc": 0,
+  "probe": {
+   "tier": "base-container",
+   "needsDaclAugmentation": false,
+   "warnings": [],
+   "probes": {
+    "baseContainerApiPresent": true,
+    "nativeCaptureAvailable": true,
+    "guardedCaptureAvailable": false,
+    "bfscfgPresent": false,
+    "bfsCompiledIn": false,
+    "baseContainerSupportsDenyPaths": true,
+    "baseContainerSupportsEnumeratePaths": false,
+    "baseContainerSupportsIngressHostLoopbackAllow": false,
+    "isolationSessionAvailable": false,
+    "hyperlightAvailable": true,
+    "uiCapabilities": {
+     "canBlockClipboardRead": true,
+     "canBlockClipboardWrite": true,
+     "canBlockInputInjection": true,
+     "canBlockInputMethodChanges": true,
+     "canBlockExternalUiObjects": true,
+     "canBlockGlobalUiNamespace": true,
+     "canBlockDesktopSwitching": true,
+     "canBlockLogoffOrShutdown": true,
+     "canBlockSystemParameterChanges": true,
+     "canBlockDisplaySettingsChanges": true
+    }
+   }
+  }
+ },
+ "machine_start": {
+  "battery": [
+   {
+    "BatteryStatus": 2,
+    "EstimatedChargeRemaining": 80
+   }
+  ],
+  "top_cpu": [
+   "pwsh#5=186",
+   "WmiPrvSE#1=96",
+   "bdservicehost=50",
+   "System=11",
+   "WmiPrvSE#2=11"
+  ],
+  "cpu_total": 40,
+  "bitdefender": [
+   "bdagent/18888",
+   "bdntwrk/10320",
+   "bdredline/4112",
+   "bdredline/18824",
+   "bdservicehost/2912",
+   "bdservicehost/2920",
+   "bdservicehost/4040",
+   "bdservicehost/4060",
+   "bdservicehost/6440",
+   "bduserhost/11852",
+   "bduserhost/14112",
+   "bduserhost/15676",
+   "bduserhost/18448",
+   "updatesrv/7436"
+  ],
+  "thermal_c": [
+   60.1
+  ]
+ },
+ "windows": "Microsoft Windows [Version 10.0.26200.9457]",
+ "priority": "BelowNormal",
+ "finished": "2026-10-11T13:26:18.290-04:00",
+ "machine_end": {
+  "battery": [
+   {
+    "BatteryStatus": 2,
+    "EstimatedChargeRemaining": 80
+   }
+  ],
+  "top_cpu": [
+   "System=109",
+   "pwsh#5=93",
+   "WmiPrvSE#1=87",
+   "bdservicehost=71",
+   "SearchProtocolHost=43"
+  ],
+  "cpu_total": 63,
+  "bitdefender": [
+   "bdagent/18888",
+   "bdntwrk/10320",
+   "bdredline/4112",
+   "bdredline/18824",
+   "bdservicehost/2912",
+   "bdservicehost/2920",
+   "bdservicehost/4040",
+   "bdservicehost/4060",
+   "bdservicehost/6440",
+   "bduserhost/11852",
+   "bduserhost/14112",
+   "bduserhost/15676",
+   "bduserhost/18448",
+   "updatesrv/7436"
+  ],
+  "thermal_c": [
+   60.1
+  ]
+ }
+}

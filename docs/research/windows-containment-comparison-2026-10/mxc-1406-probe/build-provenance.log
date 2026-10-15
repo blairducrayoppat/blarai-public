@@ -1,0 +1,277 @@
+[12:39:18] start
+[12:39:18] toolchain install (pinned 1.93 from rust-toolchain.toml)
+Default host: x86_64-pc-windows-msvc
+rustup home:  C:/blarai-spike-1740-mxc/build1406/rustup
+
+installed toolchains
+--------------------
+1.93-x86_64-pc-windows-msvc (active)
+
+active toolchain
+----------------
+name: 1.93-x86_64-pc-windows-msvc
+active because: overridden by 'C:\blarai-spike-1740-mxc\build1406\src-main\mxc-70fc7d52c4ff2852c7be16da1c0666c8d6811e63\src\rust-toolchain.toml'
+installed targets:
+  x86_64-pc-windows-msvc
+[12:39:18] cargo build --release --target x86_64-pc-windows-msvc -p wxc -p plm -p wxc_winhttp_proxy_shim
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded cfg_aliases v0.2.1
+  Downloaded cfg-if v1.0.4
+  Downloaded zerofrom v0.1.8
+  Downloaded zmij v1.0.21
+  Downloaded zerovec-derive v0.11.3
+  Downloaded winreg v0.55.0
+  Downloaded zerovec v0.11.6
+  Downloaded unicode-ident v1.0.24
+  Downloaded zerotrie v0.2.4
+  Downloaded typenum v1.20.1
+  Downloaded icu_collections v2.2.0
+  Downloaded idna v1.1.0
+  Downloaded serde_json v1.0.150
+  Downloaded clap_builder v4.6.0
+  Downloaded icu_properties_data v2.2.0
+  Downloaded serde v1.0.228
+  Downloaded chrono v0.4.45
+  Downloaded mio v1.2.1
+  Downloaded memchr v2.8.2
+  Downloaded cc v1.2.64
+  Downloaded syn v2.0.118
+  Downloaded nix v0.29.0
+  Downloaded winresource v0.1.31
+  Downloaded widestring v1.2.1
+  Downloaded url v2.5.8
+  Downloaded icu_normalizer_data v2.2.0
+  Downloaded icu_normalizer v2.2.0
+  Downloaded icu_locale_core v2.2.0
+  Downloaded getrandom v0.4.2
+  Downloaded const-oid v0.10.2
+  Downloaded bytes v1.11.1
+  Downloaded base64 v0.22.1
+  Downloaded socket2 v0.6.4
+  Downloaded serde_derive v1.0.228
+  Downloaded proc-macro2 v1.0.106
+  Downloaded litemap v0.8.2
+  Downloaded icu_provider v2.2.0
+  Downloaded icu_properties v2.2.0
+  Downloaded bitflags v2.13.0
+  Downloaded yoke v0.8.3
+  Downloaded writeable v0.6.3
+  Downloaded uuid v1.23.3
+  Downloaded tracelogging v1.2.4
+  Downloaded smallvec v1.15.2
+  Downloaded serde_core v1.0.228
+  Downloaded semver v1.0.28
+  Downloaded windows_x86_64_msvc v0.52.6
+  Downloaded parking_lot_core v0.9.12
+  Downloaded tokio v1.52.3
+  Downloaded parking_lot v0.12.5
+  Downloaded libc v0.2.186
+  Downloaded once_cell v1.21.4
+  Downloaded num-traits v0.2.19
+  Downloaded hybrid-array v0.4.12
+  Downloaded getrandom v0.2.17
+  Downloaded digest v0.11.3
+  Downloaded colorchoice v1.0.5
+  Downloaded clap_derive v4.6.1
+  Downloaded clap v4.6.1
+  Downloaded cidr v0.3.2
+  Downloaded anyhow v1.0.103
+  Downloaded windows-future v0.3.2
+  Downloaded windows-core v0.62.2
+  Downloaded unicode-general-category v1.1.0
+  Downloaded thiserror-impl v2.0.18
+  Downloaded thiserror v2.0.18
+  Downloaded tempfile v3.27.0
+  Downloaded strsim v0.11.1
+  Downloaded sha2 v0.11.0
+  Downloaded quote v1.0.45
+  Downloaded pin-project-lite v0.2.17
+  Downloaded lock_api v0.4.14
+  Downloaded flatbuffers v25.12.19
+  Downloaded find-msvc-tools v0.1.9
+  Downloaded fastrand v2.4.1
+  Downloaded displaydoc v0.2.6
+  Downloaded cpufeatures v0.3.0
+  Downloaded clap_lex v1.1.0
+  Downloaded anstyle-query v1.1.5
+  Downloaded anstyle-parse v1.0.0
+  Downloaded windows-strings v0.5.1
+  Downloaded windows-numerics v0.3.1
+  Downloaded windows-link v0.2.1
+  Downloaded windows-interface v0.59.3
+  Downloaded windows-implement v0.60.2
+  Downloaded winapi-util v0.1.11
+  Downloaded version_check v0.9.5
+  Downloaded tracelogging_macros v1.2.3
+  Downloaded tinystr v0.8.3
+  Downloaded synstructure v0.13.2
+  Downloaded stable_deref_trait v1.2.1
+  Downloaded shlex v2.0.1
+  Downloaded serde_path_to_error v0.1.20
+  Downloaded same-file v1.0.6
+  Downloaded rustc_version v0.4.1
+  Downloaded potential_utf v0.1.5
+  Downloaded heck v0.5.0
+  Downloaded zerofrom-derive v0.1.7
+  Downloaded yoke-derive v0.8.2
+  Downloaded windows-threading v0.2.1
+  Downloaded windows-targets v0.52.6
+  Downloaded windows-collections v0.3.2
+  Downloaded utf8parse v0.2.2
+  Downloaded tokio-macros v2.7.0
+  Downloaded scopeguard v1.2.0
+  Downloaded once_cell_polyfill v1.70.2
+  Downloaded memoffset v0.9.1
+  Downloaded itoa v1.0.18
+  Downloaded is_terminal_polyfill v1.70.2
+  Downloaded idna_adapter v1.2.2
+  Downloaded form_urlencoded v1.2.2
+  Downloaded crypto-common v0.2.2
+  Downloaded autocfg v1.5.1
+  Downloaded anstyle v1.0.14
+  Downloaded anstream v1.0.0
+  Downloaded windows-result v0.4.1
+  Downloaded utf8_iter v1.0.4
+  Downloaded percent-encoding v2.3.2
+  Downloaded block-buffer v0.12.1
+  Downloaded anstyle-wincon v3.0.11
+  Downloaded windows-sys v0.59.0
+  Downloaded windows-sys v0.61.2
+  Downloaded windows v0.62.2
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.45
+   Compiling windows-link v0.2.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling zmij v1.0.21
+   Compiling cfg-if v1.0.4
+   Compiling find-msvc-tools v0.1.9
+   Compiling windows-sys v0.61.2
+   Compiling version_check v0.9.5
+   Compiling getrandom v0.4.2
+   Compiling shlex v2.0.1
+   Compiling winresource v0.1.31
+   Compiling cc v1.2.64
+   Compiling serde_json v1.0.150
+   Compiling serde v1.0.228
+   Compiling autocfg v1.5.1
+   Compiling serde_core v1.0.228
+   Compiling typenum v1.20.1
+   Compiling litemap v0.8.2
+   Compiling smallvec v1.15.2
+   Compiling writeable v0.6.3
+   Compiling syn v2.0.118
+   Compiling hybrid-array v0.4.12
+   Compiling utf8_iter v1.0.4
+   Compiling icu_normalizer_data v2.2.0
+   Compiling icu_properties_data v2.2.0
+   Compiling semver v1.0.28
+   Compiling windows-strings v0.5.1
+   Compiling windows-result v0.4.1
+   Compiling memchr v2.8.2
+   Compiling itoa v1.0.18
+   Compiling windows_x86_64_msvc v0.52.6
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling parking_lot_core v0.9.12
+   Compiling const-oid v0.10.2
+   Compiling rustc_version v0.4.1
+   Compiling memoffset v0.9.1
+   Compiling num-traits v0.2.19
+   Compiling utf8parse v0.2.2
+   Compiling cfg_aliases v0.2.1
+   Compiling digest v0.11.3
+   Compiling anstyle v1.0.14
+   Compiling cpufeatures v0.3.0
+   Compiling once_cell_polyfill v1.70.2
+   Compiling libc v0.2.186
+   Compiling scopeguard v1.2.0
+   Compiling anstyle-wincon v3.0.11
+   Compiling lock_api v0.4.14
+   Compiling flatbuffers v25.12.19
+   Compiling sha2 v0.11.0
+   Compiling nix v0.29.0
+   Compiling synstructure v0.13.2
+   Compiling anstyle-parse v1.0.0
+   Compiling windows-targets v0.52.6
+   Compiling uuid v1.23.3
+   Compiling anstyle-query v1.1.5
+   Compiling windows-threading v0.2.1
+   Compiling bitflags v2.13.0
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling unicode-general-category v1.1.0
+   Compiling anyhow v1.0.103
+   Compiling percent-encoding v2.3.2
+   Compiling colorchoice v1.0.5
+   Compiling thiserror v2.0.18
+   Compiling anstream v1.0.0
+   Compiling form_urlencoded v1.2.2
+   Compiling windows-sys v0.59.0
+   Compiling parking_lot v0.12.5
+   Compiling mio v1.2.1
+   Compiling winapi-util v0.1.11
+   Compiling socket2 v0.6.4
+   Compiling bytes v1.11.1
+   Compiling tracelogging_macros v1.2.3
+   Compiling heck v0.5.0
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling zerovec-derive v0.11.3
+   Compiling displaydoc v0.2.6
+   Compiling serde_derive v1.0.228
+   Compiling windows-interface v0.59.3
+   Compiling windows-implement v0.60.2
+   Compiling thiserror-impl v2.0.18
+   Compiling tokio-macros v2.7.0
+   Compiling windows-core v0.62.2
+   Compiling once_cell v1.21.4
+   Compiling windows-numerics v0.3.1
+   Compiling windows-future v0.3.2
+   Compiling windows-collections v0.3.2
+   Compiling fastrand v2.4.1
+   Compiling clap_lex v1.1.0
+   Compiling strsim v0.11.1
+   Compiling zerofrom v0.1.8
+   Compiling pin-project-lite v0.2.17
+   Compiling yoke v0.8.3
+   Compiling tokio v1.52.3
+   Compiling clap_builder v4.6.0
+   Compiling zerovec v0.11.6
+   Compiling zerotrie v0.2.4
+   Compiling tinystr v0.8.3
+   Compiling potential_utf v0.1.5
+   Compiling icu_locale_core v2.2.0
+   Compiling icu_collections v2.2.0
+   Compiling windows v0.62.2
+   Compiling icu_provider v2.2.0
+   Compiling icu_normalizer v2.2.0
+   Compiling icu_properties v2.2.0
+   Compiling mxc-sdk v1.0.0 (C:\blarai-spike-1740-mxc\build1406\src-main\mxc-70fc7d52c4ff2852c7be16da1c0666c8d6811e63\src\mxc-sdk)
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling tempfile v3.27.0
+   Compiling winreg v0.55.0
+   Compiling tracelogging v1.2.4
+   Compiling clap_derive v4.6.1
+   Compiling chrono v0.4.45
+   Compiling same-file v1.0.6
+   Compiling serde_path_to_error v0.1.20
+   Compiling getrandom v0.2.17
+   Compiling cidr v0.3.2
+   Compiling base64 v0.22.1
+   Compiling widestring v1.2.1
+   Compiling wxc v1.0.0 (C:\blarai-spike-1740-mxc\build1406\src-main\mxc-70fc7d52c4ff2852c7be16da1c0666c8d6811e63\src\tools\wxc)
+   Compiling clap v4.6.1
+   Compiling wxc_winhttp_proxy_shim v1.0.0 (C:\blarai-spike-1740-mxc\build1406\src-main\mxc-70fc7d52c4ff2852c7be16da1c0666c8d6811e63\src\host\wxc_winhttp_proxy_shim)
+   Compiling plm v0.1.0 (C:\blarai-spike-1740-mxc\build1406\src-main\mxc-70fc7d52c4ff2852c7be16da1c0666c8d6811e63\src\host\plm)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2m 24s
+[12:41:43] build exit=0
+
+FullName                                                                               Length
+--------                                                                               ------
+C:\blarai-spike-1740-mxc\build1406\target\x86_64-pc-windows-msvc\release\wxc-exec.exe 5694976
+
+
+[12:41:43] done

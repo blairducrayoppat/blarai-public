@@ -1,0 +1,546 @@
+# Self-test results, arm3-persist, 20261011 (re-run after the second independent review: wrapped-script gate, admin-only check hardening, proof checks, restart decision)
+# Each script run with -SelfTest in a fresh host, TEMP redirected to an empty folder, hard time cap, retry once on a startup hang (none occurred in this pass).
+# A self-test calls no WFP API, registers no task and changes no system state. Kept: the lines that name a check and the verdict line.
+# Conditions: one machine, Windows 11 Pro, an elevated session, PowerShell 7 and Windows PowerShell 5.1, other agents running on the machine.
+
+## pwsh spike-wfp-persist.ps1: 112 passed, 0 failed, 0 skipped
+== extraction from the wrapped script and compile (no engine is opened) ==
+  [PASS] all 5 wrapped functions extracted
+  [PASS] the wrapped script was only read (SHA-256 recorded)
+  [PASS] the WFP C# and the persist C# compile together in-process
+  [PASS] SDDL is exactly D:(A;;CC;;;<account sid>)
+  [PASS] two filters, both BLOCK, none carrying the loopback condition
+  [PASS] the plan refuses non-account SIDs (Everyone, Users, SYSTEM, Authenticated Users, Administrators, empty, garbage)
+  [PASS] the target account is the throwaway spike account, never blarai-coder (the real coder account's containment state is not touched)
+  [PASS] SID safety: the operator SID is refused (exit 3 path)
+  [PASS] SID safety: a group in the operator token is refused
+  [PASS] SID safety: a distinct account SID is accepted
+== fixed keys and persistence flags ==
+  [PASS] the library's key strings equal the C# key constants (provider, sublayer, both filters)
+  [PASS] the persistent keys differ from the dynamic spike's (arms 1 and 2 cannot be confused with this set)
+  [PASS] the plan's filter keys are the fixed keys, in V4, V6 order
+  [PASS] every object name carries the marker "BlarAI #1682"
+  [PASS] persistent flag constant is 0x1 (provider, sublayer and filter flags in fwpmtypes.h)
+  [PASS] the marshalled provider, sublayer and EVERY filter carry the persistent flag
+  [PASS] every filter references the persistent provider and sublayer
+  [PASS] EVERY marshalled filter carries ALE_USER_ID / SECURITY_DESCRIPTOR / MATCH_EQUAL
+  [PASS] layers are ALE_AUTH_CONNECT V4 and V6 (fwpmu.h literals)
+  [PASS] x64 sizeof FWPM_FILTER0 == 200 and FWPM_FILTER_CONDITION0 == 40 (hand-derived from fwpmtypes.h)
+== the manual rollback snippet compiles (it is NOT run) ==
+  [PASS] the snippet's C# compiles and exposes Run()
+  [PASS] the snippet names all four keys, deleting filters, then the sublayer, then the provider
+== rollback and fail-closed logic against the in-memory fake ==
+  [PASS] state: a full fake set reads PRESENT, all persistent
+  [PASS] remove (full set): Ok, state ABSENT, deletes in the order filter, filter, sublayer, provider
+  [PASS] a half-failed add (provider, sublayer, one filter, then an error) reads PARTIAL
+  [PASS] remove (half-failed add): Ok, ABSENT, the missing filter reported as not_found rather than an error
+  [PASS] remove (nothing there): Ok, every key not_found, no error (idempotent)
+  [PASS] remove (one delete fails): Ok is FALSE, the failing key is named, the state read back is PARTIAL
+  [PASS] remove (one delete fails): every OTHER key was still tried and deleted (the provider after the failure too)
+  [PASS] state: an engine that cannot be read is UNKNOWN with the error text (never ABSENT)
+  [PASS] state: an empty fake is ABSENT
+  [PASS] gate: ABSENT, PARTIAL and UNKNOWN all refuse; only PRESENT allows
+  [PASS] guarded probe: with the fence ABSENT, PARTIAL or UNKNOWN the account's task is NOT started (outcome fence_absent_not_started)
+  [PASS] guarded probe: with the fence PRESENT the task is started exactly once
+  [PASS] add path: refused with no proof, a failed proof, a token of the wrong kind, or a bare string; the backend's AddAll is never called
+  [PASS] add path: refused over a stale object (state PARTIAL), nothing added, nothing deleted
+  [PASS] add path: refused when the engine cannot be read (UNKNOWN), AddAll never called
+  [PASS] add path: with a valid token on an empty fence it adds all four objects and reads back PRESENT, persistent
+  [PASS] add path: a half-failed add is rolled back by key to ABSENT and reported as not added
+  [PASS] add path: an add that "succeeds" without the persistent flag is rolled back (it would not survive a reboot)
+== the rollback proof and its hash binding ==
+  [PASS] proof: a complete, fresh proof whose hashes match (scripts AND the wrapped #1671 script) is accepted and yields the token
+  [PASS] proof: editing ONE script after the self-test invalidates it, naming the file
+  [PASS] proof: restoring the exact bytes validates it again
+  [PASS] proof: a CRLF copy of the same text validates (hashes are over LF-normalised bytes)
+  [PASS] proof: a ONE-TOKEN edit of the wrapped #1671 script (the code that builds the security descriptor) invalidates it
+  [PASS] proof: restoring the wrapped script validates it again; no wrapped-script hash supplied is refused
+  [PASS] proof: a proof with no hash of the wrapped script is refused
+  [PASS] proof: a proof written without running a self-test (0 checks run) is refused
+  [PASS] proof: a claimed 999 checks run, more than the self-test has check sites (110 here), is refused as not a real run
+  [PASS] proof: failed_checks non-empty is refused even when the passed flags were edited to true
+  [PASS] proof: a proof recording fewer checks passed than run is refused
+  [PASS] proof: a proof with no sibling self-test results, or with one that failed, is refused
+  [PASS] proof: a code-set file that is missing from the folder invalidates it, naming the file
+  [PASS] proof: older than 24 hours is refused
+  [PASS] proof: a missing rollback check tag is refused, naming it
+  [PASS] proof: a recorded failure is refused
+  [PASS] proof: no file, and a file that is not JSON, are refused
+  [PASS] proof: dated in the future is refused
+  [PASS] proof: an old-schema proof (before the wrapped-script binding) is refused
+== the wrapped script is pinned before its text becomes code; the independent rollback; the admin-only folder rule ==
+  [PASS] pin: a wrapped script whose hash is not the pinned one is refused BEFORE it is parsed
+  [PASS] pin: with the right hash the import proceeds past the pin (and fails later only because this file is not the real script)
+  [PASS] wrapped-script gate: neither pinned nor in an admin-only folder -> refused BEFORE any of its text is evaluated (nothing ran)
+  [PASS] wrapped-script gate: a wrong pin is refused before evaluation too
+  [PASS] single read: Import-WfpHelpers returns, and records for the proof, the hash of the bytes it evaluated
+  [PASS] single read: a library loaded through Get-VerifiedLibBlock is represented by the hash of the bytes that ran, and equals a fresh hash of the unchanged file
+  [PASS] code-set id: stable for unchanged files, 64 hex characters; Test-CodeSetId accepts it
+  [PASS] code-set id: changing ONE script after arming makes Test-CodeSetId refuse (the SYSTEM task falls back to the self-contained rollback)
+  [PASS] code-set id: a missing code-set file is refused, naming it
+  [PASS] manual rollback output: four rows, each deleted or already gone -> Ok
+  [PASS] manual rollback output: one error status (FWP_E_IN_USE) -> not Ok; fewer than four rows -> not Ok; an engine-open failure line -> not Ok
+  [PASS] admin-only: SYSTEM and Administrators with full control, Users read-and-execute -> no problem
+  [PASS] admin-only: Users with Modify (0x1301BF), or only create-files (0x2), or append (0x4) on the folder -> a problem each
+  [PASS] admin-only: a Deny rule does not excuse an Allow; GenericWrite and GenericAll count
+  [PASS] admin-only: an owner that is not SYSTEM, Administrators or TrustedInstaller is a problem
+  [PASS] admin-only: on an ANCESTOR, create-files and append are fine (Users have them on ProgramData) but delete-child and change-permissions are not
+  [PASS] admin-only: an inherit-only rule (children only) is not credited on the folder itself
+  [PASS] admin-only (real ACL read, no change): the user's own temp folder is NOT admin-only, and a missing folder is refused too
+== admin-only folder check against fabricated security descriptors and attributes ==
+  [PASS] fake ACL: everything admin-only (Users read-and-execute) -> Ok
+  [PASS] fake ACL: the folder grants Users modify -> refused
+  [PASS] fake ACL: the folder is OWNED by a non-administrator (owner has WRITE_DAC) -> refused
+  [PASS] fake ACL: a PARENT owned by a non-administrator, otherwise admin-only -> refused
+  [PASS] fake ACL: a PARENT granting Users DELETE (rename-away of the parent), or DELETE plus add-subfolder -> refused
+  [PASS] fake ACL: a PARENT granting Users only create-files and add-subfolder (as ProgramData does) -> still Ok
+  [PASS] fake ACL: Authenticated Users WRITE_EA only on the folder, or Everyone DELETE only -> refused
+  [PASS] fake ACL: a file in the folder owned by a non-administrator, or OWNER RIGHTS with write on the folder -> refused
+  [PASS] fake ACL: a creator-owner inherit-only rule is ignored, but Users add-file on the folder itself is refused
+  [PASS] reparse points: the target folder, a parent, or a file inside being a link -> refused
+== elevated writes: no junction, symlink or hard-link redirect; the proof is trusted only from an admin-only place ==
+  [PASS] output path guard: an ordinary path passes; a path through a directory junction is refused; an existing hard-linked file is refused
+  [PASS] Write-JsonGuarded refuses to write through the junction and nothing lands in the target
+  [PASS] Write-JsonGuarded writes an ordinary path
+  [PASS] proof location: a proof in an admin-only folder is accepted; a proof in a non-admin folder is refused EVEN when it sits beside the scripts (attended runs included)
+== arguments, verdicts, definitions ==
+  [PASS] args: no mode and two modes are errors; each single mode is valid
+  [PASS] args: there is no standalone -Add mode (the add paths are -Arm3a and the 3b arming script only)
+  [PASS] args: -WriteProof only with -SelfTest; -RemoveTaskName only with -Remove and only a plain blarai- name
+  [PASS] args: dwell 4 / 121 and dead-man 4 / 121 minutes are rejected
+  [PASS] -Check exit codes: PRESENT 0, ABSENT 20, PARTIAL 21, UNKNOWN 22, anything else 22
+  [PASS] A: all good -> 0
+  [PASS] A: operator abort -> 3 (beats everything)
+  [PASS] A: removal unverified -> 7 (beats "not blocked")
+  [PASS] A: no baseline -> 5
+  [PASS] A: add failed -> 4; not PRESENT or not persistent after the add -> 4
+  [PASS] A: block run invalid or refused by the gate -> 4
+  [PASS] A: account not blocked with the fence present -> 1
+  [PASS] A: the gate did not refuse before the add, or after the removal -> 6, never 0
+  [PASS] dead-man: SYSTEM, Highest, fires 15 minutes later, runs -Remove with the baked paths and unregisters its own name
+  [PASS] dead-man: its arguments never contain -Arm3a (it can only remove)
+  [PASS] dead-man: carries the hash of the wrapped script it must find unchanged (-WfpSha256), so a swapped file is refused before it becomes code
+  [PASS] dead-man: carries the code-set id taken when it was registered (-CodeSetId)
+  [PASS] dead-man is OPT-IN: the switch is -DeadManTask (default off) and there is no -NoDeadManTask
+  [PASS] probe outcome (driver): blocked / open / no_result / wrong_sid
+  [PASS] watchdog: fail, ok, fail never aborts; two consecutive failures abort
+  [PASS] export summary: both filter keys and the marker -> ok; one key missing -> not ok; marker missing -> not ok
+persist selftest: all passed
+
+## pwsh spike-arm3b-arm.ps1: 52 passed, 0 failed, 0 skipped
+== argument rules (floors, not defaults) ==
+  [PASS] defaults are valid (30 min idle, 10 min countdown, 600 s delay, 30 min veto)
+  [PASS] exactly one mode
+  [PASS] idle below 30 minutes is refused (cannot be lowered for convenience)
+  [PASS] countdown below 10 minutes, or above the window script's 15-minute maximum, is refused
+  [PASS] restart delay below 600 s or above 1800 s is refused
+  [PASS] veto below 30 minutes, or less than 10 minutes after the restart is due, is refused
+== task definitions ==
+  [PASS] post-reboot task: SYSTEM, Highest, at startup with a one-minute delay, -Live, baked absolute paths and all three task names
+  [PASS] veto task: SYSTEM, Highest, once, exactly 30 minutes after arming, running the veto script
+  [PASS] both SYSTEM tasks carry the pinned hash of the wrapped script and the code-set id when given
+  [PASS] neither registered task can add: no argument names the arming script or -Arm3a
+== idle gate and countdown gate ==
+== idle gate and countdown gate (fake providers) ==
+  [PASS] idle: 1800 s needed; 1799 refuses, 1800 passes, 99999 passes
+  [PASS] idle: an unreadable idle time (-1) refuses even against a requirement of 0
+  [PASS] gate: 600 s idle refuses with the reason; 2400 s passes; -1 refuses saying it could not be read
+  [PASS] session: only an interactive session above 0 can see the operator's input (session 0 or non-interactive reads as unreadable)
+  [PASS] idle gate returns the last-input tick it read: the baseline for the countdown and the pending-restart watch
+  [PASS] input: the same tick is no input; a moved tick is; an unreadable tick on either side counts as input
+  [PASS] shutdown arguments: /r /t 600 /c "arm 3b" exactly, no /f passed (the module header states that /t above 0 implies /f anyway)
+  [PASS] shutdown delay below 60 s or above 3600 s is rejected
+  [PASS] countdown: 600 s with no input proceeds, after 600 s of fake time, with a start toast and reminders at 300 s and 60 s left
+  [PASS] countdown: input on the 50th poll (about 100 s in) aborts at once, with the reason
+  [PASS] countdown: input on the very first poll aborts
+  [PASS] countdown with the idle gate's baseline: input that happened BEFORE the countdown started (tick differs from the baseline) aborts at once
+  [PASS] countdown: if no toast and no window could be shown it refuses before counting
+  [PASS] countdown: a window alone (toast failed) is a visible warning and may proceed
+  [PASS] countdown: an unreadable input clock refuses
+  [PASS] countdown: the window reporting STOP (exit 1) aborts
+  [PASS] countdown: the window reporting it could not be shown (exit 2) aborts
+  [PASS] input watch: a 600 s wait completes only if no input; input at poll 40 ends it early
+  [PASS] input watch: a quiet 120 s wait completes
+  [PASS] real input clock is readable on this host or reports -1 (never throws)
+== the arming flow against fakes ==
+  [PASS] not idle: exit 10, nothing added, no task, no shutdown
+  [PASS] input during the countdown: exit 11, nothing added, no task, no shutdown
+  [PASS] no visible warning could be raised: exit 10, nothing added
+  [PASS] no valid proof: exit 2, nothing added (the add path is unreachable)
+  [PASS] a stale object: exit 2, nothing registered, no shutdown, the stale object is left for -Remove
+  [PASS] a task already registered (something armed): exit 2, nothing added
+  [PASS] no baseline: exit 5, nothing added
+  [PASS] happy path: all four objects added and persistent, both tasks registered, then exactly "shutdown /r /t 600 /c arm 3b", exit 12 (restart pending when the watch ended)
+  [PASS] ORDER: both cleanup tasks are registered while the store is still EMPTY (before the add), the armed record follows, the shutdown command comes last
+  [PASS] the armed record is written twice: first without filters_added_at (an interrupted arming is recognisable), then with it and the flags
+  [PASS] input while the restart is pending: shutdown /a, set removed by key (ABSENT), both tasks deleted, exit 11
+  [PASS] rollback order: the pending restart is cancelled BEFORE the tasks are deleted
+  [PASS] a failed task registration: NOTHING was added (the add comes after the tasks), no shutdown command, rolled back, exit 4
+  [PASS] a failing shutdown command: rolled back, both tasks deleted, set removed, exit 4, the stage named
+  [PASS] a rollback whose removal fails: exit 7 (NOT verified), never 4
+  [PASS] an add that is not persistent: the cleanup tasks (registered before it) are deleted again, set absent, no shutdown, exit 4 and the reason says so
+  [PASS] an exception AFTER the add (the old unprotected window): the set is removed by key and both tasks deleted, exit 4, never "nothing was added"
+  [PASS] no recorded Lead Architect decision on the forced restart: exit 2 before anything else, nothing added, no task, no shutdown
+  [PASS] decision file: absent -> refused
+  [PASS] decision file: a complete recent decision is accepted; a wrong decision, no name, no reference, 30 days old, dated in the future, or unparseable are each refused
+  [PASS] a script folder writable by non-administrators: exit 2, nothing added, no task registered (SYSTEM tasks would run editable code)
+  [PASS] the steps record carries the idle gate, countdown, add flags and the shutdown command for the evidence
+arm3b-arm selftest: all passed
+
+## pwsh spike-arm3b-post-reboot.ps1: 38 passed, 0 failed, 0 skipped
+== arguments and verdict ==
+  [PASS] args: MaxAttempts 0 / 11 and ExpiryHours 0 / 169 rejected
+  [PASS] args: exactly one mode; network timeout 29 and 1801 rejected
+  [PASS] P: all good -> 0
+  [PASS] P: removal unverified -> 7 (beats everything)
+  [PASS] P: no confirmed restart -> 4, never a survival claim
+  [PASS] P: no add recorded in the arm state (arming never completed) -> 4, never "did not survive"
+  [PASS] P: a repeat run (attempt 2 or more) -> 4, even when the set reads ABSENT: it was already acted on
+  [PASS] P: ABSENT at start -> 8 (did not survive); PARTIAL -> 9; UNKNOWN -> 4
+  [PASS] P: present but not every object persistent -> 4
+  [PASS] P: network never up -> 4; probe invalid -> 4
+  [PASS] P: present but the account not blocked -> 1
+  [PASS] P: the gate did not refuse after removal -> 6, never 0
+== network wait and engine-open retry (fake clocks) ==
+  [PASS] network: comes up on the 4th try after 15 s
+  [PASS] network: never up -> up=false after the timeout, with the last error
+  [PASS] engine open: succeeds on the 3rd attempt
+  [PASS] engine open: gives up after the attempts with the last error
+== the post-reboot flow against fakes ==
+  [PASS] survived: exit 0; the set read PRESENT and persistent at start; the account probed once under the fence (blocked) and once after removal (open)
+  [PASS] survived: removed by key and read back ABSENT; the gate refused afterwards without starting the task; claim inputs c10 and c11 true
+  [PASS] survived: the result is written to post-reboot-result.json, then the wrapper, veto and this task are deleted, this task LAST
+  [PASS] gone: exit 8 (did not survive); the account's task was NOT started under the fence (only the unguarded post-removal control ran); c10 false
+  [PASS] partial: exit 9; the account's task not started under the fence; the remnants are removed by key
+  [PASS] unreadable engine: fence UNKNOWN, the account's task NOT started, removal NOT verified -> exit 7
+  [PASS] removal not verified: this task and the veto task are KEPT (retry at the next startup); only the wrapper is deleted
+  [PASS] a removal that fails: exit 7, the failing key named in the record
+  [PASS] no network: exit 4 (inconclusive) but the set is STILL removed and verified
+  [PASS] no confirmed restart (boot time earlier than the arm time): exit 4, c10 false, the set still removed
+  [PASS] arm state unreadable: no restart can be confirmed -> exit 4, the set still removed
+  [PASS] operator connect failing after removal WITH the network up -> removal not verified, exit 7
+  [PASS] present but the account CONNECTED under the fence -> exit 1; and egress "open" after removal is consistent, so removal still verifies
+  [PASS] egress still blocked AFTER the removal -> removal not verified (exit 7): the block is not attributable to a filter that is gone
+== bounded retries, expiry, and a down network told apart from a set that did not survive ==
+  [PASS] network down, set present: verified by the engine alone (no operator connect or account probe required), reason names the network, NOT "did not survive"
+  [PASS] network down, set absent at the FIRST run after a confirmed restart: still reported as not surviving (the engine reading does not depend on the network), and the reason says so
+  [PASS] a repeat attempt that finds the set ABSENT is exit 4 (an earlier attempt acted on it), never a false "did not survive"
+  [PASS] an arm state with no recorded add (arming interrupted before the add): exit 4, "arming did not complete", the set (if any) still removed
+  [PASS] removal still unverified at attempt 3 of 3: the veto and this task are DELETED (bounded), the record says GAVE UP and demands the manual rollback
+  [PASS] an expired arm state (older than the limit) with an unverified removal at attempt 1: also gives up and deletes the task; the result records expired=true
+  [PASS] unverified at attempt 1 of 3 and not expired: the task is kept for the next startup (existing behaviour, now bounded)
+  [PASS] expiry rule (pure): 25 h old is expired at 24 h, 23 h is not, no arm state is not
+arm3b-post-reboot selftest: all passed
+
+## pwsh spike-arm3b-veto.ps1: 13 passed, 0 failed, 0 skipped
+  [PASS] args: exactly one mode
+== decision table ==
+  [PASS] no restart since arming -> veto
+  [PASS] the arm state unreadable -> veto (the safe direction)
+  [PASS] restarted, post-reboot Running -> leave it alone
+  [PASS] restarted, set ABSENT -> nothing to do
+  [PASS] restarted, set PRESENT or PARTIAL or UNKNOWN, nothing running -> safety net removal
+== the veto flow against fakes ==
+  [PASS] no restart: shutdown /a, the set removed by key (ABSENT), the post-reboot and wrapper tasks deleted, "reboot vetoed" recorded, exit 0
+  [PASS] no restart: the shutdown is cancelled BEFORE the removal and the record is written BEFORE the veto task deletes itself (last)
+  [PASS] restarted and post-reboot running: the set is NOT touched, no shutdown /a, only the veto task deletes itself
+  [PASS] restarted and the set already gone: nothing to do, exit 0
+  [PASS] restarted, a set left and nothing running: removed by the safety net
+  [PASS] a removal that fails: exit 7, recorded, and the post-reboot task is KEPT (it still removes the set if a restart happens)
+  [PASS] arm state unreadable: treated as not restarted - the set is removed
+arm3b-veto selftest: all passed
+
+## pwsh Start-ElevatedOnce.ps1: 21 passed, 0 failed, 0 skipped
+  [PASS] task names must start with blarai- and be plain
+  [PASS] plain arguments pass; quotes, ;, &, |, $, backtick, % and newlines are refused
+  [PASS] an allowlisted script in the wrapper folder with plain arguments is accepted
+  [PASS] the 3b arming script is NOT runnable through the wrapper without a recorded restart decision, and is with one
+  [PASS] a script that is not on the allowlist is refused
+  [PASS] an allowlisted name in ANOTHER folder is refused
+  [PASS] a path with .. is refused; an argument with a shell metacharacter is refused
+  [PASS] no script named is refused
+  [PASS] arg line: a value with a space is quoted, plain ones are not
+  [PASS] log path: an ordinary path passes; a path through a directory junction is refused (the elevated write would land elsewhere)
+  [PASS] arguments round-trip through the base64 token (leading dashes survive); it never starts with a dash
+  [PASS] definition: RunLevel Highest, interactive logon, no trigger, one instance, unregisters itself
+  [PASS] definition: the inner command line names this script with -Inner, the task name, the target and the log
+  [PASS] definition: the printed target and follow-up commands are exactly what will run
+  [PASS] admin-only: SYSTEM and Administrators full control with Users read-and-execute -> no problem; Users Modify, create-files or append on the folder -> a problem each
+  [PASS] admin-only: a Deny does not excuse an Allow; a non-admin owner is a problem; on an ancestor create-files is fine but delete-child is not; inherit-only is not credited
+  [PASS] admin-only (real ACL read, no change): the user's own temp folder is NOT admin-only, and a missing folder is refused
+  [PASS] inner run: target, follow-up, then unregister LAST, exactly once; both exit codes in the log
+  [PASS] inner run: a target that throws is logged, the follow-up STILL runs, and the task is still unregistered
+  [PASS] inner run: a failing unregistration is logged loudly, not swallowed silently
+  [PASS] inner run: timestamps carry an offset
+elevated-once selftest: all passed
+
+## powershell spike-wfp-persist.ps1: 112 passed, 0 failed, 0 skipped
+== extraction from the wrapped script and compile (no engine is opened) ==
+  [PASS] all 5 wrapped functions extracted
+  [PASS] the wrapped script was only read (SHA-256 recorded)
+  [PASS] the WFP C# and the persist C# compile together in-process
+  [PASS] SDDL is exactly D:(A;;CC;;;<account sid>)
+  [PASS] two filters, both BLOCK, none carrying the loopback condition
+  [PASS] the plan refuses non-account SIDs (Everyone, Users, SYSTEM, Authenticated Users, Administrators, empty, garbage)
+  [PASS] the target account is the throwaway spike account, never blarai-coder (the real coder account's containment state is not touched)
+  [PASS] SID safety: the operator SID is refused (exit 3 path)
+  [PASS] SID safety: a group in the operator token is refused
+  [PASS] SID safety: a distinct account SID is accepted
+== fixed keys and persistence flags ==
+  [PASS] the library's key strings equal the C# key constants (provider, sublayer, both filters)
+  [PASS] the persistent keys differ from the dynamic spike's (arms 1 and 2 cannot be confused with this set)
+  [PASS] the plan's filter keys are the fixed keys, in V4, V6 order
+  [PASS] every object name carries the marker "BlarAI #1682"
+  [PASS] persistent flag constant is 0x1 (provider, sublayer and filter flags in fwpmtypes.h)
+  [PASS] the marshalled provider, sublayer and EVERY filter carry the persistent flag
+  [PASS] every filter references the persistent provider and sublayer
+  [PASS] EVERY marshalled filter carries ALE_USER_ID / SECURITY_DESCRIPTOR / MATCH_EQUAL
+  [PASS] layers are ALE_AUTH_CONNECT V4 and V6 (fwpmu.h literals)
+  [PASS] x64 sizeof FWPM_FILTER0 == 200 and FWPM_FILTER_CONDITION0 == 40 (hand-derived from fwpmtypes.h)
+== the manual rollback snippet compiles (it is NOT run) ==
+  [PASS] the snippet's C# compiles and exposes Run()
+  [PASS] the snippet names all four keys, deleting filters, then the sublayer, then the provider
+== rollback and fail-closed logic against the in-memory fake ==
+  [PASS] state: a full fake set reads PRESENT, all persistent
+  [PASS] remove (full set): Ok, state ABSENT, deletes in the order filter, filter, sublayer, provider
+  [PASS] a half-failed add (provider, sublayer, one filter, then an error) reads PARTIAL
+  [PASS] remove (half-failed add): Ok, ABSENT, the missing filter reported as not_found rather than an error
+  [PASS] remove (nothing there): Ok, every key not_found, no error (idempotent)
+  [PASS] remove (one delete fails): Ok is FALSE, the failing key is named, the state read back is PARTIAL
+  [PASS] remove (one delete fails): every OTHER key was still tried and deleted (the provider after the failure too)
+  [PASS] state: an engine that cannot be read is UNKNOWN with the error text (never ABSENT)
+  [PASS] state: an empty fake is ABSENT
+  [PASS] gate: ABSENT, PARTIAL and UNKNOWN all refuse; only PRESENT allows
+  [PASS] guarded probe: with the fence ABSENT, PARTIAL or UNKNOWN the account's task is NOT started (outcome fence_absent_not_started)
+  [PASS] guarded probe: with the fence PRESENT the task is started exactly once
+  [PASS] add path: refused with no proof, a failed proof, a token of the wrong kind, or a bare string; the backend's AddAll is never called
+  [PASS] add path: refused over a stale object (state PARTIAL), nothing added, nothing deleted
+  [PASS] add path: refused when the engine cannot be read (UNKNOWN), AddAll never called
+  [PASS] add path: with a valid token on an empty fence it adds all four objects and reads back PRESENT, persistent
+  [PASS] add path: a half-failed add is rolled back by key to ABSENT and reported as not added
+  [PASS] add path: an add that "succeeds" without the persistent flag is rolled back (it would not survive a reboot)
+== the rollback proof and its hash binding ==
+  [PASS] proof: a complete, fresh proof whose hashes match (scripts AND the wrapped #1671 script) is accepted and yields the token
+  [PASS] proof: editing ONE script after the self-test invalidates it, naming the file
+  [PASS] proof: restoring the exact bytes validates it again
+  [PASS] proof: a CRLF copy of the same text validates (hashes are over LF-normalised bytes)
+  [PASS] proof: a ONE-TOKEN edit of the wrapped #1671 script (the code that builds the security descriptor) invalidates it
+  [PASS] proof: restoring the wrapped script validates it again; no wrapped-script hash supplied is refused
+  [PASS] proof: a proof with no hash of the wrapped script is refused
+  [PASS] proof: a proof written without running a self-test (0 checks run) is refused
+  [PASS] proof: a claimed 999 checks run, more than the self-test has check sites (110 here), is refused as not a real run
+  [PASS] proof: failed_checks non-empty is refused even when the passed flags were edited to true
+  [PASS] proof: a proof recording fewer checks passed than run is refused
+  [PASS] proof: a proof with no sibling self-test results, or with one that failed, is refused
+  [PASS] proof: a code-set file that is missing from the folder invalidates it, naming the file
+  [PASS] proof: older than 24 hours is refused
+  [PASS] proof: a missing rollback check tag is refused, naming it
+  [PASS] proof: a recorded failure is refused
+  [PASS] proof: no file, and a file that is not JSON, are refused
+  [PASS] proof: dated in the future is refused
+  [PASS] proof: an old-schema proof (before the wrapped-script binding) is refused
+== the wrapped script is pinned before its text becomes code; the independent rollback; the admin-only folder rule ==
+  [PASS] pin: a wrapped script whose hash is not the pinned one is refused BEFORE it is parsed
+  [PASS] pin: with the right hash the import proceeds past the pin (and fails later only because this file is not the real script)
+  [PASS] wrapped-script gate: neither pinned nor in an admin-only folder -> refused BEFORE any of its text is evaluated (nothing ran)
+  [PASS] wrapped-script gate: a wrong pin is refused before evaluation too
+  [PASS] single read: Import-WfpHelpers returns, and records for the proof, the hash of the bytes it evaluated
+  [PASS] single read: a library loaded through Get-VerifiedLibBlock is represented by the hash of the bytes that ran, and equals a fresh hash of the unchanged file
+  [PASS] code-set id: stable for unchanged files, 64 hex characters; Test-CodeSetId accepts it
+  [PASS] code-set id: changing ONE script after arming makes Test-CodeSetId refuse (the SYSTEM task falls back to the self-contained rollback)
+  [PASS] code-set id: a missing code-set file is refused, naming it
+  [PASS] manual rollback output: four rows, each deleted or already gone -> Ok
+  [PASS] manual rollback output: one error status (FWP_E_IN_USE) -> not Ok; fewer than four rows -> not Ok; an engine-open failure line -> not Ok
+  [PASS] admin-only: SYSTEM and Administrators with full control, Users read-and-execute -> no problem
+  [PASS] admin-only: Users with Modify (0x1301BF), or only create-files (0x2), or append (0x4) on the folder -> a problem each
+  [PASS] admin-only: a Deny rule does not excuse an Allow; GenericWrite and GenericAll count
+  [PASS] admin-only: an owner that is not SYSTEM, Administrators or TrustedInstaller is a problem
+  [PASS] admin-only: on an ANCESTOR, create-files and append are fine (Users have them on ProgramData) but delete-child and change-permissions are not
+  [PASS] admin-only: an inherit-only rule (children only) is not credited on the folder itself
+  [PASS] admin-only (real ACL read, no change): the user's own temp folder is NOT admin-only, and a missing folder is refused too
+== admin-only folder check against fabricated security descriptors and attributes ==
+  [PASS] fake ACL: everything admin-only (Users read-and-execute) -> Ok
+  [PASS] fake ACL: the folder grants Users modify -> refused
+  [PASS] fake ACL: the folder is OWNED by a non-administrator (owner has WRITE_DAC) -> refused
+  [PASS] fake ACL: a PARENT owned by a non-administrator, otherwise admin-only -> refused
+  [PASS] fake ACL: a PARENT granting Users DELETE (rename-away of the parent), or DELETE plus add-subfolder -> refused
+  [PASS] fake ACL: a PARENT granting Users only create-files and add-subfolder (as ProgramData does) -> still Ok
+  [PASS] fake ACL: Authenticated Users WRITE_EA only on the folder, or Everyone DELETE only -> refused
+  [PASS] fake ACL: a file in the folder owned by a non-administrator, or OWNER RIGHTS with write on the folder -> refused
+  [PASS] fake ACL: a creator-owner inherit-only rule is ignored, but Users add-file on the folder itself is refused
+  [PASS] reparse points: the target folder, a parent, or a file inside being a link -> refused
+== elevated writes: no junction, symlink or hard-link redirect; the proof is trusted only from an admin-only place ==
+  [PASS] output path guard: an ordinary path passes; a path through a directory junction is refused; an existing hard-linked file is refused
+  [PASS] Write-JsonGuarded refuses to write through the junction and nothing lands in the target
+  [PASS] Write-JsonGuarded writes an ordinary path
+  [PASS] proof location: a proof in an admin-only folder is accepted; a proof in a non-admin folder is refused EVEN when it sits beside the scripts (attended runs included)
+== arguments, verdicts, definitions ==
+  [PASS] args: no mode and two modes are errors; each single mode is valid
+  [PASS] args: there is no standalone -Add mode (the add paths are -Arm3a and the 3b arming script only)
+  [PASS] args: -WriteProof only with -SelfTest; -RemoveTaskName only with -Remove and only a plain blarai- name
+  [PASS] args: dwell 4 / 121 and dead-man 4 / 121 minutes are rejected
+  [PASS] -Check exit codes: PRESENT 0, ABSENT 20, PARTIAL 21, UNKNOWN 22, anything else 22
+  [PASS] A: all good -> 0
+  [PASS] A: operator abort -> 3 (beats everything)
+  [PASS] A: removal unverified -> 7 (beats "not blocked")
+  [PASS] A: no baseline -> 5
+  [PASS] A: add failed -> 4; not PRESENT or not persistent after the add -> 4
+  [PASS] A: block run invalid or refused by the gate -> 4
+  [PASS] A: account not blocked with the fence present -> 1
+  [PASS] A: the gate did not refuse before the add, or after the removal -> 6, never 0
+  [PASS] dead-man: SYSTEM, Highest, fires 15 minutes later, runs -Remove with the baked paths and unregisters its own name
+  [PASS] dead-man: its arguments never contain -Arm3a (it can only remove)
+  [PASS] dead-man: carries the hash of the wrapped script it must find unchanged (-WfpSha256), so a swapped file is refused before it becomes code
+  [PASS] dead-man: carries the code-set id taken when it was registered (-CodeSetId)
+  [PASS] dead-man is OPT-IN: the switch is -DeadManTask (default off) and there is no -NoDeadManTask
+  [PASS] probe outcome (driver): blocked / open / no_result / wrong_sid
+  [PASS] watchdog: fail, ok, fail never aborts; two consecutive failures abort
+  [PASS] export summary: both filter keys and the marker -> ok; one key missing -> not ok; marker missing -> not ok
+persist selftest: all passed
+
+## powershell spike-arm3b-arm.ps1: 52 passed, 0 failed, 0 skipped
+== argument rules (floors, not defaults) ==
+  [PASS] defaults are valid (30 min idle, 10 min countdown, 600 s delay, 30 min veto)
+  [PASS] exactly one mode
+  [PASS] idle below 30 minutes is refused (cannot be lowered for convenience)
+  [PASS] countdown below 10 minutes, or above the window script's 15-minute maximum, is refused
+  [PASS] restart delay below 600 s or above 1800 s is refused
+  [PASS] veto below 30 minutes, or less than 10 minutes after the restart is due, is refused
+== task definitions ==
+  [PASS] post-reboot task: SYSTEM, Highest, at startup with a one-minute delay, -Live, baked absolute paths and all three task names
+  [PASS] veto task: SYSTEM, Highest, once, exactly 30 minutes after arming, running the veto script
+  [PASS] both SYSTEM tasks carry the pinned hash of the wrapped script and the code-set id when given
+  [PASS] neither registered task can add: no argument names the arming script or -Arm3a
+== idle gate and countdown gate ==
+== idle gate and countdown gate (fake providers) ==
+  [PASS] idle: 1800 s needed; 1799 refuses, 1800 passes, 99999 passes
+  [PASS] idle: an unreadable idle time (-1) refuses even against a requirement of 0
+  [PASS] gate: 600 s idle refuses with the reason; 2400 s passes; -1 refuses saying it could not be read
+  [PASS] session: only an interactive session above 0 can see the operator's input (session 0 or non-interactive reads as unreadable)
+  [PASS] idle gate returns the last-input tick it read: the baseline for the countdown and the pending-restart watch
+  [PASS] input: the same tick is no input; a moved tick is; an unreadable tick on either side counts as input
+  [PASS] shutdown arguments: /r /t 600 /c "arm 3b" exactly, no /f passed (the module header states that /t above 0 implies /f anyway)
+  [PASS] shutdown delay below 60 s or above 3600 s is rejected
+  [PASS] countdown: 600 s with no input proceeds, after 600 s of fake time, with a start toast and reminders at 300 s and 60 s left
+  [PASS] countdown: input on the 50th poll (about 100 s in) aborts at once, with the reason
+  [PASS] countdown: input on the very first poll aborts
+  [PASS] countdown with the idle gate's baseline: input that happened BEFORE the countdown started (tick differs from the baseline) aborts at once
+  [PASS] countdown: if no toast and no window could be shown it refuses before counting
+  [PASS] countdown: a window alone (toast failed) is a visible warning and may proceed
+  [PASS] countdown: an unreadable input clock refuses
+  [PASS] countdown: the window reporting STOP (exit 1) aborts
+  [PASS] countdown: the window reporting it could not be shown (exit 2) aborts
+  [PASS] input watch: a 600 s wait completes only if no input; input at poll 40 ends it early
+  [PASS] input watch: a quiet 120 s wait completes
+  [PASS] real input clock is readable on this host or reports -1 (never throws)
+== the arming flow against fakes ==
+  [PASS] not idle: exit 10, nothing added, no task, no shutdown
+  [PASS] input during the countdown: exit 11, nothing added, no task, no shutdown
+  [PASS] no visible warning could be raised: exit 10, nothing added
+  [PASS] no valid proof: exit 2, nothing added (the add path is unreachable)
+  [PASS] a stale object: exit 2, nothing registered, no shutdown, the stale object is left for -Remove
+  [PASS] a task already registered (something armed): exit 2, nothing added
+  [PASS] no baseline: exit 5, nothing added
+  [PASS] happy path: all four objects added and persistent, both tasks registered, then exactly "shutdown /r /t 600 /c arm 3b", exit 12 (restart pending when the watch ended)
+  [PASS] ORDER: both cleanup tasks are registered while the store is still EMPTY (before the add), the armed record follows, the shutdown command comes last
+  [PASS] the armed record is written twice: first without filters_added_at (an interrupted arming is recognisable), then with it and the flags
+  [PASS] input while the restart is pending: shutdown /a, set removed by key (ABSENT), both tasks deleted, exit 11
+  [PASS] rollback order: the pending restart is cancelled BEFORE the tasks are deleted
+  [PASS] a failed task registration: NOTHING was added (the add comes after the tasks), no shutdown command, rolled back, exit 4
+  [PASS] a failing shutdown command: rolled back, both tasks deleted, set removed, exit 4, the stage named
+  [PASS] a rollback whose removal fails: exit 7 (NOT verified), never 4
+  [PASS] an add that is not persistent: the cleanup tasks (registered before it) are deleted again, set absent, no shutdown, exit 4 and the reason says so
+  [PASS] an exception AFTER the add (the old unprotected window): the set is removed by key and both tasks deleted, exit 4, never "nothing was added"
+  [PASS] no recorded Lead Architect decision on the forced restart: exit 2 before anything else, nothing added, no task, no shutdown
+  [PASS] decision file: absent -> refused
+  [PASS] decision file: a complete recent decision is accepted; a wrong decision, no name, no reference, 30 days old, dated in the future, or unparseable are each refused
+  [PASS] a script folder writable by non-administrators: exit 2, nothing added, no task registered (SYSTEM tasks would run editable code)
+  [PASS] the steps record carries the idle gate, countdown, add flags and the shutdown command for the evidence
+arm3b-arm selftest: all passed
+
+## powershell spike-arm3b-post-reboot.ps1: 38 passed, 0 failed, 0 skipped
+== arguments and verdict ==
+  [PASS] args: MaxAttempts 0 / 11 and ExpiryHours 0 / 169 rejected
+  [PASS] args: exactly one mode; network timeout 29 and 1801 rejected
+  [PASS] P: all good -> 0
+  [PASS] P: removal unverified -> 7 (beats everything)
+  [PASS] P: no confirmed restart -> 4, never a survival claim
+  [PASS] P: no add recorded in the arm state (arming never completed) -> 4, never "did not survive"
+  [PASS] P: a repeat run (attempt 2 or more) -> 4, even when the set reads ABSENT: it was already acted on
+  [PASS] P: ABSENT at start -> 8 (did not survive); PARTIAL -> 9; UNKNOWN -> 4
+  [PASS] P: present but not every object persistent -> 4
+  [PASS] P: network never up -> 4; probe invalid -> 4
+  [PASS] P: present but the account not blocked -> 1
+  [PASS] P: the gate did not refuse after removal -> 6, never 0
+== network wait and engine-open retry (fake clocks) ==
+  [PASS] network: comes up on the 4th try after 15 s
+  [PASS] network: never up -> up=false after the timeout, with the last error
+  [PASS] engine open: succeeds on the 3rd attempt
+  [PASS] engine open: gives up after the attempts with the last error
+== the post-reboot flow against fakes ==
+  [PASS] survived: exit 0; the set read PRESENT and persistent at start; the account probed once under the fence (blocked) and once after removal (open)
+  [PASS] survived: removed by key and read back ABSENT; the gate refused afterwards without starting the task; claim inputs c10 and c11 true
+  [PASS] survived: the result is written to post-reboot-result.json, then the wrapper, veto and this task are deleted, this task LAST
+  [PASS] gone: exit 8 (did not survive); the account's task was NOT started under the fence (only the unguarded post-removal control ran); c10 false
+  [PASS] partial: exit 9; the account's task not started under the fence; the remnants are removed by key
+  [PASS] unreadable engine: fence UNKNOWN, the account's task NOT started, removal NOT verified -> exit 7
+  [PASS] removal not verified: this task and the veto task are KEPT (retry at the next startup); only the wrapper is deleted
+  [PASS] a removal that fails: exit 7, the failing key named in the record
+  [PASS] no network: exit 4 (inconclusive) but the set is STILL removed and verified
+  [PASS] no confirmed restart (boot time earlier than the arm time): exit 4, c10 false, the set still removed
+  [PASS] arm state unreadable: no restart can be confirmed -> exit 4, the set still removed
+  [PASS] operator connect failing after removal WITH the network up -> removal not verified, exit 7
+  [PASS] present but the account CONNECTED under the fence -> exit 1; and egress "open" after removal is consistent, so removal still verifies
+  [PASS] egress still blocked AFTER the removal -> removal not verified (exit 7): the block is not attributable to a filter that is gone
+== bounded retries, expiry, and a down network told apart from a set that did not survive ==
+  [PASS] network down, set present: verified by the engine alone (no operator connect or account probe required), reason names the network, NOT "did not survive"
+  [PASS] network down, set absent at the FIRST run after a confirmed restart: still reported as not surviving (the engine reading does not depend on the network), and the reason says so
+  [PASS] a repeat attempt that finds the set ABSENT is exit 4 (an earlier attempt acted on it), never a false "did not survive"
+  [PASS] an arm state with no recorded add (arming interrupted before the add): exit 4, "arming did not complete", the set (if any) still removed
+  [PASS] removal still unverified at attempt 3 of 3: the veto and this task are DELETED (bounded), the record says GAVE UP and demands the manual rollback
+  [PASS] an expired arm state (older than the limit) with an unverified removal at attempt 1: also gives up and deletes the task; the result records expired=true
+  [PASS] unverified at attempt 1 of 3 and not expired: the task is kept for the next startup (existing behaviour, now bounded)
+  [PASS] expiry rule (pure): 25 h old is expired at 24 h, 23 h is not, no arm state is not
+arm3b-post-reboot selftest: all passed
+
+## powershell spike-arm3b-veto.ps1: 13 passed, 0 failed, 0 skipped
+  [PASS] args: exactly one mode
+== decision table ==
+  [PASS] no restart since arming -> veto
+  [PASS] the arm state unreadable -> veto (the safe direction)
+  [PASS] restarted, post-reboot Running -> leave it alone
+  [PASS] restarted, set ABSENT -> nothing to do
+  [PASS] restarted, set PRESENT or PARTIAL or UNKNOWN, nothing running -> safety net removal
+== the veto flow against fakes ==
+  [PASS] no restart: shutdown /a, the set removed by key (ABSENT), the post-reboot and wrapper tasks deleted, "reboot vetoed" recorded, exit 0
+  [PASS] no restart: the shutdown is cancelled BEFORE the removal and the record is written BEFORE the veto task deletes itself (last)
+  [PASS] restarted and post-reboot running: the set is NOT touched, no shutdown /a, only the veto task deletes itself
+  [PASS] restarted and the set already gone: nothing to do, exit 0
+  [PASS] restarted, a set left and nothing running: removed by the safety net
+  [PASS] a removal that fails: exit 7, recorded, and the post-reboot task is KEPT (it still removes the set if a restart happens)
+  [PASS] arm state unreadable: treated as not restarted - the set is removed
+arm3b-veto selftest: all passed
+
+## powershell Start-ElevatedOnce.ps1: 21 passed, 0 failed, 0 skipped
+  [PASS] task names must start with blarai- and be plain
+  [PASS] plain arguments pass; quotes, ;, &, |, $, backtick, % and newlines are refused
+  [PASS] an allowlisted script in the wrapper folder with plain arguments is accepted
+  [PASS] the 3b arming script is NOT runnable through the wrapper without a recorded restart decision, and is with one
+  [PASS] a script that is not on the allowlist is refused
+  [PASS] an allowlisted name in ANOTHER folder is refused
+  [PASS] a path with .. is refused; an argument with a shell metacharacter is refused
+  [PASS] no script named is refused
+  [PASS] arg line: a value with a space is quoted, plain ones are not
+  [PASS] log path: an ordinary path passes; a path through a directory junction is refused (the elevated write would land elsewhere)
+  [PASS] arguments round-trip through the base64 token (leading dashes survive); it never starts with a dash
+  [PASS] definition: RunLevel Highest, interactive logon, no trigger, one instance, unregisters itself
+  [PASS] definition: the inner command line names this script with -Inner, the task name, the target and the log
+  [PASS] definition: the printed target and follow-up commands are exactly what will run
+  [PASS] admin-only: SYSTEM and Administrators full control with Users read-and-execute -> no problem; Users Modify, create-files or append on the folder -> a problem each
+  [PASS] admin-only: a Deny does not excuse an Allow; a non-admin owner is a problem; on an ancestor create-files is fine but delete-child is not; inherit-only is not credited
+  [PASS] admin-only (real ACL read, no change): the user's own temp folder is NOT admin-only, and a missing folder is refused
+  [PASS] inner run: target, follow-up, then unregister LAST, exactly once; both exit codes in the log
+  [PASS] inner run: a target that throws is logged, the follow-up STILL runs, and the task is still unregistered
+  [PASS] inner run: a failing unregistration is logged loudly, not swallowed silently
+  [PASS] inner run: timestamps carry an offset
+elevated-once selftest: all passed

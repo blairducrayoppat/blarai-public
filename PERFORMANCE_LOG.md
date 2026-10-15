@@ -12,6 +12,172 @@ only comparable across entries when the prompt set and methodology are
 identical, which is enforced by version-controlling the prompts inside
 `scripts/benchmark_gpu_inference.py`.
 
+### 2026-10-13 — NEP-0005 open question 3 with srt-win's own CLI (#1763)
+
+*Plain summary: the earlier entry of the same day measured half-sets with a harness built on srt-win's library. This one drives srt-win's own command line (install, wfp status, wfp verify, install again, install --force, uninstall) against the same kind of half-sets, for the stock build pinned at `24eb39e9` and for a patched build, three passes each, in test sublayer S1 only and on loopback only. With a block filter or the permit filters deleted, stock `srt-win wfp status` printed `installed` in all 9 half-set states; the patched build printed `partial` in all 9. A plain `srt-win install` left the half-set unchanged in stock (exit 0 with "no changes" for a missing block, exit 13 for missing permits) and restored all four filters in the patched build (9 of 9). Stock `install --force` restored the set in 9 of 9. n=3 per state per build, one machine, one Windows build.*
+
+**Hardware and software.** Intel Core Ultra 7 258V, Windows 11 Pro build 10.0.26200.0 (read from the run records); no GPU or model work. Runs 2026-10-13 (-04:00): stock 16:52:47 to 16:57:46, patched 16:58:02 to 17:03:13, both exit 0. srt-win pinned at anthropics/sandbox-runtime `24eb39e9`; stock exe sha256 `620CCB98...`, patched exe `A5724CE9...`. Sublayer S1 `c971a69f-d6ab-4885-9b49-506d8aa51c86`; srt-win's default sublayer was never used. Other machine load and antivirus state during the runs: not recorded in these run files.
+
+**Method.** Driver `srtcli-halfset.ps1` sha256 `baaa8764...` (commit `7097fbec`); self-test 98 of 98; independent Opus review, 6 rounds (FAIL, PASS, PASS, PASS, FAIL, PASS; dispositions in `docs/reviews/nep0005-srtcli-halfset-review-disposition-2026-10-13.md`). Per build and pass: `srt-win install` (which creates its own `srt-sandbox` account; the Lead Architect approved that and its removal, #1763 comment 4095); state F recorded; then for H6 (IPv6 block deleted), H4 (IPv4 block deleted) and HP (both loopback permits deleted) in turn: delete the filter(s), record `wfp status`, `wfp verify` against a 127.0.0.1 and a [::1] listener on an ephemeral port outside 60080-60089 (plus in-range controls on 60085 in F and HP), the host check `verifyWindowsWfpEgress` from the stock and the patched TypeScript build, then a plain `srt-win install` with the same arguments and the same records again, then `install --force` to restore F. After every pass (three per build): `srt-win uninstall` and direct checks (S1, S2, S3 enumeration, `netsh wfp show state` export, footprint, user rights, access-list comparison against a pre-run snapshot). Three passes back to back on one boot.
+
+**Results (identical in all three passes of every state, both builds).**
+
+| State | filters | stock status | patched status | verify v4 / v6 (outside range) | host check stock / patched | plain re-install, stock | plain re-install, patched |
+|---|---|---|---|---|---|---|---|
+| F | 4 | installed | installed | blocked / blocked (in-range 60085: connected / connected) | pass / pass | n/a | n/a |
+| H6 | 3 | installed | partial | blocked / connected | pass / wfp_fence_inactive | exit 0, "already installed ... filters=3; no changes"; set stays 3, verify unchanged | exit 0; status installed, 4 filters, verify blocked / blocked, both host checks pass |
+| H4 | 3 | installed | partial | connected / blocked | wfp_fence_inactive / wfp_fence_inactive | exit 0, "no changes"; set stays 3, verify unchanged | exit 0; status installed, 4 filters, verify blocked / blocked, both host checks pass |
+| HP | 2 | installed | partial | blocked / blocked (in-range 60085: blocked / blocked) | pass / pass | exit 13, "already installed ... port_range=<unknown> ... Pass --force"; set stays 2, in-range blocked / blocked | exit 0; status installed, 4 filters, in-range connected / connected |
+
+The verify and host-check columns are the same in both builds' state records (only the status word and the re-install effect differ). `install --force` restored the full set in 9 of 9 for each build (exit 0). srt-win's `wfp status` read `installed` for the stock build in every half-set state; the stock TypeScript host check reads pass for H6 and HP and `wfp_fence_inactive` for H4.
+
+**Timings (ms, per srt-win CLI call; min-max, median; one machine, back to back).**
+
+| Call | stock | patched |
+|---|---|---|
+| install (n=3) | 1412-1608, median 1420 | 1462-1725, median 1502 |
+| `install --force` restore (n=9) | 1086-1490, median 1148 | 1117-1296, median 1221 |
+| plain re-install (n=9) | 98-111, median 108 (early-out: "no changes" or refusal) | 1157-1570, median 1224 (repairs the set) |
+| uninstall (n=3) | 1340-1532, median 1494 | 1494-1569, median 1499 |
+
+**After uninstall (6 of 6 cycles).** srt-win's uninstall exited 0 each time. Direct checks clean in 6 of 6: S1, S2 and S3 enumerate 0 filters, sweep count 0, `netsh wfp show state` export hits 0 for srt-win and S1-S3 and the default sublayer, user-rights SID hits 0; account, group, registry key, hide value, profile directory and profile-list entry absent. The store directory `C:\ProgramData\sandbox-runtime` was created by the first install of the session (first cycle, from absent) and no uninstall removed it (7 of 7 including the first cycle; the counted runs began with it present); it was removed by hand after the runs were recorded.
+
+**Access lists.** The first live stock attempt (driver `819b4d9a`, 16:39:32, not counted) completed every state with the same results and then stopped on its access-list check (exit 10): against the pre-run snapshot, 570 access lists changed in text with equivalent effect (513 `D:` to `D:AI`, 50 `D:P` to `D:PAI`, 7 CREATOR OWNER entries canonicalised: 5 made inherit-only, 2 effective-only entries dropped) and 7 narrowed (allow entries removed, re-derived from the parent); 0 widened, 0 other. In the counted runs, install/uninstall cycles 2 to 7 changed no access list (0 changed, 0 equivalent, 0 narrowed, 0 other, in all 6 after-uninstall checks). Only the access section of each list was snapshotted.
+
+**Operator controls.** Per build, 21 states: outside-range failures 0, loopback failures 0.
+
+**Not measured.**
+- real IPv6 or internet egress
+- another machine or Windows build
+- a restart with a half-set in place
+- a non-elevated run of the host checks (status needs elevation; verify does not)
+- the patched status-type change through checkWindowsDependencies (only verifyWindowsWfpEgress was driven)
+- file ownership (only the access section of each DACL was snapshotted)
+
+**Variation.** n=3 per state per build, back to back on one boot; the passes agree, which is a repeat and not independent replication. No variation across boots, days or machine load was measured.
+
+Data: `docs/performance/nep0005_srtcli_halfset_2026-10-13.json`; sanitised summary `docs/research/containment-evidence-2026-10-05/nep0005-open-questions/runs/srtcli-results-summary.json`.
+
+### 2026-10-13 - Which partial or home-built Windows Filtering Platform filter sets still block a throwaway account's loopback connects, what srt-win's own status says about each, and whether the account's standard token can add or delete a filter, #1763
+
+*Plain summary: on this laptop, 14 filter states (8 variants of the srt-win four-filter set, 6 sets we built ourselves) were each put in place three times and the throwaway account `blarai-spike` tried to connect to six loopback targets (IPv4 and IPv6, three ports). All three passes of every state gave the same answer. Blocks act per address family (a deleted V4 block frees IPv4 and leaves IPv6 blocked, and the reverse); with both permits deleted the blocks also stop the one port inside the permit range; a block still works without a provider; an exact-port permit opened exactly that port on that family. srt-win's own status word did not always match what the account experienced: it read `absent` with two permits standing (account open) and `absent` while our own blocks in another sublayer blocked the account on all six targets. The account's own non-elevated token was refused by the engine (`0x00000005`) on both an add and a delete, 3 of 3. Connects take 1 to 41 ms here, so nothing is a speed result; the numbers are counts and error codes.*
+
+**Hardware and software.** Intel Core Ultra 7 258V, 31.3 GB, Windows 11 Pro 10.0.26200 (25H2, update build revision 9457, read 2026-10-13 10:56), PowerShell 7.6.6 (as the rollback proof records its host); no GPU or model work. Last boot 2026-10-12 14:59:49 (the arm 3b restart), so uptime 19.8 h at the first state. Runs 2026-10-13 (-04:00): halfset 10:46:31 to 10:49:05, ours 10:49:30 to 10:51:15, n1 10:51:27 to 10:52:51, all exit 0, each from the admin-only live copy of commit `716fd87a`; an account-session proof (taskcheck) ran at 10:45:54 on the same code and one earlier, at 10:26:58, on commit `0654307a` (inferred from timestamps). Harness: Rust `halfset.rs` sha256 `e0d560fc...`, exe `ebe02980...`, pinned srt-win `24eb39e9...`, pinned `Cargo.lock` `c41cf410...` (full hashes in the bundle's `AS_RUN.md`). Bitdefender processes (bdagent, bdntwrk, bdredline, bdservicehost, bduserhost) were present when read at 10:58 the same day; its state during the runs and any other machine load were not recorded.
+
+**Method.** Three test sublayers (S1 for srt-win's harness, S2 and S3 for our own objects) and a provider of ours; the account `blarai-spike` (relative id 1271). Every state, every pass: a direct sweep (the three sublayers enumerate zero, the provider is absent, `netsh wfp show filters` has no hit for our marker, `srt-win` or the GUIDs) before adding; a control in which the account and the operator connect to all six loopback targets before any filter; the state is added (srt-win `install` then single-filter deletes for the half sets; our own adder for ours); srt-win `status`, enumeration and key reads are recorded; the account connects to the six targets (`127.0.0.1` and `[::1]` at 61763 and 61764, outside the srt-win permit range 60080-60089, and 60085, inside it) while the operator connects too; removal by key; the sweep again. Account-side probes ran as `blarai-spike` through a secondary (interactive-type) logon with a fresh in-memory session password and an explicit minimal environment, NOT the batch logon the earlier arms' scheduled task uses; after each session the account's password was reset and its task re-registered and proven restored. N1: the account's own standard token made one direct `FwpmFilterAdd0` against S2 and one direct `FwpmFilterDeleteByKey0` against a test filter we had added.
+
+| State | In place | srt-win status on S1 (filters) | 61763 v4 / v6 | 61764 v4 / v6 | 60085 (inside the permit range) v4 / v6 |
+|---|---|---|---|---|---|
+| R0 | nothing (control) | absent (0) | open / open | open / open | open / open |
+| R1 | full srt-win set | installed (4) | blocked / blocked | blocked / blocked | open / open |
+| R2 | V4 block deleted | installed (3) | open / blocked | open / blocked | open / open |
+| R3 | V6 block deleted | installed (3) | blocked / open | blocked / open | open / open |
+| R4 | both blocks deleted, permits remain | absent (2) | open / open | open / open | open / open |
+| R5 | permits deleted, blocks remain | installed (2) | blocked / blocked | blocked / blocked | blocked / blocked |
+| R6 | full set for a stale SID (no such account) | installed (4) | open / open | open / open | open / open |
+| R7 | our unlabelled blocks in S3, srt-win read on empty S1 | absent (0) | blocked / blocked | blocked / blocked | blocked / blocked |
+| O1 | ours (S2): V4 block only | absent (S1 empty) | blocked / open | blocked / open | blocked / open |
+| O2 | ours: V6 block only | absent (S1 empty) | open / blocked | open / blocked | open / blocked |
+| O3 | ours: a permit with no block | absent (S1 empty) | open / open | open / open | open / open |
+| O4 | ours: both blocks + exact-port permit `127.0.0.1:61763` | absent (S1 empty) | open / blocked | blocked / blocked | blocked / blocked |
+| O5 | ours: a block with no provider (engine answered `added`) | absent (S1 empty) | blocked / open | blocked / open | blocked / open |
+| O6 | ours: a filter naming a missing sublayer (engine refused, `FwpmFilterAdd0 0x80320007`; nothing stood) | absent (S1 empty) | open / open | open / open | open / open |
+| N1 | account's own standard token: direct add, direct delete | n/a | add denied `0x00000005` at the call; delete denied `0x00000005` at the call; the test filter stood afterwards; 3 of 3 passes | | |
+
+Across the 42 connect cycles (14 states x 3 passes) the account connected to all 252 control rows before the filters; with the state in place 150 rows connected and 102 were blocked, all 102 with Windows error 10013. The operator's loopback connects succeeded in 42 of 42 cycles before and 42 of 42 during, and its three connects outside the permit range succeeded in every cycle; the operator watchdog made 1 or 2 connects per cycle and recorded 0 failures. After removal by key every one of the 45 cycles (42 plus the 3 N1) read clean: S1, S2 and S3 with 0 filters and absent, provider absent, 0 export hits, no foreign filter; the final `-Check` exited 20.
+
+**Variation and what the counts are.** The three passes of a state ran back to back on one boot, a few seconds each, and agreed in all 15 states; that is a repeat, not independent replication, and no variation across boots, days or conditions was measured. The 95 `netsh` exports (3,557,094 bytes each, all with the same sha256) were taken only with no filter standing, so no export shows a state in place; the states are evidenced by the harness enumeration, srt-win status and our key reads. The statement that srt-win's status did not match the account's experience is about two rows (R4, R7) and is a reading of its status word, not a claim about its intent.
+
+**Not measured.** Any target beyond loopback (no internet address, no other host); UDP, DNS and ports other than 61763, 61764 and 60085; persistence (each state stood for seconds; no restart, hold or sleep); the batch-logon token of the account's scheduled task under these states; the Network Configuration Operators row (not run); whether the session was elevated, the exact launch command lines, other machine load and the Bitdefender state during the runs (none are in the run files); engine access list dumps; exports while a state stood; speed. Data: `docs/performance/nep0005_halfset_matrix_2026-10-13.json`; sanitised results, per-state summary (`results-summary.json`), export manifest and as-run provenance in `docs/research/containment-evidence-2026-10-05/nep0005-open-questions/runs/`.
+
+### 2026-10-11 - Raw WFP block keyed to a throwaway account: loopback permit on and off (arm 1), a 7,200 s hold (arm 2), a persistent set added and removed by key (arm 3a), #1718, #1682
+
+*Plain summary: on this laptop a Windows Filtering Platform (WFP) block keyed to one account's SID refused that account's internet connect every time it was probed: 3 of 3 runs with the loopback permit (and the account could still call a local model server), 3 of 3 without it (and then it could not), and 120 of 120 once-a-minute probes during one 7,200 s hold with Bitdefender running. A persistent version of the same block was added and removed by key in one 21-second run. Connect refusals take 19 to 116 ms, so nothing here is a speed result; the numbers are counts, durations and error codes. A restart was NOT tested.*
+
+**Hardware and software.** Intel Core Ultra 7 258V, 31.3 GB, Intel Arc 140V iGPU (driver 32.0.101.8831), Windows 11 Pro 10.0.26200 build 26200.9457 (25H2), elevated Windows PowerShell 5.1.26100.9444 (Desktop); Bitdefender running (bdagent, bdntwrk, bdredline, bdservicehost, bduserhost); firewall profiles on; WSL2 installed, distributions stopped (`wsl --shutdown` before arms 2 and 3a). Arm 1 only: OpenVINO 2026.4.0-22959, GenAI 2026.4.0.0-3407, Qwen3.5-4B INT8 on the GPU (warm load 5.6 to 9.6 s) as the operator-run local server. Arm 1 ran 2026-10-09 18:06 to 18:12 (uptime 0.25 to 0.35 h, a fresh restart); arm 2 on 2026-10-11 from 14:48:44 (uptime 43.4 h); arm 3a 16:51:27 to 16:52:08 (uptime 45.4 h). Other load: this machine's other agent sessions and the operator desktop; no gate run and no model load during arms 2 and 3a. Arms 2 and 3a were started by a one-shot elevated scheduled task from an admin-only copy of the scripts.
+
+**Method.** One throwaway local account named `blarai-spike` (arm 1: relative id 1011, deleted afterwards; arms 2 and 3a: a newly provisioned account of the same name, relative id 1271 - two different accounts), its scheduled task started by the operator; a raw WFP provider, sublayer and filters added with `FwpmFilterAdd0` (per-SID security descriptor on the `ALE_USER_ID` condition) at `ALE_AUTH_CONNECT_V4` and `_V6`; the operator's own traffic watched every 2 s (two failures in a row abort and remove). Each run has an operator baseline, an account baseline with the filters absent (the connect must succeed), the filters, the account's probe, removal verified by key and an account run after removal (egress open again), so a refusal is attributable to the filters. Arm 1: six invocations alternated permit on (four filters) and off (two block filters), each its own process and dynamic engine session; filters stood 2.9 to 4.3 s. Arm 2: one dynamic session held the four-filter set 7,200.9 s (dead-man 7,230 s), the account probed through its task every 60 s (120 samples), `netsh wfp show filters` exported at the start, at 3,600 s and before close. Arm 3a: one run of the persistent set (provider, sublayer, two block filters, persistent flag `0x1` on all four, fixed keys, non-dynamic session), the account probed through a gate that starts it only if the set reads present, removal by key, read back.
+
+| Arm and condition | Runs | Account's internet connect (1.1.1.1:443) | Account's loopback request to the real server | Notes |
+|---|---|---|---|---|
+| 1, permit on (4 filters) | 3 | refused 3 of 3, error 10013, 20 to 25 ms | HTTP 200, 32 tokens, 1,967 to 1,985 ms (3 of 3) | baseline and after-removal also 200 |
+| 1, permit off (2 filters) | 3 | refused 3 of 3, error 10013, 19 to 21 ms | refused 3 of 3 at the socket, error 10013, 36 to 39 ms | succeeded again after removal; the server never saw the blocked request |
+| 2, 7,200 s hold, permit on | 1 hold | refused 120 of 120, error 10013 in all 120, probe 24 to 116 ms (median 48) | not tested | operator watchdog 3,421 connects, 0 failures, longest tick gap 5 s; all three exports held all four keys and the marker (5 hits each); Bitdefender folder-timestamp signal only (five Bitdefender folders had later last-write times at the end than at the start: 14:42 to 16:42, 14:27 to 16:27, 12:42 to 15:42; the start values predate the hold, the two-hour spacing looks periodic, no new process) |
+| 3a, persistent set, no restart | 1 run | refused (10013, 82 ms) with the set present; gate refused to start the account when the set was absent (before the add and after removal) | not tested | objects existed 20.9 s; removal by key deleted 4 of 4, read back absent; follow-up removal found 4 of 4 not found; ran the pre-fix scripts of commit `aab46664` (see `arm3-persist/runs/AS_RUN.md`) |
+
+**Variation and what the counts are.** Not a speed measurement: connect refusals are tens of milliseconds and the loopback completion is 2 s dominated by a 32-token generation. Arm 1's six runs span about seven minutes after one restart and arm 3a is one run: runs minutes apart on one boot are a repeat, not independent replications. Arm 2 is ONE hold: its 120 samples are minutes apart inside one observation. No variance across holds, restarts, days or boots was measured, so no effect smaller than the unmeasured variation can be claimed, and none is.
+
+**Not measured.** IPv6 (the V6 block filters were installed and never probed), UDP, DNS and other ports; a restart (arm 3b was not run, so persistence across a reboot is NOT ESTABLISHED); a second hold; a hold across sleep or a Bitdefender engine update (the update signal is weak: process names and folder timestamps only); other antivirus products or drivers; the real `blarai-coder` account; the product's own model server (arm 1 used `spike_model.py` serve mode); streaming or concurrent clients; speed of anything under the block; the dead-man task (arm 3a ran without it). Data: `docs/performance/containment_wfp_arms_2026-10-11.json`; raw files `docs/research/containment-evidence-2026-10-05/arm1-permit/runs/`, `arm2-hold/runs/`, `arm3-persist/runs/`; claims C7 to C11 in `docs/research/account-level-containment-evidence-2026-10-05.md`.
+
+### 2026-10-11 - MXC PR #1406 loopback-proxy probe: a tier-1 container reached the configured loopback endpoint and the four other destinations tested stayed blocked, #1746 item a
+
+*Plain summary: with the self-built Microsoft MXC main build (commit 70fc7d52, which contains PR #1406), a process inside MXC's Windows process container reached a throwaway listener on 127.0.0.1:18099 in 3 of 3 runs, through four HTTP client paths plus a raw socket, while a second loopback port, the machine's LAN address, 1.1.1.1:443 and example.com:443 were refused (WinError 10013) in 3 of 3 runs. The signed v1.0.0 launcher and two other configurations on the main build were rejected at validation (3 of 3 each).*
+
+**Hardware and software.** Intel Core Ultra 7 258V, Windows 11 Pro 10.0.26200.9457, AC power, thermal zone 60.1 C, Bitdefender running, system CPU 36 to 78 % at each launch; elevated console; harness BelowNormal. MXC `wxc-exec.exe` main build (commit 70fc7d52, self-built with Rust 1.93, unsigned, sha256 `3cf91a45...`; `--probe`: tier base-container, baseContainerSupportsIdentitylessLoopbackProxy true) and the signed v1.0.0 (sha256 `aa444c0f...`). Container: Python 3.14.3 from the throwaway fixture copy, UI lockdown off. No GPU or model work. 2026-10-11 13:25 to 13:27 -04:00.
+
+**Method.** `tools/probes/mxc_1406/run_probe.py`: per condition 3 separate launcher invocations, each after `--dry-run`, with fresh host-side listeners on 127.0.0.1:18099, 127.0.0.1:18100 and 10.0.10.12:18099 (host-control-tested first); success judged from the listener log. `verify-clean`, ACL hashes, registry mappings and the MXC state dir checked after every run (the harness snapshot showed no change after any run; the borrowed `verify-clean` check only covers the earlier study's artifacts).
+
+| Condition (main build unless noted) | Dry-run | 18099 reached (log) | 18100 | LAN | 1.1.1.1 / example.com |
+|---|---|---|---|---|---|
+| T-on: egress deny, ingress allow + hostLoopback allow, networkProxy 127.0.0.1:18099 | pass 3/3 | 3/3 (5 lines per run: raw socket, urllib, curl.exe, WinHTTP x2) | blocked 3/3 | blocked 3/3 | blocked 3/3 |
+| P-18100: as T-on, proxy endpoint 18100 | pass 3/3 | blocked 3/3 | reached 3/3 | blocked 3/3 | blocked 3/3 |
+| L-off-c: no proxy, loopback deny | pass 3/3 | blocked 3/3 | blocked 3/3 | blocked 3/3 | 1.1.1.1 blocked 3/3 (10013); example.com: name resolution failed first, no connection attempted |
+| L-off-a: no proxy, hostLoopback allow | rejected 3/3 | not run | | | |
+| L-off-b: proxy, hostLoopback deny | rejected 3/3 | not run | | | |
+| V100: signed v1.0.0, T-on config | rejected 3/3 (hostLoopback allow unsupported) | not run | | | |
+
+Also seen: under T-on DNS resolution of example.com succeeded inside the container (it failed under L-off-c). Container runs took 0.5 to 0.9 s wall.
+
+**Not measured.** IPv6, UDP, other builds or Windows versions, a real model server, long duration or volume, CONNECT/HTTPS tunnelling through a forwarding proxy (the listener answers locally), a non-elevated launcher, the allowedProxyPeer shape, DNS content leakage (DNS resolved inside the container; whether a never-seen name reaches an upstream resolver is unshown), inbound connections to a listener inside the container, the temporary upstream status of this code path (MXC marks it for removal once PSEC 1.1 hosts are universal). Data: `docs/research/windows-containment-comparison-2026-10/mxc-1406-probe/` (README, `raw/`, `raw-p18100/`) and `docs/performance/mxc_1406_probe_2026-10-11/summary.json`.
+
+### 2026-10-11 - Containment probe payload across six confinement setups: what each blocks, what still starts, and the control's variation on the toolchain copy, #1740
+
+*Plain summary: the same test program was run inside six setups (unconfined, a SAFER normal-user token, a write-restricted token, a fully restricted token, an AppContainer in four variants, Microsoft's MXC container). Start-up times are 0.05 to 0.2 s and carry about 10 % run-to-run variation, so timing is not a finding; what differs is what each setup blocks and which tools still start. Predictions made from Windows' access check before any launch matched every launch of the unconfined, SAFER, restricted-token and AppContainer setups (the MXC launches were not predicted).*
+
+**Hardware and software.** Intel Core Ultra 7 258V, 31.3 GB (19 GB free, CPU 59 % at start), Windows 11 Pro 10.0.26200 build 26200.9457 (25H2), Python 3.14.3 (probe), node v24.13.0, git 2.55.0, opencode 1.17.8, `microsoft/mxc` v1.0.0 (`wxc-exec.exe` sha256 `aa444c0f...`, release archive sha256 matches the published `0bb483b3...`, signature valid); elevated console; Bitdefender present (not re-checked). 2026-10-11 11:00 to 11:25 -04:00. Also running: this session, background builder and reviewer agents, the operator desktop; no GPU work, no test gate. No model loaded; the model endpoints were down. Toolchain: a throwaway copy under `C:/blarai-spike-1740/toolchain` (the real install for the phase-1 control).
+
+**Method.** `tools/probes/containment_arms/run_phase2.py`, `run_arm.py`, `run_arm_e.py`: 3 runs per variant (control 5); each network rule has an allowed control and a lock-off run; the permission inventory (Windows' access check) predicted fixture writes and secret reads before launch.
+
+| Variant | node / git / Python / git-bash / opencode | secrets refused | other folders writable | internet | local listener |
+|---|---|---|---|---|---|
+| D control (copy) | ok / ok / ok / ok / ok | 0 of 5 | 11 | open | open |
+| B2 write-restricted | ok / ok / ok / FAIL / ok | 0 of 5 | 1 | open | open |
+| B3 fully restricted | ok / ok / ok / FAIL / FAIL | 5 of 5 | 5 (+1 write-only) | open | open |
+| C0 AppContainer, nothing granted | ok / ok / ok / FAIL / FAIL | 5 of 5 | 2 | blocked | blocked |
+| C2 + internetClient | same | 5 of 5 | 2 | open | blocked |
+| C3 + loopback exemption + rule keyed to the package | same | 5 of 5 | 2 | blocked | open |
+| E1 Microsoft container, UI lockdown off | ok / ok / ok / FAIL / FAIL | 5 of 5 | 0 | blocked | blocked |
+| E3/E4 host-loopback allow, proxy | refused by the launcher | | | | |
+
+Prediction against run, for the setups with a prediction (not the MXC launches): 48 of 48 fixture writes and 15 of 15 secret reads in every variant (control 80 of 80 and 25 of 25). Control variation (CV, fixture copy, n=5): node 10.4 %, git 8.8 %, Python 9.6 %, task 3.9 %, payload total 3.1 %.
+
+**Not measured.** The dedicated account `blarai-coder` on the same payload (needs the Lead Architect); opencode against a model; the unscoped separation rule, IPv6, UDP, other ports; a standard (non-elevated) console; thermal state; idle-gated timing. Data: `docs/research/windows-containment-comparison-2026-10/phase2/` (`summary-phase2.md`, `conditions-phase2.json`).
+
+### 2026-10-10 - Containment probe payload, unconfined control arm: run-to-run variation before any comparison, #1740
+
+*Plain summary: before comparing the coder's containment setups, the probe that will compare them was run 7 times
+unconfined to learn how much its timings move on their own. Start-up of each tool varies by 2 to 5 %, opencode's
+start and the small end-to-end task by about 10 %; so a difference under about 10 % between setups is not a finding.
+Every yes/no outcome (45 of them) was identical in all 7 runs.*
+
+**Hardware and software.** Intel Core Ultra 7 258V, 31.3 GB (12.2 GB free, CPU 11 % at start), Windows 11 Pro
+10.0.26200, Python 3.14.3, node v24.13.0, git 2.55.0, opencode 1.17.8; elevated console launching the payload hidden
+under a medium-integrity token shaped like the operator's limited token (`limited_equivalent`, checked against the real limited token on 40 paths; `tools/probes/containment_arms/run_arm.py --arm D`), with the toolchain from its real install. Also running: the session,
+four network-bound research subagents, the operator desktop; no GPU work, no test gate. 2026-10-10 22:11:54 to 22:12:41
+-04:00. No model was loaded; the model endpoints were down.
+
+| timing (7 runs) | mean | sd | CV |
+|---|---|---|---|
+| payload launch to exit | 6.587 s | 0.125 s | 1.9 % |
+| git-bash start | 0.528 s | 0.014 s | 2.7 % |
+| git / node / python start | 0.057 to 0.068 s | 0.001 to 0.003 s | 1.7 to 4.5 % |
+| opencode `--version` | 0.525 s | 0.054 s | 10.2 % |
+| small task (git init, Python, node, bash, commit) | 0.768 s | 0.076 s | 9.9 % |
+
+**Not measured in this 2026-10-10 entry.** The confined setups (run on 2026-10-11, entry above); opencode against a model; thermal state;
+runs started by the idle-checking timer. Data: `docs/research/windows-containment-comparison-2026-10/arm-D/` and
+`summary-phase1.md`; copy of the summary and conditions plus machine-readable timings (`arm_d_timings.json`) in `docs/performance/containment_probe_2026-10-10/`.
+
 ### 2026-10-08 - Standing test gate as parallel groups: 24 to 12 minutes, same 13,288 tests, #1707
 
 *Plain summary: running the project's test gate as six concurrent processes instead of one cut it from about 24 minutes
@@ -99,6 +265,124 @@ scanner state were not recorded). Variance across days. The slow tier (612 tests
 reasons in each; the real checkout runs them. One intermittent failure (`test_graduation_reset_stamps_current_mode_immediately`,
 a Windows file-replace refusal) appeared in 3 of the 8 timed runs and is ticketed as #1706. Data, logs and the per-file tables:
 `docs/performance/gate_runtime_2026-10-07/`.
+
+### 2026-10-05 - Confined-model spike: Qwen3.5-4B INT8 on the Arc 140V served by a restricted local account over loopback, 3.7 to 8.5 tokens per second (decode-time basis; 3.7 to 7.7 on the log's wall-clock throughput basis), and not yet comparable to an unconfined figure, #1689
+
+*Plain summary: a throwaway local account with no admin rights, no interactive session and (in one run) a Windows
+Filtering Platform block on all its outbound connections loaded a 4-billion-parameter model on the laptop's GPU and
+answered a request over the loopback interface. Across 6 generations it produced 3.7 to 8.5 output tokens per second
+(decode-time basis); the same model run in-process by the operator afterwards gave 4.5 to 4.8. The confined spread
+alone is 2.3x and the box was not thermally gated, so no confined-versus-unconfined ratio is claimed. This entry was
+missing from the log; the runs are dated 2026-10-05 (15:57 to 16:03 -04:00), banked here on 2026-10-11.*
+
+**Hardware and software.** Intel Core Ultra 7 258V (Lunar Lake), Intel Arc 140V iGPU (16 GB shared), NPU present and
+unused, 31.32 GB RAM; Windows 11 Pro 10.0.26200, Windows PowerShell 5.1.26100.9444 (64-bit) as the operator side;
+Python 3.11.9, OpenVINO 2026.4.0-22959-99c81491cc3, OpenVINO GenAI 2026.4.0.0-3407-7ea2546852a. GPU driver 32.0.101.8831
+as stated in Vikunja #1689 comment 3896; the run files do not record it. Model `Qwen3.5-4B-int8-ov` (INT8) on device GPU,
+plain generation (no speculative decoding, no MTP, no prefix cache). Bitdefender present (bdagent, bdntwrk, bdredline,
+bdservicehost, bduserhost running); Windows Firewall profiles on, BFE and mpssvc running; uptime 34.93 to 34.95 h. Free RAM
+19.40 to 19.56 GB (In-Use 11.76 to 11.92 GB) before each model load. Per the claims table, builders were also loading the
+CPU; thermal state and per-process load were not recorded.
+
+**Method.** Account `blarai-spike` (token: not admin, session 0, not interactive, medium integrity, NTLM batch logon)
+running `spike_model.py` through a scheduled task; a reconstruction of the scripts used (from commit 9adcafc4 with test SIDs restored; it does not prove provenance, and Test A run 1 ran an earlier
+`spike-run-test.ps1` that no longer exists) is in `docs/research/containment-evidence-2026-10-05/confined-model-spike/as-run/` (the
+scripts were hardened afterwards; `post-run-hardened/` holds the later set; the results themselves are in `runs/`). One prompt ("Explain in three sentences why the sky is blue."), 2 generations
+of 64 tokens per run, GPU. `tok/s (decode)` is output tokens per decode time (`tok_per_s_tpot`), `tok/s (wall)` is tokens
+over the generation's wall time. Test A (no block) ran twice; Test B ran the server with a raw WFP block keyed to the
+account standing (4 filters, one dynamic session; filters added 16:00:03.985, the post-removal read came 126.69 s later; engine close is not timestamped, so about 127 s is an upper bound on how long the filters stood)
+and the operator sent one 32-token request to `127.0.0.1:49580`. Control: same model and prompt in-process as the operator,
+started 16:02:18.9 (after Test B finished at 16:02:10.7). The three confined runs span about 5 minutes on one machine and
+are a repeat, not independent replications.
+
+| run (start, -04:00) | load | gen 1: TTFT, tok/s decode / wall | gen 2: TTFT, tok/s decode / wall |
+|---|---|---|---|
+| Test A run 1, 15:57:30 | 24.773 s | 3847.72 ms, 4.94 / 3.85 | 525.37 ms, 3.72 / 3.66 |
+| Test A run 2, 15:59:14 | 17.192 s | 2368.44 ms, 8.47 / 6.52 | 162.11 ms, 7.77 / 7.73 |
+| Test B (block standing), 16:00:02 | 33.685 s | 2698.30 ms, 6.77 / 5.33 | 275.62 ms, 4.60 / 4.57 |
+| control, in-process, 16:02:18 | 13.973 s | 3393.25 ms, 4.82 / 3.89 | 266.19 ms, 4.50 / 4.49 |
+
+Confined range: 3.72 to 8.47 tok/s (decode), 3.66 to 7.73 (wall), 6 generations. Control range: 4.50 to 4.82 (decode),
+3.89 to 4.49 (wall), 2 generations. Within the confined account the best generation is 2.28 times the worst. Test B
+served request: HTTP 200, `model_loaded=true`, 32 tokens, 7670 ms at the operator (7572.9 ms server-side, TTFT 522.71 ms);
+the account's own connect to 1.1.1.1:443 mid-hold failed with Windows socket error 10013 after 6.9 ms; operator watchdog
+94 of 94 connects OK; engine objects absent after close; exit code 0. The operator's connect to the listener inside the
+WFP window is not a test of the permit filter (outbound-connect-only filters; the permit's role was measured separately
+on 2026-10-09, arm 1, and is not part of this entry). Test A run 2 and Test B also passed the file-denial step (8 of 8
+secret reads and 4 of 4 outside writes denied; writes to `C:\Windows\Temp` and `B:\models` were allowed). Test A run 1's
+file-denial step reported a failure that was a probe bug (fixed), not a GPU result.
+
+**Also not recorded:** power source or plan (AC or battery); Test B's second account probe (`outbound_probe`, 16:02:09.172) was also refused with WinError 10013 after 68 ms; the served request has two server-side timings (7214.8 ms in the response body, 7572.9 ms in the server request log; the entry cites the second).
+
+**Not measured.** Any confined-versus-unconfined speed ratio (needs the cold-GPU gate: thermal zone at or below 72 C per
+generation; none was applied); thermal state; the 14B INT4 plus draft pipeline, MTP, prefix cache, speculative decoding;
+streaming and concurrent clients; any prompt other than one short question; 64 tokens per generation; other GPU drivers;
+the model process's own memory (host In-Use only); more than 2 generations per run. The model's output is a reasoning
+prefix ("Thinking Process"), so these tokens are not an answer-quality sample.
+
+**Source discrepancies.** (1) Vikunja #1689 comment 3896 quotes 7.8 to 8.5 tok/s, which is Test A run 2 only; the full range
+is 3.7 to 8.5. (2) Comment 3896 said the control ran at the same time; the raw data show it started after Test B ended
+(corrected in comment 3897). (3) The three runs' load times differ (24.8, 17.2, 33.7 s) and no cause was identified.
+Data: `docs/performance/containment_spikes_2026-10-05/confined_model_1689_2026-10-05.json`; raw run files in
+`docs/research/containment-evidence-2026-10-05/confined-model-spike/runs/` (`testA-20261005-155840.json`,
+`testA-20261005-155954.json`, `testB-20261005-160210.json`, `control/control-inproc.json`); claims table
+`docs/research/account-level-containment-evidence-2026-10-05.md` (C3a, C3b, C6a).
+
+### 2026-10-04 - Raw Windows Filtering Platform block keyed to the dedicated coder account: egress blocked in 3 of 3 runs with Bitdefender running (Bitdefender "owns filtering" per the 2026-07-10 bisect, #775 comment 1653, not re-observed here), #1671
+
+*Plain summary: a low-level Windows packet-filter rule (WFP, the filtering layer inside Windows) tied to the dedicated
+`blarai-coder` account blocked that account's outbound connection to the internet in all 3 runs, while the operator's
+own connections were unaffected and the account's egress was open again once the rule was removed. The Windows Firewall
+per-account rule on the same machine is inert (Vikunja #775 comment 1653). Three runs inside about a minute are a
+repeat, not independent replications, and each rule stood for only about 5 seconds. Runs 2026-10-04 23:59:31 to
+2026-10-05 00:00:28 -04:00; banked here on 2026-10-11.*
+
+**Hardware and software.** Intel Core Ultra 7 258V, Windows 11 Pro 10.0.26200, elevated 64-bit Windows PowerShell
+5.1.26100.9444; uptime 18.94, 18.95, 18.96 h. No GPU, model, OpenVINO or driver was involved. Bitdefender processes running
+(bdagent, bdntwrk, bdredline, bdservicehost, bduserhost); Windows Firewall Domain, Private and Public profiles enabled,
+default outbound NotConfigured; BFE and mpssvc Running/Automatic. RAM, thermal state and other running work were not
+recorded.
+
+**Method.** `wfp-coder-egress-spike.ps1 -Live -HoldSeconds 100`, Lead Architect present. One provider, one sublayer and 4
+filters in a dynamic WFP session (removed when the engine handle closes), all with the coder-SID condition: permit loopback
+V4/V6 (weight 0x2000), block V4/V6 (weight 0x1000), outbound-connect layer only. Per run: operator baseline of 6 TCP connects
+(1.1.1.1:443 and 8.8.8.8:443), coder baseline probe through a scheduled task (egress expected open), filters added in one
+transaction, operator watchdog every 2 s, coder probe during the block, engine closed, objects verified absent, coder probe
+again. "Blocked" means the connect did not complete in 5000 ms or threw: any failure counts, which is why the baseline and
+post-removal "open" readings are what attribute the block to the filters. One TCP connect per reading.
+
+| | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| started (-04:00) | 2026-10-04 23:59:31 | 2026-10-04 23:59:51 | 2026-10-05 00:00:17 |
+| operator baseline connects OK | 6 of 6 (20 to 24 ms) | 6 of 6 (22 to 25 ms) | 6 of 6 (20 to 26 ms) |
+| coder baseline blocked | no (connected) | no | no |
+| coder during block | blocked | blocked | blocked |
+| operator watchdog / during-block connects | 3 of 3 / 2 of 2 | 3 of 3 / 2 of 2 | 3 of 3 / 2 of 2 |
+| coder loopback GET (stub) during block | HTTP 200 | HTTP 200 | HTTP 200 |
+| objects absent after close; coder egress open after | yes; yes | yes; yes | yes; yes |
+| filters added to post-removal read | 5.13 s | 5.35 s | 5.13 s |
+| exit code; filter ids | 0; 407213-407216 | 0; 407217-407220 | 0; 407221-407224 |
+
+Conclusion for this machine and this filter set: the raw block enforced for the coder account under Bitdefender; this is
+the observed result of these runs, not a statement about WFP or Bitdefender in general. The during-block reading was taken
+about 3.2 s after the filters were added (a read time, not the probe time).
+
+**Not measured.** Reboot persistence (dynamic by design); IPv6 destinations (v6 filters installed, never probed); UDP, DNS and
+ports other than 443; Bitdefender update or restart during a block; other antivirus; a real coder dispatch under the block;
+any hold longer than about 5 s; the filters' latency cost (no with/without timing comparison; the 19 to 37 ms operator
+connects are not a finding); the permit filter's role (the loopback listener was a stub started by the operator script and
+the permit may simply be unused; measured separately on 2026-10-09, arm 1).
+
+**Instrument limit.** `coder_during.outbound_detail` reads "no connection to 1.1.1.1:443 within 5000ms (blocked)" in all three runs, but each result was read about 3.2 s after the filters were added, so the probe did not wait 5000 ms; in the probe version current at the time (agentic-setup `4c91809`, `coder-containment-probe.ps1`, `Test-OutboundBlocked`) that string is printed for both a timeout and an attempt that completes with `Connected=false`. The error code is therefore unrecorded (probably WinError 10013 by analogy with #1689 and arm 1, not measured), and the probe's definition of "blocked" lives in agentic-setup, not in this repository. Attribution to the filters rests on the "open" baseline and "open" post-removal readings (3 of 3 each).
+
+**Source discrepancies.** The result files record `hold_seconds: 100`, the requested cap; the timestamps give 5.13, 5.35 and
+5.13 s from filters-added to the post-removal read (engine close is not timestamped), so both durations are upper bounds.
+`secret_reads_denied: true` in these files is vacuous (empty path list). Vikunja #1671 comment 3873 called the result a re-visit
+trigger for the accepted egress gap; #1671 comments 3891 (the stub listener and the 3 to 5 s hold) and 3894 retract that, and #775 comment 3893 corrects #775 comment 3874.
+Data: `docs/performance/containment_spikes_2026-10-05/wfp_coder_block_1671_2026-10-05.json`; raw files in
+`docs/research/containment-evidence-2026-10-05/wfp-spike/` (`result-20261004-235941.json`, `result-20261005-000002.json`,
+`result-20261005-000028.json`, `live-run-console.txt`); claims table
+`docs/research/account-level-containment-evidence-2026-10-05.md` (C1, C1b).
 
 ### 2026-10-04 (evening) - Qwen3.5-9B INT8 (+MTP) vs Qwen3-14B INT4, #1665
 
@@ -442,7 +726,7 @@ OpenVINO GenAI 2026.2.1. Elevated, quiet box, assistant down.
 
 **Models.** Qwen3-14B INT4 (`models/qwen3-14b/openvino-int4-gpu`) with speculative decoding via the
 pruned Qwen3-0.6B INT8 draft, and Qwen3.6-35B-A3B INT4
-(`C:/Users/mrbla/models/qwen36-35b-a3b-int4-ov-OFFICIAL`) through VLMPipeline, which has no
+(`C:/Users/__USER__/models/qwen36-35b-a3b-int4-ov-OFFICIAL`) through VLMPipeline, which has no
 speculative decoding at all.
 
 **Methodology.** Both suites, both brains, ONE process, greedy (`do_sample=False`),
@@ -871,7 +1155,7 @@ different method, different day, neither derived from the other, and commensurab
 I weakened a real agreement to accommodate my own bad data point.
 
 **One more, on the instruments themselves.** The probes I committed "so a number going to a
-governance decision can be re-run by whoever doubts it" hardcoded `REPO = C:/Users/mrbla/BlarAI`. A
+governance decision can be re-run by whoever doubts it" hardcoded `REPO = C:/Users/__USER__/BlarAI`. A
 doubter checking out a branch and running them would have measured `main` and been told nothing about
 it — the wrong-instrument failure this entire ticket exists to correct, reintroduced inside the
 instrument correcting it. They derive the repository from their own location now. `"elevated": True`
@@ -1241,7 +1525,7 @@ which is an AGENTS.md loaded into every task. #1484.
 
 1. Run the benchmark from the repo root:
    ```
-   C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe scripts\benchmark_gpu_inference.py
+   C:\Users\__USER__\BlarAI\.venv\Scripts\python.exe scripts\benchmark_gpu_inference.py
    ```
 2. Copy the printed Markdown entry from stdout and paste it as a new `###`
    section below (newest at the top).
@@ -4196,7 +4480,7 @@ the three thinking-control arms is stage S0 of the 2026.4 program (#1611).
 
 ## 2026-07-16 — genai PR #4139 on-hardware verification (Arc 140V, the issue's own model): branch doesn't compile as-is; after a one-char fix, the thinking-suppression state machine never engages — outputs byte-identical to baseline in every condition
 
-**What / why.** Operator-directed: build openvino.genai PR #4139 (`enable_thinking`/`reasoning_budget_tokens` in GenerationConfig — the #3937 resolution path) from source and verify on the exact model the linked issue is about, Qwen3.6-35B-A3B official INT4 IR, which the PR author never tested. Toolchain venv (`C:/Users/mrbla/builds/genai-pr4139/venv-build`), PR's own baseline (openvino 2026.4.0-dev nightly), Ninja generator pinned locally (build-env accommodation).
+**What / why.** Operator-directed: build openvino.genai PR #4139 (`enable_thinking`/`reasoning_budget_tokens` in GenerationConfig — the #3937 resolution path) from source and verify on the exact model the linked issue is about, Qwen3.6-35B-A3B official INT4 IR, which the PR author never tested. Toolchain venv (`C:/Users/__USER__/builds/genai-pr4139/venv-build`), PR's own baseline (openvino 2026.4.0-dev nightly), Ninja generator pinned locally (build-env accommodation).
 
 **Build findings.** (1) The branch tip (`f3e59fb`) does NOT compile: `OPENVINO_ASSERT(...)` at `src/cpp/src/sampling/logit_processor.hpp:55` is missing its closing `);` — MSVC C1057 in every TU including the header; one-character local patch applied, then the wheel built clean (`openvino_genai-2026.4.0.0`, self-identifying as the fork branch). (2) `pip wheel` needs the nightly index for `openvino_tokenizers~=2026.4.0.0.dev` (not on PyPI).
 

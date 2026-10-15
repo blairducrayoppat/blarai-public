@@ -1,0 +1,475 @@
+{
+ "launch": {
+  "exit_code": 0,
+  "timed_out": false,
+  "wall_secs": 9.149,
+  "listener_accepts": 1
+ },
+ "cmdline": "\"C:/blarai-spike-1740/toolchain/Python314/python.exe\" -I \"C:\\blarai-spike-1740\\payload\\arm_payload.py\" --arm B2 --tag B2-20261011T112126-r3 --out \"C:\\blarai-spike-1740\\worktree\\result-B2-20261011T112126-r3.json\" --tools \"C:\\blarai-spike-1740\\payload\\tools.json\" --listener-port 49947",
+ "variant": {
+  "label": "B2-fixture-block-only",
+  "fence": "discriminate:block-only",
+  "toolchain": "fixture",
+  "capabilities": [],
+  "loopback_exempt": false
+ },
+ "fence_report": {
+  "fence": "#1740",
+  "kind": "discriminate",
+  "target": "",
+  "started": "2026-10-11T11:21:27.3028449-04:00",
+  "watchdog": [
+   {
+    "t": "2026-10-11T11:21:28.2336661-04:00",
+    "ok": true
+   },
+   {
+    "t": "2026-10-11T11:21:30.2858295-04:00",
+    "ok": true
+   },
+   {
+    "t": "2026-10-11T11:21:32.3277122-04:00",
+    "ok": true
+   },
+   {
+    "t": "2026-10-11T11:21:34.3672972-04:00",
+    "ok": true
+   },
+   {
+    "t": "2026-10-11T11:21:36.3979929-04:00",
+    "ok": true
+   }
+  ],
+  "condition": "app C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe; block SD D:(A;;CC;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;;CC;;;S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337); no permit",
+  "variant": "block-only",
+  "filter_ids": [
+   456310,
+   456311,
+   456312,
+   456313
+  ],
+  "armed": "2026-10-11T11:21:28.1040633-04:00",
+  "close_status": "0x00000000",
+  "after": {
+   "sublayer": false,
+   "provider": false,
+   "filters": []
+  },
+  "finished": "2026-10-11T11:21:38.4173108-04:00",
+  "exit_code": 0
+ },
+ "payload": {
+  "arm": "B2",
+  "tag": "B2-20261011T112126-r3",
+  "started": "2026-10-11T11:21:28-04:00",
+  "identity": {
+   "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+   "groups_enabled": [
+    "S-1-1-0",
+    "S-1-5-32-578",
+    "S-1-5-32-559",
+    "S-1-5-32-545",
+    "S-1-5-4",
+    "S-1-2-1",
+    "S-1-5-11",
+    "S-1-5-15",
+    "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+    "S-1-5-113",
+    "S-1-5-5-0-273776",
+    "S-1-2-0",
+    "S-1-5-64-36"
+   ],
+   "groups_deny_only": [
+    "S-1-5-114",
+    "S-1-5-32-544"
+   ],
+   "restricting_sids": [
+    "S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337",
+    "S-1-1-0",
+    "S-1-5-5-0-273776"
+   ],
+   "integrity": "S-1-16-8192",
+   "appcontainer_sid": "",
+   "privileges": [
+    "SeChangeNotifyPrivilege"
+   ]
+  },
+  "toolchain": {
+   "node": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/nodejs/node.exe",
+     "--version"
+    ],
+    "rc": 0,
+    "secs": 0.152,
+    "out": "v24.13.0",
+    "err": ""
+   },
+   "git": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+     "--version"
+    ],
+    "rc": 0,
+    "secs": 0.165,
+    "out": "git version 2.55.0.windows.1",
+    "err": ""
+   },
+   "bash": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/Git/bin/bash.exe",
+     "-lc",
+     "echo bash-ok; uname -s"
+    ],
+    "rc": 3221225794,
+    "secs": 0.675,
+    "out": "",
+    "err": "0 [main] bash (16792) C:\\blarai-spike-1740\\toolchain\\Git\\bin\\..\\usr\\bin\\bash.exe: *** fatal error - couldn't create signal pipe, Win32 error 5"
+   },
+   "python": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/Python314/python.exe",
+     "-I",
+     "-c",
+     "import sys; print(sys.version)"
+    ],
+    "rc": 0,
+    "secs": 0.143,
+    "out": "3.14.3 (tags/v3.14.3:323c59a, Feb  3 2026, 16:04:56) [MSC v.1944 64 bit (AMD64)]",
+    "err": ""
+   },
+   "opencode": {
+    "argv": [
+     "C:/blarai-spike-1740/toolchain/npm/opencode.cmd",
+     "--version"
+    ],
+    "rc": 0,
+    "secs": 1.196,
+    "out": "1.17.8",
+    "err": ""
+   },
+   "task": {
+    "ok": false,
+    "secs": 1.853,
+    "steps": [
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "init",
+       "-q"
+      ],
+      "rc": 0,
+      "secs": 0.339,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Python314/python.exe",
+       "-I",
+       "-c",
+       "open('a.txt','w').write('alpha\\n')"
+      ],
+      "rc": 0,
+      "secs": 0.166,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/nodejs/node.exe",
+       "-e",
+       "require('fs').writeFileSync('b.txt', String(6*7)+'\\n')"
+      ],
+      "rc": 0,
+      "secs": 0.18,
+      "out": "",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/bin/bash.exe",
+       "-c",
+       "cat a.txt b.txt > c.txt && wc -l c.txt"
+      ],
+      "rc": 3221225794,
+      "secs": 0.582,
+      "out": "",
+      "err": "0 [main] bash (20336) C:\\blarai-spike-1740\\toolchain\\Git\\bin\\..\\usr\\bin\\bash.exe: *** fatal error - couldn't create signal pipe, Win32 error 5"
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "add",
+       "a.txt",
+       "b.txt",
+       "c.txt"
+      ],
+      "rc": 128,
+      "secs": 0.198,
+      "out": "",
+      "err": "fatal: pathspec 'c.txt' did not match any files"
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "commit",
+       "-q",
+       "-m",
+       "probe"
+      ],
+      "rc": 1,
+      "secs": 0.203,
+      "out": "On branch main\n\nInitial commit\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\ta.txt\n\tb.txt\n\nnothing added to commit but untracked files present (use \"git add\" to t",
+      "err": ""
+     },
+     {
+      "argv": [
+       "C:/blarai-spike-1740/toolchain/Git/cmd/git.exe",
+       "-c",
+       "user.name=probe",
+       "-c",
+       "user.email=probe@local",
+       "-c",
+       "core.hooksPath=NUL",
+       "-c",
+       "init.defaultBranch=main",
+       "log",
+       "--oneline",
+       "-1"
+      ],
+      "rc": 128,
+      "secs": 0.184,
+      "out": "",
+      "err": "fatal: your current branch 'main' does not have any commits yet"
+     }
+    ]
+   }
+  },
+  "loopback": [
+   {
+    "target": "127.0.0.1:8099",
+    "result": "failed",
+    "winerror": 10061,
+    "errno": 10061,
+    "error": "ConnectionRefusedError",
+    "secs": 2.037
+   },
+   {
+    "target": "127.0.0.1:8000",
+    "result": "failed",
+    "winerror": 10061,
+    "errno": 10061,
+    "error": "ConnectionRefusedError",
+    "secs": 2.042
+   },
+   {
+    "target": "127.0.0.1:49947",
+    "result": "connected",
+    "secs": 0.003
+   }
+  ],
+  "file_reach": {
+   "secret_reads": {
+    "C:\\Users\\__USER__\\.ssh": "allowed",
+    "C:\\Users\\__USER__\\.git-credentials": "allowed",
+    "C:\\Users\\__USER__\\AppData\\Local\\BlarAI": "allowed",
+    "C:\\Users\\__USER__\\.config\\opencode": "allowed",
+    "C:\\Users\\__USER__\\.codex\\.sandbox-secrets": "allowed"
+   },
+   "fixture_writes": {
+    "C:\\blarai-spike-1740\\leak\\authenticated-users-modify": "denied",
+    "C:\\blarai-spike-1740\\leak\\fleet": "denied",
+    "C:\\blarai-spike-1740\\leak\\models": "denied",
+    "C:\\blarai-spike-1740\\leak\\projects": "denied",
+    "C:\\blarai-spike-1740\\leak\\users-modify": "denied",
+    "C:\\blarai-spike-1740\\leak\\windows-temp-classic": "denied",
+    "C:\\blarai-spike-1740\\leak\\windows-temp-today": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-A": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-B2": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-C": "denied",
+    "C:\\blarai-spike-1740\\instrument\\deny-D": "denied",
+    "C:\\blarai-spike-1740\\instrument\\grant-A": "denied",
+    "C:\\blarai-spike-1740\\instrument\\grant-B2": "allowed",
+    "C:\\blarai-spike-1740\\instrument\\grant-C": "denied",
+    "C:\\blarai-spike-1740\\instrument\\grant-D": "denied",
+    "C:\\blarai-spike-1740\\worktree": "allowed"
+   }
+  },
+  "egress": [
+   {
+    "target": "1.1.1.1:443",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.003
+   },
+   {
+    "target": "example.com:443",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.015
+   }
+  ],
+  "inheritance": {
+   "depth": 0,
+   "identity": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [
+     "S-1-5-114",
+     "S-1-5-32-544"
+    ],
+    "restricting_sids": [
+     "S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337",
+     "S-1-1-0",
+     "S-1-5-5-0-273776"
+    ],
+    "integrity": "S-1-16-8192",
+    "appcontainer_sid": "",
+    "privileges": [
+     "SeChangeNotifyPrivilege"
+    ]
+   },
+   "write_authusers": "denied",
+   "egress": {
+    "target": "1.1.1.1:443",
+    "result": "failed",
+    "winerror": 10013,
+    "errno": 13,
+    "error": "PermissionError",
+    "secs": 0.004
+   },
+   "child": {
+    "depth": 1,
+    "identity": {
+     "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+     "groups_enabled": [
+      "S-1-1-0",
+      "S-1-5-32-578",
+      "S-1-5-32-559",
+      "S-1-5-32-545",
+      "S-1-5-4",
+      "S-1-2-1",
+      "S-1-5-11",
+      "S-1-5-15",
+      "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+      "S-1-5-113",
+      "S-1-5-5-0-273776",
+      "S-1-2-0",
+      "S-1-5-64-36"
+     ],
+     "groups_deny_only": [
+      "S-1-5-114",
+      "S-1-5-32-544"
+     ],
+     "restricting_sids": [
+      "S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337",
+      "S-1-1-0",
+      "S-1-5-5-0-273776"
+     ],
+     "integrity": "S-1-16-8192",
+     "appcontainer_sid": "",
+     "privileges": [
+      "SeChangeNotifyPrivilege"
+     ]
+    },
+    "write_authusers": "denied",
+    "egress": {
+     "target": "1.1.1.1:443",
+     "result": "failed",
+     "winerror": 10013,
+     "errno": 13,
+     "error": "PermissionError",
+     "secs": 0.012
+    },
+    "child": {
+     "depth": 2,
+     "identity": {
+      "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "groups_enabled": [
+       "S-1-1-0",
+       "S-1-5-32-578",
+       "S-1-5-32-559",
+       "S-1-5-32-545",
+       "S-1-5-4",
+       "S-1-2-1",
+       "S-1-5-11",
+       "S-1-5-15",
+       "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+       "S-1-5-113",
+       "S-1-5-5-0-273776",
+       "S-1-2-0",
+       "S-1-5-64-36"
+      ],
+      "groups_deny_only": [
+       "S-1-5-114",
+       "S-1-5-32-544"
+      ],
+      "restricting_sids": [
+       "S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337",
+       "S-1-1-0",
+       "S-1-5-5-0-273776"
+      ],
+      "integrity": "S-1-16-8192",
+      "appcontainer_sid": "",
+      "privileges": [
+       "SeChangeNotifyPrivilege"
+      ]
+     },
+     "write_authusers": "denied",
+     "egress": {
+      "target": "1.1.1.1:443",
+      "result": "failed",
+      "winerror": 10013,
+      "errno": 13,
+      "error": "PermissionError",
+      "secs": 0.008
+     }
+    }
+   }
+  },
+  "total_secs": 8.893
+ }
+}

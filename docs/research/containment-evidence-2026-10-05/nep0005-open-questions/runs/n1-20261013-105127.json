@@ -1,0 +1,1754 @@
+{
+  "kind": "nep5-results",
+  "phase": "n1",
+  "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\nep5-results-n1-20261013-105127.json",
+  "started": "2026-10-13T10:51:27.384-04:00",
+  "passes": 3,
+  "records": [
+    {
+      "state": "N1",
+      "pass": 1,
+      "title": "non-elevated add and delete by the account's own standard token against S2",
+      "kind": "n1",
+      "started": "2026-10-13T10:51:28.123-04:00",
+      "clock": "2026-10-13 10:51:28 -04:00",
+      "class": "ok",
+      "reason": "both denied by the engine at the call (add: 0x00000005; delete: 0x00000005)",
+      "steps": {
+        "sweep_before": {
+          "label": "N1-p1-before",
+          "at": "2026-10-13T10:51:28.656-04:00",
+          "clean": true,
+          "stop": false,
+          "unreadable": false,
+          "not_clean": [],
+          "problems": [],
+          "sublayers": {
+            "S1": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S2": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S3": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            }
+          },
+          "provider_present": false,
+          "foreign": [],
+          "export": {
+            "ok": true,
+            "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\exports-20261013-105127\\export-N1-p1-before.xml",
+            "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+            "bytes": 3557094,
+            "hits": {
+              "marker": 0,
+              "srt_win": 0,
+              "provider": 0,
+              "S1": 0,
+              "S2": 0,
+              "S3": 0,
+              "total": 0
+            },
+            "error": null
+          }
+        },
+        "session": {
+          "Ok": true,
+          "Steps": {
+            "task_before": "original",
+            "provision_preconditions": {
+              "Ok": true,
+              "Detail": "spike-provision.ps1 -DryRun exit 0; tail: venv python           : C:\\Users\\_OPERATOR_\\BlarAI\\.venv-2026.4\\Scripts\\python.exe | venv base interpreter : C:\\Users\\_OPERATOR_\\AppData\\Local\\Programs\\Python\\Python311 | model dir             : B:\\models\\Qwen3.5-4B-int8-ov | elevated now          : True (-Apply needs it; -DryRun does not) | free RAM now          : 19.3 GB of 31.3 GB (the 4B load needs ~10 GB In-Use; the spike refuses below 14 GB free) | task already present  : True | C:\\blarai-spike exists: True | DRY RUN complete; preconditions hold. Nothing was changed."
+            },
+            "probe_script": {
+              "Ok": true,
+              "Reason": "copied to C:\\blarai-spike\\bin\\spike-nep5-connect-probe.ps1"
+            },
+            "password": {
+              "ok": true,
+              "reason": "a fresh session password was set (held in memory only)",
+              "changed": true
+            }
+          },
+          "Reason": "probe installed, session password set",
+          "OwnsRecord": true
+        },
+        "add": {
+          "Ok": true,
+          "Refused": false,
+          "Added": true,
+          "Stop": false,
+          "Reason": "added",
+          "Attempts": [],
+          "At": "2026-10-13T10:51:32.285-04:00"
+        },
+        "n1_add": {
+          "class": "denied",
+          "code": "0x00000005",
+          "valid": true,
+          "problems": [],
+          "direct": {
+            "op": "add",
+            "phase": "call",
+            "rc_hex": "0x00000005",
+            "verdict": "denied",
+            "error": null
+          },
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          },
+          "filter_present_after": false
+        },
+        "n1_delete": {
+          "class": "denied",
+          "code": "0x00000005",
+          "valid": true,
+          "problems": [],
+          "direct": {
+            "op": "delete",
+            "phase": "call",
+            "rc_hex": "0x00000005",
+            "verdict": "denied",
+            "error": null
+          },
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          },
+          "filter_still_present": true
+        },
+        "session_exit": {
+          "Ok": true,
+          "TaskRestored": true,
+          "RestoreWhy": "",
+          "TaskNow": "original",
+          "DefinitionMatches": true,
+          "Reprovision": {
+            "Ok": true,
+            "ExitCode": 0,
+            "TimedOut": false,
+            "Detail": "spike-provision.ps1 -Apply -ForceNewPassword exit 0; tail: [spike-provision] 5/7 files into bin | [ok] copied spike-run-test.ps1 | [ok] copied spike_model.py | [ok] generated spike-config.json | [spike-provision] 6/7 scheduled task (no trigger; credential vaulted) | [ok] registered \\BlarAI\\BlarAI-Spike-Model as blarai-spike (RunLevel Limited, no trigger) | [spike-provision] 7/7 done | PROVISION complete. Next: spike-wfp.ps1 -DryRun, then -TestA, then -TestB (see README.md). Rollback: spike-cleanup.ps1.",
+            "Manual": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\ProgramData\\BlarAI\\trackb-live\\spike-provision.ps1\" -Apply -ForceNewPassword   (from an elevated prompt)"
+          },
+          "StartedInOriginalForm": {
+            "Ok": true,
+            "Detail": "the restored task started as the account and returned a valid result"
+          },
+          "Files": {
+            "Ok": true,
+            "Left": []
+          },
+          "At": "2026-10-13T10:51:54.222-04:00"
+        },
+        "removal": {
+          "ok": true,
+          "steps": [
+            {
+              "step": "filter",
+              "via": "harness",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+              "status": "deleted"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0002",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0003",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0004",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0005",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0006",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0021",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0011",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0012",
+              "status": "not_found"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+              "status": "deleted"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+              "status": "deleted"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+              "status": "deleted"
+            },
+            {
+              "step": "provider",
+              "via": "engine",
+              "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96360",
+              "status": "deleted"
+            }
+          ],
+          "errors": []
+        },
+        "sweep_after": {
+          "label": "N1-p1-after",
+          "at": "2026-10-13T10:51:56.529-04:00",
+          "clean": true,
+          "stop": false,
+          "unreadable": false,
+          "not_clean": [],
+          "problems": [],
+          "sublayers": {
+            "S1": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S2": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S3": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            }
+          },
+          "provider_present": false,
+          "foreign": [],
+          "export": {
+            "ok": true,
+            "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\exports-20261013-105127\\export-N1-p1-after.xml",
+            "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+            "bytes": 3557094,
+            "hits": {
+              "marker": 0,
+              "srt_win": 0,
+              "provider": 0,
+              "S1": 0,
+              "S2": 0,
+              "S3": 0,
+              "total": 0
+            },
+            "error": null
+          }
+        },
+        "watchdog": {
+          "connects": 1,
+          "failures": 0,
+          "max_consecutive_failures": 0,
+          "aborted": false,
+          "failure_events": []
+        }
+      },
+      "commands": [
+        {
+          "at": "2026-10-13T10:51:28.129-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:28.199-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:28.271-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:28.339-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:54.225-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:54.300-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":1,\"exit\":0,\"filters\":[{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"}],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:54.375-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:54.444-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":1,\"exit\":0,\"filters\":[{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"}],\"ok\":true,\"scanned\":2992,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:54.539-04:00",
+          "argv": [
+            "delete-filter",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+            "--key",
+            "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"command\":\"delete-filter\",\"deleted_filter\":{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"},\"exit\":0,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:54.821-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":true,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:55.087-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":false,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:55.371-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":true,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:55.647-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:55.716-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:55.795-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:55.873-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:55.981-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:56.085-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:56.166-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:56.241-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        }
+      ],
+      "summary": "N1: add=denied (0x00000005); delete=denied (0x00000005)",
+      "finished": "2026-10-13T10:51:56.535-04:00"
+    },
+    {
+      "state": "N1",
+      "pass": 2,
+      "title": "non-elevated add and delete by the account's own standard token against S2",
+      "kind": "n1",
+      "started": "2026-10-13T10:51:56.547-04:00",
+      "clock": "2026-10-13 10:51:56 -04:00",
+      "class": "ok",
+      "reason": "both denied by the engine at the call (add: 0x00000005; delete: 0x00000005)",
+      "steps": {
+        "sweep_before": {
+          "label": "N1-p2-before",
+          "at": "2026-10-13T10:51:57.053-04:00",
+          "clean": true,
+          "stop": false,
+          "unreadable": false,
+          "not_clean": [],
+          "problems": [],
+          "sublayers": {
+            "S1": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S2": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S3": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            }
+          },
+          "provider_present": false,
+          "foreign": [],
+          "export": {
+            "ok": true,
+            "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\exports-20261013-105127\\export-N1-p2-before.xml",
+            "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+            "bytes": 3557094,
+            "hits": {
+              "marker": 0,
+              "srt_win": 0,
+              "provider": 0,
+              "S1": 0,
+              "S2": 0,
+              "S3": 0,
+              "total": 0
+            },
+            "error": null
+          }
+        },
+        "session": {
+          "Ok": true,
+          "Steps": {
+            "task_before": "original",
+            "provision_preconditions": {
+              "Ok": true,
+              "Detail": "spike-provision.ps1 -DryRun exit 0; tail: venv python           : C:\\Users\\_OPERATOR_\\BlarAI\\.venv-2026.4\\Scripts\\python.exe | venv base interpreter : C:\\Users\\_OPERATOR_\\AppData\\Local\\Programs\\Python\\Python311 | model dir             : B:\\models\\Qwen3.5-4B-int8-ov | elevated now          : True (-Apply needs it; -DryRun does not) | free RAM now          : 19.2 GB of 31.3 GB (the 4B load needs ~10 GB In-Use; the spike refuses below 14 GB free) | task already present  : True | C:\\blarai-spike exists: True | DRY RUN complete; preconditions hold. Nothing was changed."
+            },
+            "probe_script": {
+              "Ok": true,
+              "Reason": "copied to C:\\blarai-spike\\bin\\spike-nep5-connect-probe.ps1"
+            },
+            "password": {
+              "ok": true,
+              "reason": "a fresh session password was set (held in memory only)",
+              "changed": true
+            }
+          },
+          "Reason": "probe installed, session password set",
+          "OwnsRecord": true
+        },
+        "add": {
+          "Ok": true,
+          "Refused": false,
+          "Added": true,
+          "Stop": false,
+          "Reason": "added",
+          "Attempts": [],
+          "At": "2026-10-13T10:52:00.059-04:00"
+        },
+        "n1_add": {
+          "class": "denied",
+          "code": "0x00000005",
+          "valid": true,
+          "problems": [],
+          "direct": {
+            "op": "add",
+            "phase": "call",
+            "rc_hex": "0x00000005",
+            "verdict": "denied",
+            "error": null
+          },
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          },
+          "filter_present_after": false
+        },
+        "n1_delete": {
+          "class": "denied",
+          "code": "0x00000005",
+          "valid": true,
+          "problems": [],
+          "direct": {
+            "op": "delete",
+            "phase": "call",
+            "rc_hex": "0x00000005",
+            "verdict": "denied",
+            "error": null
+          },
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          },
+          "filter_still_present": true
+        },
+        "session_exit": {
+          "Ok": true,
+          "TaskRestored": true,
+          "RestoreWhy": "",
+          "TaskNow": "original",
+          "DefinitionMatches": true,
+          "Reprovision": {
+            "Ok": true,
+            "ExitCode": 0,
+            "TimedOut": false,
+            "Detail": "spike-provision.ps1 -Apply -ForceNewPassword exit 0; tail: [spike-provision] 5/7 files into bin | [ok] copied spike-run-test.ps1 | [ok] copied spike_model.py | [ok] generated spike-config.json | [spike-provision] 6/7 scheduled task (no trigger; credential vaulted) | [ok] registered \\BlarAI\\BlarAI-Spike-Model as blarai-spike (RunLevel Limited, no trigger) | [spike-provision] 7/7 done | PROVISION complete. Next: spike-wfp.ps1 -DryRun, then -TestA, then -TestB (see README.md). Rollback: spike-cleanup.ps1.",
+            "Manual": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\ProgramData\\BlarAI\\trackb-live\\spike-provision.ps1\" -Apply -ForceNewPassword   (from an elevated prompt)"
+          },
+          "StartedInOriginalForm": {
+            "Ok": true,
+            "Detail": "the restored task started as the account and returned a valid result"
+          },
+          "Files": {
+            "Ok": true,
+            "Left": []
+          },
+          "At": "2026-10-13T10:52:21.982-04:00"
+        },
+        "removal": {
+          "ok": true,
+          "steps": [
+            {
+              "step": "filter",
+              "via": "harness",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+              "status": "deleted"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0002",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0003",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0004",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0005",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0006",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0021",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0011",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0012",
+              "status": "not_found"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+              "status": "deleted"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+              "status": "deleted"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+              "status": "deleted"
+            },
+            {
+              "step": "provider",
+              "via": "engine",
+              "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96360",
+              "status": "deleted"
+            }
+          ],
+          "errors": []
+        },
+        "sweep_after": {
+          "label": "N1-p2-after",
+          "at": "2026-10-13T10:52:24.173-04:00",
+          "clean": true,
+          "stop": false,
+          "unreadable": false,
+          "not_clean": [],
+          "problems": [],
+          "sublayers": {
+            "S1": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S2": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S3": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            }
+          },
+          "provider_present": false,
+          "foreign": [],
+          "export": {
+            "ok": true,
+            "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\exports-20261013-105127\\export-N1-p2-after.xml",
+            "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+            "bytes": 3557094,
+            "hits": {
+              "marker": 0,
+              "srt_win": 0,
+              "provider": 0,
+              "S1": 0,
+              "S2": 0,
+              "S3": 0,
+              "total": 0
+            },
+            "error": null
+          }
+        },
+        "watchdog": {
+          "connects": 2,
+          "failures": 0,
+          "max_consecutive_failures": 0,
+          "aborted": false,
+          "failure_events": []
+        }
+      },
+      "commands": [
+        {
+          "at": "2026-10-13T10:51:56.548-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:56.623-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:56.695-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:51:56.767-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:21.982-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:22.064-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":1,\"exit\":0,\"filters\":[{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"}],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:22.133-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:22.207-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":1,\"exit\":0,\"filters\":[{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"}],\"ok\":true,\"scanned\":2992,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:22.295-04:00",
+          "argv": [
+            "delete-filter",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+            "--key",
+            "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"command\":\"delete-filter\",\"deleted_filter\":{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"},\"exit\":0,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:22.575-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":true,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:22.841-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":false,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.127-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":true,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.406-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.479-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.548-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.616-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.703-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.770-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.837-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:23.909-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        }
+      ],
+      "summary": "N1: add=denied (0x00000005); delete=denied (0x00000005)",
+      "finished": "2026-10-13T10:52:24.174-04:00"
+    },
+    {
+      "state": "N1",
+      "pass": 3,
+      "title": "non-elevated add and delete by the account's own standard token against S2",
+      "kind": "n1",
+      "started": "2026-10-13T10:52:24.193-04:00",
+      "clock": "2026-10-13 10:52:24 -04:00",
+      "class": "ok",
+      "reason": "both denied by the engine at the call (add: 0x00000005; delete: 0x00000005)",
+      "steps": {
+        "sweep_before": {
+          "label": "N1-p3-before",
+          "at": "2026-10-13T10:52:24.681-04:00",
+          "clean": true,
+          "stop": false,
+          "unreadable": false,
+          "not_clean": [],
+          "problems": [],
+          "sublayers": {
+            "S1": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S2": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S3": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            }
+          },
+          "provider_present": false,
+          "foreign": [],
+          "export": {
+            "ok": true,
+            "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\exports-20261013-105127\\export-N1-p3-before.xml",
+            "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+            "bytes": 3557094,
+            "hits": {
+              "marker": 0,
+              "srt_win": 0,
+              "provider": 0,
+              "S1": 0,
+              "S2": 0,
+              "S3": 0,
+              "total": 0
+            },
+            "error": null
+          }
+        },
+        "session": {
+          "Ok": true,
+          "Steps": {
+            "task_before": "original",
+            "provision_preconditions": {
+              "Ok": true,
+              "Detail": "spike-provision.ps1 -DryRun exit 0; tail: venv python           : C:\\Users\\_OPERATOR_\\BlarAI\\.venv-2026.4\\Scripts\\python.exe | venv base interpreter : C:\\Users\\_OPERATOR_\\AppData\\Local\\Programs\\Python\\Python311 | model dir             : B:\\models\\Qwen3.5-4B-int8-ov | elevated now          : True (-Apply needs it; -DryRun does not) | free RAM now          : 19.2 GB of 31.3 GB (the 4B load needs ~10 GB In-Use; the spike refuses below 14 GB free) | task already present  : True | C:\\blarai-spike exists: True | DRY RUN complete; preconditions hold. Nothing was changed."
+            },
+            "probe_script": {
+              "Ok": true,
+              "Reason": "copied to C:\\blarai-spike\\bin\\spike-nep5-connect-probe.ps1"
+            },
+            "password": {
+              "ok": true,
+              "reason": "a fresh session password was set (held in memory only)",
+              "changed": true
+            }
+          },
+          "Reason": "probe installed, session password set",
+          "OwnsRecord": true
+        },
+        "add": {
+          "Ok": true,
+          "Refused": false,
+          "Added": true,
+          "Stop": false,
+          "Reason": "added",
+          "Attempts": [],
+          "At": "2026-10-13T10:52:28.122-04:00"
+        },
+        "n1_add": {
+          "class": "denied",
+          "code": "0x00000005",
+          "valid": true,
+          "problems": [],
+          "direct": {
+            "op": "add",
+            "phase": "call",
+            "rc_hex": "0x00000005",
+            "verdict": "denied",
+            "error": null
+          },
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          },
+          "filter_present_after": false
+        },
+        "n1_delete": {
+          "class": "denied",
+          "code": "0x00000005",
+          "valid": true,
+          "problems": [],
+          "direct": {
+            "op": "delete",
+            "phase": "call",
+            "rc_hex": "0x00000005",
+            "verdict": "denied",
+            "error": null
+          },
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          },
+          "filter_still_present": true
+        },
+        "session_exit": {
+          "Ok": true,
+          "TaskRestored": true,
+          "RestoreWhy": "",
+          "TaskNow": "original",
+          "DefinitionMatches": true,
+          "Reprovision": {
+            "Ok": true,
+            "ExitCode": 0,
+            "TimedOut": false,
+            "Detail": "spike-provision.ps1 -Apply -ForceNewPassword exit 0; tail: [spike-provision] 5/7 files into bin | [ok] copied spike-run-test.ps1 | [ok] copied spike_model.py | [ok] generated spike-config.json | [spike-provision] 6/7 scheduled task (no trigger; credential vaulted) | [ok] registered \\BlarAI\\BlarAI-Spike-Model as blarai-spike (RunLevel Limited, no trigger) | [spike-provision] 7/7 done | PROVISION complete. Next: spike-wfp.ps1 -DryRun, then -TestA, then -TestB (see README.md). Rollback: spike-cleanup.ps1.",
+            "Manual": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\ProgramData\\BlarAI\\trackb-live\\spike-provision.ps1\" -Apply -ForceNewPassword   (from an elevated prompt)"
+          },
+          "StartedInOriginalForm": {
+            "Ok": true,
+            "Detail": "the restored task started as the account and returned a valid result"
+          },
+          "Files": {
+            "Ok": true,
+            "Left": []
+          },
+          "At": "2026-10-13T10:52:49.046-04:00"
+        },
+        "removal": {
+          "ok": true,
+          "steps": [
+            {
+              "step": "filter",
+              "via": "harness",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+              "status": "deleted"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0002",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0003",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0004",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0005",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0006",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0021",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0011",
+              "status": "not_found"
+            },
+            {
+              "step": "filter",
+              "via": "engine-fixed-key",
+              "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0012",
+              "status": "not_found"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+              "status": "deleted"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+              "status": "deleted"
+            },
+            {
+              "step": "sublayer",
+              "via": "harness",
+              "key": "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+              "status": "deleted"
+            },
+            {
+              "step": "provider",
+              "via": "engine",
+              "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96360",
+              "status": "deleted"
+            }
+          ],
+          "errors": []
+        },
+        "sweep_after": {
+          "label": "N1-p3-after",
+          "at": "2026-10-13T10:52:51.187-04:00",
+          "clean": true,
+          "stop": false,
+          "unreadable": false,
+          "not_clean": [],
+          "problems": [],
+          "sublayers": {
+            "S1": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S2": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            },
+            "S3": {
+              "filter_keys": [],
+              "present": false,
+              "readable": true
+            }
+          },
+          "provider_present": false,
+          "foreign": [],
+          "export": {
+            "ok": true,
+            "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\exports-20261013-105127\\export-N1-p3-after.xml",
+            "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+            "bytes": 3557094,
+            "hits": {
+              "marker": 0,
+              "srt_win": 0,
+              "provider": 0,
+              "S1": 0,
+              "S2": 0,
+              "S3": 0,
+              "total": 0
+            },
+            "error": null
+          }
+        },
+        "watchdog": {
+          "connects": 1,
+          "failures": 0,
+          "max_consecutive_failures": 0,
+          "aborted": false,
+          "failure_events": []
+        }
+      },
+      "commands": [
+        {
+          "at": "2026-10-13T10:52:24.194-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:24.271-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:24.347-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:24.415-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:49.046-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:49.118-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":1,\"exit\":0,\"filters\":[{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"}],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:49.184-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:49.255-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":1,\"exit\":0,\"filters\":[{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"}],\"ok\":true,\"scanned\":2992,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:49.343-04:00",
+          "argv": [
+            "delete-filter",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+            "--key",
+            "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"command\":\"delete-filter\",\"deleted_filter\":{\"action\":\"block\",\"has_user_condition\":true,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"kind\":null,\"layer\":\"ale_auth_connect_v4\",\"name\":\"BlarAI #1763 s2-block-v4\",\"num_conditions\":1,\"port_range\":null,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"tool\":null,\"user_sid\":null,\"weight\":\"0x0000000000001000\"},\"exit\":0,\"key\":\"f1763001-0000-4d8e-9a31-2b6d4c8e0001\",\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:49.612-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":true,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:49.881-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":false,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.138-04:00",
+          "argv": [
+            "delete-sublayer",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+            "--live",
+            "C:\\ProgramData\\BlarAI\\trackb-live\\harness-live-proof-1763.json"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"absent_after\":true,\"already_absent\":true,\"command\":\"delete-sublayer\",\"exit\":0,\"extra\":null,\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.397-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.473-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.539-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.607-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.696-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "c971a69f-d6ab-4885-9b49-506d8aa51c86"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"c971a69f-d6ab-4885-9b49-506d8aa51c86\",\"sublayer_label\":\"S1\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.765-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"3e29ae7e-fd9f-413a-8b8d-da9bd3a96359\",\"sublayer_label\":\"S2\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.835-04:00",
+          "argv": [
+            "enum",
+            "--sublayer",
+            "6cf901ba-a6cd-4846-81a5-2598c55bdef5"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"sublayer\":\"6cf901ba-a6cd-4846-81a5-2598c55bdef5\",\"sublayer_label\":\"S3\"}\n",
+          "stderr": ""
+        },
+        {
+          "at": "2026-10-13T10:52:50.905-04:00",
+          "argv": [
+            "enum",
+            "--all-ours"
+          ],
+          "exit": 0,
+          "outcome": "ok",
+          "stdout": "{\"command\":\"enum_all_ours\",\"count\":0,\"exit\":0,\"filters\":[],\"ok\":true,\"scanned\":2991,\"stop_count\":0,\"stop_filters\":[]}\n",
+          "stderr": ""
+        }
+      ],
+      "summary": "N1: add=denied (0x00000005); delete=denied (0x00000005)",
+      "finished": "2026-10-13T10:52:51.187-04:00"
+    }
+  ],
+  "finished": "2026-10-13T10:52:51.211-04:00",
+  "exit_code": 0,
+  "pre_cleanup": {
+    "Ok": true,
+    "Class": "ok",
+    "Reason": "nothing to remove: the machine reads clean",
+    "Steps": {
+      "sweep_before": {
+        "label": "pre-clean-before",
+        "at": "2026-10-13T10:51:28.102-04:00",
+        "clean": true,
+        "stop": false,
+        "unreadable": false,
+        "not_clean": [],
+        "problems": [],
+        "sublayers": {
+          "S1": {
+            "filter_keys": [],
+            "present": false,
+            "readable": true
+          },
+          "S2": {
+            "filter_keys": [],
+            "present": false,
+            "readable": true
+          },
+          "S3": {
+            "filter_keys": [],
+            "present": false,
+            "readable": true
+          }
+        },
+        "provider_present": false,
+        "foreign": [],
+        "export": {
+          "ok": true,
+          "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run-n1\\exports-20261013-105127\\export-pre-clean-before.xml",
+          "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+          "bytes": 3557094,
+          "hits": {
+            "marker": 0,
+            "srt_win": 0,
+            "provider": 0,
+            "S1": 0,
+            "S2": 0,
+            "S3": 0,
+            "total": 0
+          },
+          "error": null
+        }
+      }
+    }
+  }
+}

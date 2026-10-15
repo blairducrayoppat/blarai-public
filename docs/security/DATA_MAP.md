@@ -8,6 +8,15 @@ direct disk inspection (`Get-ChildItem`, `icacls`, SID resolution) on the dev bo
 **Air-gap note:** nothing in this map is network-facing. Every certificate/seam below is for the
 *internal* host-loopback / vsock service mesh. The air-gap stays welded; this is an inventory, not a change.
 
+> **DATED HISTORY (authored 2026-06-08; last revised 2026-07-03, commit `bcbad774`).** The "Air-gap
+> note" above and the inventory below describe the posture of 2026-06-08 to 2026-06-10 (rows 8 to 10 and the #637 updates were added on 2026-06-09 and 2026-06-10). **Status as of 2026-10-11:** the air-gap is no longer fully welded. The model-callable
+> `web_search` scope has been live since 2026-07-02 (git `9a7eed8c`, `0f578d83`); the certificates and
+> stores inventoried here are still the internal loopback and vsock mesh, and this map was not
+> re-surveyed for the external-egress scope. For what is allowed out today, read
+> `DeterministicPolicyChecker._EGRESS_ALLOWLIST` in `services/policy_agent/src/gpu_inference.py`, the
+> status block at the top of `docs/adrs/ADR-027-Egress-Policy-Network-Facing.md`, and
+> `docs/runbooks/web_search_go_live.md`.
+
 > **How to read the ACL shorthand** (Windows `icacls`): `F` = full control, `RX` = read+execute,
 > `W` = write, `M` = modify. `(I)` = **inherited** from the parent folder (not set explicitly on the
 > file). `(OI)(CI)` = the entry flows down to files/subfolders. A principal like `BUILTIN\Administrators`
@@ -181,7 +190,7 @@ There is **no cloud sync, no vector DB service, no second copy** — single file
 
 | Object | Principals with access | Inherited? | Notes |
 |---|---|---|---|
-| **Runtime data dir** `%LOCALAPPDATA%\BlarAI\` | `SYSTEM` (F), `BUILTIN\Administrators` (F), `NORTHSTAR100\mrbla` (F) | yes | **Clean** — exactly the three expected principals |
+| **Runtime data dir** `%LOCALAPPDATA%\BlarAI\` | `SYSTEM` (F), `BUILTIN\Administrators` (F), `__HOST__\mrbla` (F) | yes | **Clean** — exactly the three expected principals |
 | `dek_keystore.json` (root key) | same three (F) | yes | Readable by any local admin — but contents are TPM-wrapped (file access ≠ key access) |
 | `sessions.db` (history) | same three (F) | yes | Clean |
 | `substrate.db` (memory) | same three (F) | yes | Clean |
@@ -194,7 +203,7 @@ DEK), not on the file permissions, which are permissive-to-admins by default.
 
 ### 4b. Process identity (who runs the code that opens these files)
 
-- **Host-mode (default topology):** services run as **the logged-in Windows user** (`NORTHSTAR100\mrbla`).
+- **Host-mode (default topology):** services run as **the logged-in Windows user** (`__HOST__\mrbla`).
 - **Launcher** runs **elevated (Administrator)** — `launcher/__main__.py:726`.
 - **The UI child process is deliberately de-elevated to Medium integrity** (drops admin via
   `CreateRestrictedToken` + `CreateProcessWithTokenW`, `launcher/process_launch.py:184-237`, ADR-019) so the
@@ -224,8 +233,8 @@ Two consequences:
    compromised-admin scenario it is not a real confidentiality boundary. The **encryption layer is what
    actually protects the data** — the ACLs do not.
 2. **Orphaned foreign principal on the cert keys:** the `certs\` tree (private keys included) carries an ACL
-   entry for a SID whose domain (`76345465-2051216645-4251589009`) is **not this machine** (this box is
-   `4125655822-2918122917-2734753367`; `mrbla` is `…-1001`). It **does not resolve** to any live account, so
+   entry for a SID whose domain (`76345465-2051216645-4251589009`) is **not this machine** (this box's own domain is
+   written in this repository only as the placeholder `1000000001-1000000002-1000000003`, #1765; `mrbla` is `…-1001`). It **does not resolve** to any live account, so
    it grants nothing today — but it has `RX,W` and is an ACL-hygiene defect carried in from the repo's
    history. It is **absent** from the runtime data dir (which is clean). *(REMEDIATED by #637, 2026-06-09:
    `cert_provisioning.py` now strips orphaned foreign SIDs from `certs\` at every boot — §7 item 2. The next

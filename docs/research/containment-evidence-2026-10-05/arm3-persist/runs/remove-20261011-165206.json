@@ -1,0 +1,62 @@
+{
+  "kind": "remove-by-key",
+  "at": "2026-10-11T16:52:06.941-04:00",
+  "state_before": {
+    "State": "ABSENT",
+    "Present": [],
+    "Missing": [
+      "filter:block-account-v4",
+      "filter:block-account-v6",
+      "sublayer:sublayer",
+      "provider:provider"
+    ],
+    "AllPersistent": false,
+    "Flags": {},
+    "Error": null
+  },
+  "removal": {
+    "Ok": true,
+    "Rows": [
+      {
+        "kind": "filter",
+        "key": "f1300003-0000-4d8e-9a31-2b6d4c8e3f21",
+        "name": "block-account-v4",
+        "status": "not_found"
+      },
+      {
+        "kind": "filter",
+        "key": "f1300004-0000-4d8e-9a31-2b6d4c8e3f22",
+        "name": "block-account-v6",
+        "status": "not_found"
+      },
+      {
+        "kind": "sublayer",
+        "key": "7e1f6a10-5c0b-4d8e-9a31-2b6d4c8e3f02",
+        "name": "sublayer",
+        "status": "not_found"
+      },
+      {
+        "kind": "provider",
+        "key": "7e1f6a10-5c0b-4d8e-9a31-2b6d4c8e3f01",
+        "name": "provider",
+        "status": "not_found"
+      }
+    ],
+    "Errors": [],
+    "StateAfter": {
+      "State": "ABSENT",
+      "Present": [],
+      "Missing": [
+        "filter:block-account-v4",
+        "filter:block-account-v6",
+        "sublayer:sublayer",
+        "provider:provider"
+      ],
+      "AllPersistent": false,
+      "Flags": {},
+      "Error": null
+    },
+    "At": "2026-10-11T16:52:06.941-04:00"
+  },
+  "unregistered_task": null
+}

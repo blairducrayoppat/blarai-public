@@ -1,0 +1,66 @@
+{
+ "runs": [
+  {
+   "tag": "E0-20261011T110518-r1",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E0-20261011T110521-r2",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E0-20261011T110523-r3",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E1-20261011T110525-r1",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E1-20261011T110528-r2",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E1-20261011T110532-r3",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E2-20261011T110536-r1",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E2-20261011T110546-r2",
+   "rc": 0,
+   "changed": []
+  },
+  {
+   "tag": "E2-20261011T110557-r3",
+   "rc": 0,
+   "changed": []
+  }
+ ],
+ "final_snapshot": {
+  "acl": {
+   "C:\\blarai-spike-1740": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\payload": "f02e93e85aa5019d",
+   "C:\\blarai-spike-1740\\worktree": "eed43a1d6e9b65c0",
+   "C:\\blarai-spike-1740\\leak": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\instrument": "7c6b1fa6e78148c3",
+   "C:\\blarai-spike-1740\\toolchain\\Python314\\python.exe": "ca7c61792557ae4f",
+   "C:\\blarai-spike-1740\\toolchain\\Git\\cmd\\git.exe": "ca7c61792557ae4f"
+  },
+  "process_sandboxes": [
+   "<absent>"
+  ],
+  "appcontainer_mappings": 217,
+  "state_dir": []
+ }
+}

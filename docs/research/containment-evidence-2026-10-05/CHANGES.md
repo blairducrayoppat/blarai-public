@@ -12,6 +12,10 @@ account writes, private temp files, a password self-check; about 16:44 to 16:50)
 - `confined-model-spike/post-run-hardened/`: the current versions. The table below gives the line changes between the two sets.
 - `arm1-permit/scripts/`: the scripts as changed for arm 1 (the permit filter's role; the account as loopback client), beside that
   arm's results in `arm1-permit/runs/`. The table gives their line changes against the hardened set.
+- `arm2-hold/scripts/`: the scripts as changed for arm 2 (the long hold), beside that arm's results in `arm2-hold/runs/` (result JSON, the per-sample
+  line files and the self-test results; the raw filter exports are not bundled). The table gives their line changes against the arm 1 set.
+- `arm3-persist/scripts/`: the arm 3 scripts (a persistent filter set, a restart, fail-closed on absence), beside `arm3-persist/DESIGN.md` (written before
+  them) and that arm's results in `arm3-persist/runs/`. Files that exist in the arm 2 folder are compared with it; the rest are new.
 
 Provenance and limits of the as-run set: it was recovered from the first bundle commit `9adcafc4` (committed 16:36, after the
 runs and before the hardening). The unsanitised originals were overwritten by the hardening: in the research-data folder the
@@ -37,7 +41,7 @@ For the other scripts there is no timestamp evidence of edits between provisioni
 - `README.md`, `CHANGES.md` and `make_changes.py` are authored here, not copied.
 - The counts below are of the placeholders present in each bundled file; the test recounts them.
 
-| File | Kind | User-name | Machine-name | SID-domain | Model-text cut | Hardened vs as-run (arm 1 vs hardened) |
+| File | Kind | User-name | Machine-name | SID-domain | Model-text cut | Hardened vs as-run (arm 1 vs hardened, arm 2 vs arm 1, arm 3 vs arm 2) |
 |---|---|---|---|---|---|---|
 | `arm1-permit/runs/server/server-testc-off-20261009-180836.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
 | `arm1-permit/runs/server/server-testc-off-20261009-180943.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
@@ -59,6 +63,42 @@ For the other scripts there is no timestamp evidence of edits between provisioni
 | `arm1-permit/scripts/spike-run-test.ps1` | text copy | 1 | 0 | 0 | 0 | arm 1 vs hardened: +91/-26 lines |
 | `arm1-permit/scripts/spike-wfp.ps1` | text copy | 3 | 0 | 0 | 0 | arm 1 vs hardened: +356/-13 lines |
 | `arm1-permit/scripts/spike_model.py` | text copy | 0 | 0 | 0 | 0 | arm 1 vs hardened: +24/-5 lines |
+| `arm2-hold/runs/hold-on-20261011-144844-samples.txt` | text copy | 0 | 0 | 0 | 0 | - |
+| `arm2-hold/runs/hold-on-20261011-144844.json` | re-serialised JSON | 4 | 0 | 4 | 0 | - |
+| `arm2-hold/runs/wrapper-arm2-log.txt` | text copy | 1 | 0 | 0 | 0 | - |
+| `arm2-hold/scripts/Convert-ToLive.ps1` | text copy | 5 | 0 | 0 | 0 | arm 2 (new file) |
+| `arm2-hold/scripts/README.md` | text copy | 1 | 0 | 0 | 0 | arm 2 vs arm 1: +49/-29 lines |
+| `arm2-hold/scripts/Run-Arm2-AsAdmin.cmd` | text copy | 0 | 0 | 0 | 0 | arm 2 (new file) |
+| `arm2-hold/scripts/spike-lib.ps1` | text copy | 6 | 0 | 0 | 0 | arm 2 vs arm 1: +4/-2 lines |
+| `arm2-hold/scripts/spike-run-test.ps1` | text copy | 1 | 0 | 0 | 0 | arm 2 vs arm 1: +9/-5 lines |
+| `arm2-hold/scripts/spike-wfp.ps1` | text copy | 4 | 0 | 0 | 0 | arm 2 vs arm 1: +486/-6 lines |
+| `arm2-hold/scripts/Start-ElevatedOnce.ps1` | text copy | 0 | 0 | 0 | 0 | arm 2 (new file) |
+| `arm2-hold/selftest/selftest-results-20261011.txt` | text copy | 0 | 0 | 0 | 0 | - |
+| `arm3-persist/DESIGN.md` | text copy | 0 | 0 | 0 | 0 | - |
+| `arm3-persist/runs/arm3a-20261011-165130.json` | re-serialised JSON | 4 | 0 | 5 | 0 | - |
+| `arm3-persist/runs/arm3b-arm-refused-20261012-143857.json` | re-serialised JSON | 16 | 0 | 16 | 0 | - |
+| `arm3-persist/runs/arm3b-armed-20261012-144923.json` | re-serialised JSON | 0 | 0 | 1 | 0 | - |
+| `arm3-persist/runs/arm3b-post-reboot-attempts-20261012.json` | re-serialised JSON | 0 | 0 | 0 | 0 | - |
+| `arm3-persist/runs/arm3b-post-reboot-result-20261012-150113.json` | re-serialised JSON | 0 | 0 | 3 | 0 | - |
+| `arm3-persist/runs/AS_RUN.md` | text copy | 1 | 0 | 0 | 0 | - |
+| `arm3-persist/runs/post-3a-verification.txt` | text copy | 0 | 0 | 0 | 0 | - |
+| `arm3-persist/runs/post-3b-verification.txt` | text copy | 0 | 0 | 0 | 0 | - |
+| `arm3-persist/runs/remove-20261011-165206.json` | re-serialised JSON | 0 | 0 | 0 | 0 | - |
+| `arm3-persist/runs/wrapper-arm3a-log.txt` | text copy | 1 | 0 | 0 | 0 | - |
+| `arm3-persist/runs/wrapper-arm3b-attempts.txt` | text copy | 3 | 0 | 3 | 0 | - |
+| `arm3-persist/scripts/arm3-idle-gate.ps1` | text copy | 0 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/README.md` | text copy | 0 | 0 | 0 | 0 | arm 3 vs arm 2: +65/-48 lines |
+| `arm3-persist/scripts/Run-Arm3a-AsAdmin.cmd` | text copy | 0 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/spike-arm3b-arm.ps1` | text copy | 2 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/spike-arm3b-common.ps1` | text copy | 0 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/spike-arm3b-post-reboot.ps1` | text copy | 1 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/spike-arm3b-veto.ps1` | text copy | 1 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/spike-lib.ps1` | text copy | 6 | 0 | 0 | 0 | arm 3 vs arm 2: identical |
+| `arm3-persist/scripts/spike-persist-lib.ps1` | text copy | 0 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/spike-task-driver.ps1` | text copy | 0 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/spike-wfp-persist.ps1` | text copy | 1 | 0 | 0 | 0 | arm 3 (new file) |
+| `arm3-persist/scripts/Start-ElevatedOnce.ps1` | text copy | 0 | 0 | 0 | 0 | arm 3 vs arm 2: identical |
+| `arm3-persist/selftest/selftest-results-20261011.txt` | text copy | 0 | 0 | 0 | 0 | - |
 | `ARMS_HANDOFF.md` | text copy | 1 | 1 | 0 | 0 | - |
 | `confined-model-spike/as-run/README.md` | text copy | 0 | 0 | 0 | 0 | as-run |
 | `confined-model-spike/as-run/Run-Spike-AsAdmin.cmd` | text copy | 0 | 0 | 0 | 0 | as-run |
@@ -83,6 +123,36 @@ For the other scripts there is no timestamp evidence of edits between provisioni
 | `confined-model-spike/runs/testA-20261005-155954.json` | re-serialised JSON | 18 | 3 | 4 | 2 | - |
 | `confined-model-spike/runs/testB-20261005-160210.json` | re-serialised JSON | 18 | 3 | 6 | 4 | - |
 | `confined-model-spike/spike-state.cleaned.json` | re-serialised JSON | 4 | 0 | 2 | 0 | - |
+| `nep0005-open-questions/harness/build-harness.ps1` | text copy | 2 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/harness/halfset.rs` | text copy | 0 | 0 | 3 | 0 | - |
+| `nep0005-open-questions/harness/README.md` | text copy | 1 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/harness/tests/refusals.ps1` | text copy | 3 | 0 | 1 | 0 | - |
+| `nep0005-open-questions/runs/AS_RUN.md` | text copy | 2 | 1 | 2 | 0 | - |
+| `nep0005-open-questions/runs/exports-manifest.json` | re-serialised JSON | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/runs/halfset-20261013-104631.json` | re-serialised JSON | 0 | 0 | 645 | 0 | - |
+| `nep0005-open-questions/runs/n1-20261013-105127.json` | re-serialised JSON | 6 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/runs/ours-20261013-104930.json` | re-serialised JSON | 0 | 0 | 21 | 0 | - |
+| `nep0005-open-questions/runs/results-summary.json` | re-serialised JSON | 0 | 0 | 7 | 0 | - |
+| `nep0005-open-questions/runs/srtcli-results-summary.json` | re-serialised JSON | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/runs/taskcheck-20261013-104554.json` | re-serialised JSON | 2 | 0 | 1 | 0 | - |
+| `nep0005-open-questions/runs/taskcheck-first-20261013-102658.json` | re-serialised JSON | 2 | 0 | 1 | 0 | - |
+| `nep0005-open-questions/scripts/README.md` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/scripts/spike-nep5-connect-probe.ps1` | text copy | 0 | 0 | 1 | 0 | - |
+| `nep0005-open-questions/scripts/spike-nep5-lib.ps1` | text copy | 0 | 0 | 2 | 0 | - |
+| `nep0005-open-questions/scripts/spike-nep5-matrix.ps1` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/scripts/spike-nep5-run-lib.ps1` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/SPEC.md` | text copy | 1 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/Deploy-Srtcli.ps1` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/Export-SrtcliSummary.ps1` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/fake-srt-win.mjs` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/pr/0001-windows-wfp-status-partial.patch` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/pr/pr-body.md` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/run-verify.mjs` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/status-completeness.patch` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/status-partial-consumer.patch` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/ts-selftest.json` | re-serialised JSON | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/fix/verify-ipv6.patch` | text copy | 0 | 0 | 0 | 0 | - |
+| `nep0005-open-questions/srtcli/srtcli-halfset.ps1` | text copy | 0 | 0 | 0 | 0 | - |
 | `preflight/775-preflight-2026-10-05.md` | text copy | 14 | 1 | 3 | 0 | - |
 | `reviews/code-review-1690-rules-tooling-2026-10-05.md` | text copy | 23 | 0 | 0 | 0 | - |
 | `reviews/code-review-775-fused-leg-2026-10-05.md` | text copy | 5 | 0 | 0 | 0 | - |

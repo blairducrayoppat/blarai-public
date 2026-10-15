@@ -1,0 +1,171 @@
+{
+  "kind": "nep5-results",
+  "phase": "taskcheck",
+  "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run2\\nep5-results-taskcheck-20261013-102658.json",
+  "started": "2026-10-13T10:26:58.381-04:00",
+  "passes": 3,
+  "records": [
+    {
+      "state": "taskcheck",
+      "pass": 1,
+      "started": "2026-10-13T10:26:59.138-04:00",
+      "class": "ok",
+      "reason": "the probe started as the account, returned its token SID and connected to a bound loopback listener; the task was restored and PROVEN: re-provisioned, arguments, definition against the baseline, and the restored task started as the account",
+      "steps": {
+        "session": {
+          "Ok": true,
+          "Steps": {
+            "task_before": "original",
+            "baseline": "recorded in C:\\ProgramData\\BlarAI\\trackb-live\\task-baseline-1763-v2.xml",
+            "provision_preconditions": {
+              "Ok": true,
+              "Detail": "spike-provision.ps1 -DryRun exit 0; tail: venv python           : C:\\Users\\_OPERATOR_\\BlarAI\\.venv-2026.4\\Scripts\\python.exe | venv base interpreter : C:\\Users\\_OPERATOR_\\AppData\\Local\\Programs\\Python\\Python311 | model dir             : B:\\models\\Qwen3.5-4B-int8-ov | elevated now          : True (-Apply needs it; -DryRun does not) | free RAM now          : 19.6 GB of 31.3 GB (the 4B load needs ~10 GB In-Use; the spike refuses below 14 GB free) | task already present  : True | C:\\blarai-spike exists: True | DRY RUN complete; preconditions hold. Nothing was changed."
+            },
+            "probe_script": {
+              "Ok": true,
+              "Reason": "copied to C:\\blarai-spike\\bin\\spike-nep5-connect-probe.ps1"
+            },
+            "password": {
+              "ok": true,
+              "reason": "a fresh session password was set (held in memory only)",
+              "changed": true
+            }
+          },
+          "Reason": "probe installed, session password set",
+          "OwnsRecord": true
+        },
+        "identity": {
+          "started": true,
+          "valid": true,
+          "problems": [],
+          "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1271",
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          }
+        },
+        "connect": {
+          "valid": true,
+          "problems": [],
+          "row": {
+            "family": "v4",
+            "port": 61763,
+            "result": "connected",
+            "win32": 0,
+            "ms": 27,
+            "error": ""
+          },
+          "launch": {
+            "logon_type": "interactive (CreateProcessWithLogonW, LOGON_WITH_PROFILE); NOT the batch logon the existing task uses",
+            "environment_variable_names_supplied": [
+              "APPDATA",
+              "ComSpec",
+              "LOCALAPPDATA",
+              "PATH",
+              "PATHEXT",
+              "PSModulePath",
+              "SystemDrive",
+              "SystemRoot",
+              "TEMP",
+              "TMP",
+              "USERPROFILE",
+              "windir"
+            ],
+            "working_folder": "C:\\blarai-spike\\bin"
+          }
+        },
+        "session_exit": {
+          "Ok": true,
+          "TaskRestored": true,
+          "RestoreWhy": "",
+          "TaskNow": "original",
+          "DefinitionMatches": true,
+          "Reprovision": {
+            "Ok": true,
+            "ExitCode": 0,
+            "TimedOut": false,
+            "Detail": "spike-provision.ps1 -Apply -ForceNewPassword exit 0; tail: [spike-provision] 5/7 files into bin | [ok] copied spike-run-test.ps1 | [ok] copied spike_model.py | [ok] generated spike-config.json | [spike-provision] 6/7 scheduled task (no trigger; credential vaulted) | [ok] registered \\BlarAI\\BlarAI-Spike-Model as blarai-spike (RunLevel Limited, no trigger) | [spike-provision] 7/7 done | PROVISION complete. Next: spike-wfp.ps1 -DryRun, then -TestA, then -TestB (see README.md). Rollback: spike-cleanup.ps1.",
+            "Manual": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\ProgramData\\BlarAI\\trackb-live\\spike-provision.ps1\" -Apply -ForceNewPassword   (from an elevated prompt)"
+          },
+          "StartedInOriginalForm": {
+            "Ok": true,
+            "Detail": "the restored task started as the account and returned a valid result"
+          },
+          "Files": {
+            "Ok": true,
+            "Left": []
+          },
+          "At": "2026-10-13T10:27:27.931-04:00"
+        }
+      },
+      "finished": "2026-10-13T10:27:27.941-04:00"
+    }
+  ],
+  "finished": "2026-10-13T10:27:27.945-04:00",
+  "exit_code": 0,
+  "pre_cleanup": {
+    "Ok": true,
+    "Class": "ok",
+    "Reason": "nothing to remove: the machine reads clean",
+    "Steps": {
+      "sweep_before": {
+        "label": "pre-clean-before",
+        "at": "2026-10-13T10:26:59.126-04:00",
+        "clean": true,
+        "stop": false,
+        "unreadable": false,
+        "not_clean": [],
+        "problems": [],
+        "sublayers": {
+          "S1": {
+            "filter_keys": [],
+            "present": false,
+            "readable": true
+          },
+          "S2": {
+            "filter_keys": [],
+            "present": false,
+            "readable": true
+          },
+          "S3": {
+            "filter_keys": [],
+            "present": false,
+            "readable": true
+          }
+        },
+        "provider_present": false,
+        "foreign": [],
+        "export": {
+          "ok": true,
+          "path": "C:\\ProgramData\\BlarAI\\arm3b-out\\nep5-run2\\exports-20261013-102658\\export-pre-clean-before.xml",
+          "sha256": "2FD651444B67F5DE3592191DAFADEDE2B8E907AFC83FADEB4A0A0622EE48B310",
+          "bytes": 3557094,
+          "hits": {
+            "marker": 0,
+            "srt_win": 0,
+            "provider": 0,
+            "S1": 0,
+            "S2": 0,
+            "S3": 0,
+            "total": 0
+          },
+          "error": null
+        }
+      }
+    }
+  }
+}

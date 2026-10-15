@@ -1,7 +1,7 @@
 {
   "harness": "minp_ab",
   "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
-  "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+  "model_dir": "C:\\Users\\__USER__\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
   "config": {
     "min_ps": [
       0.0,

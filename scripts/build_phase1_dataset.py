@@ -34,6 +34,10 @@ import statistics
 import sys
 from pathlib import Path
 
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+import identity_lock as _il  # noqa: E402
+
 RUN = Path(__file__).resolve().parents[1] / "docs/performance/_run"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -101,8 +105,13 @@ def sanitise_tree(root: Path) -> int:
     """Replace the local user name in paths and the host name in every text file under root."""
     import re
 
-    user = re.compile(r"(Users.{1,4})mrbla", re.I)
-    host = re.compile("NORTHSTAR100", re.I)
+    import getpass
+    import os
+    import platform
+
+    # The operator and host names are read from the machine, never held as literals (gate lock: tests/security/test_no_host_identity_in_tree.py).
+    user = re.compile(r"(Users.{1,4})" + re.escape(os.environ.get("USERNAME") or getpass.getuser()), re.I)
+    host = re.compile(re.escape(os.environ.get("COMPUTERNAME") or platform.node()), re.I)
     changed = 0
     for p in root.rglob("*"):
         if not p.is_file():
@@ -112,6 +121,11 @@ def sanitise_tree(root: Path) -> int:
         except (UnicodeDecodeError, OSError):
             continue
         t2 = host.sub("<host>", user.sub(lambda m: m.group(1) + "<user>", t))
+        hosts, users = _il.find_hits(t2.encode('utf-8', 'surrogatepass'))  # digest recognition: holds under any account
+        for tok in hosts:
+            t2 = re.sub(re.escape(tok.decode()), '<host>', t2, flags=re.I)
+        for tok in users:
+            t2 = re.sub(r'(?<![A-Za-z])' + re.escape(tok.decode()) + r'(?![A-Za-z])', '<user>', t2, flags=re.I)
         if t2 != t:
             p.write_text(t2, encoding="utf-8", newline="")
             changed += 1

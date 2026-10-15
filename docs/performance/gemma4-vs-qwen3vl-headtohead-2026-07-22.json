@@ -130,7 +130,7 @@
     "'EXPERIMENTAL / not fully validated with OpenVINO' status of the Gemma IRs - HF model cards."
   ],
   "artifacts_executed_against": [
-    "C:/Users/mrbla/BlarAI/models/qwen3-vl-8b-instruct/openvino-int4-ov (READ-ONLY, production artefact, unmodified)",
+    "C:/Users/__USER__/BlarAI/models/qwen3-vl-8b-instruct/openvino-int4-ov (READ-ONLY, production artefact, unmodified)",
     "OpenVINO/gemma-4-26b-a4b-it-int4-ov (13.634 GB measured)",
     "OpenVINO/gemma-4-E4B-it-int4-ov (6.016 GB)",
     "subjects: cook_ok.png, cook_broken.png, good2.png, page_error.png, blarai_lighthouse3.png"

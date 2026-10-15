@@ -5,7 +5,7 @@
 
 TimeCreated:        2026-04-25T20:56:05.3787167Z
 EventRecordID:      105994
-Computer:           Northstar100
+Computer:           __HOST__
 
 AppName:            python.exe
 AppVersion:         3.11.9150.1013
@@ -35,7 +35,7 @@ ProcessId:          0x43bc
 #     <EventID>1000</EventID><Level>2</Level><Task>100</Task>
 #     <TimeCreated SystemTime='2026-04-25T20:56:05.3787167Z'/>
 #     <EventRecordID>105994</EventRecordID>
-#     <Computer>Northstar100</Computer>
+#     <Computer>__HOST__</Computer>
 #   </System>
 #   <EventData>
 #     <Data Name='AppName'>python.exe</Data>

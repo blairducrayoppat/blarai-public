@@ -1,0 +1,101 @@
+{
+  "question": "Does a raw Windows Filtering Platform block keyed to a throwaway account SID refuse that account's outbound connect, with and without the loopback permit filter (arm 1), across a 7,200 s hold with Bitdefender running (arm 2), and can a persistent version be added and removed by key (arm 3a)?",
+  "date": "2026-10-11 (arm 1 run 2026-10-09)",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V",
+    "ram_gb": 31.3,
+    "gpu": "Intel Arc 140V (driver 32.0.101.8831)",
+    "os": "Windows 11 Pro 10.0.26200 build 26200.9457 (25H2)",
+    "shell": "elevated Windows PowerShell 5.1.26100.9444",
+    "antivirus": "Bitdefender running (bdagent, bdntwrk, bdredline, bdservicehost, bduserhost)",
+    "wsl2": "installed, distributions stopped"
+  },
+  "software_arm1_only": {
+    "openvino": "2026.4.0-22959",
+    "openvino_genai": "2026.4.0.0-3407",
+    "model": "Qwen3.5-4B INT8 on GPU, operator-run server (spike_model.py serve)"
+  },
+  "method": "Throwaway local account; raw WFP provider/sublayer/filters at ALE_AUTH_CONNECT V4/V6 with a per-SID ALE_USER_ID condition; operator baseline, account baseline (filters absent), filters, account probe, removal verified by key, account run after removal; operator watchdog every 2 s.",
+  "results": {
+    "arm1_permit_on": {
+      "runs": 3,
+      "account_internet_connect": "refused 3 of 3, error 10013, 20-25 ms",
+      "account_loopback_request": "HTTP 200, 32 tokens, 1967-1985 ms (3 of 3)",
+      "filters_stood_seconds": [
+        4.31,
+        4.22,
+        4.24
+      ]
+    },
+    "arm1_permit_off": {
+      "runs": 3,
+      "account_internet_connect": "refused 3 of 3, error 10013, 19-21 ms",
+      "account_loopback_request": "refused 3 of 3 at the socket, error 10013, 36-39 ms",
+      "filters_stood_seconds": [
+        2.91,
+        2.93,
+        2.92
+      ]
+    },
+    "arm2_hold": {
+      "holds": 1,
+      "hold_seconds": 7200,
+      "filters_stood_seconds": 7200.9,
+      "samples": 120,
+      "blocked": 120,
+      "open": 0,
+      "no_result": 0,
+      "error_codes": {
+        "10013": 120
+      },
+      "probe_ms_min": 24,
+      "probe_ms_median": 48,
+      "probe_ms_max": 116,
+      "operator_watchdog_connects": 3421,
+      "operator_watchdog_failures": 0,
+      "max_tick_gap_seconds": 5,
+      "exports": {
+        "start": true,
+        "mid": true,
+        "end": true,
+        "marker_hits_each": 5
+      },
+      "bitdefender_update_signal": "bitdefender_folder_timestamps_changed (weak: five folders had later last-write times at the end than at the start - 14:42 to 16:42 x3, 14:27 to 16:27, 12:42 to 15:42 - start values predate the hold, periodic-looking two-hour spacing, no new process)",
+      "exit_code": 0
+    },
+    "arm3a_persistent": {
+      "runs": 1,
+      "flags_persistent_all_four": true,
+      "objects_existed_seconds": 20.9,
+      "account_under_fence": "refused, error 10013, 82 ms",
+      "gate_refused_when_absent": {
+        "before_add": true,
+        "after_removal": true
+      },
+      "removal_by_key_deleted": 4,
+      "followup_remove_not_found": 4,
+      "dead_man_task": "not registered",
+      "exit_code": 0
+    }
+  },
+  "not_measured": [
+    "IPv6",
+    "UDP",
+    "DNS and other ports",
+    "a restart (arm 3b not run; persistence across a reboot NOT ESTABLISHED)",
+    "a second hold",
+    "a hold across sleep or a Bitdefender engine update",
+    "other antivirus products or drivers",
+    "the real blarai-coder account",
+    "the product model server",
+    "streaming or concurrent clients",
+    "speed of anything under the block",
+    "the dead-man task"
+  ],
+  "replication_note": "Arm 1: six runs within about seven minutes after one restart are a repeat, not independent replications. Arm 2 is one hold; its 120 samples are inside one observation. Arm 3a is one run. No variation across holds, boots or days was measured.",
+  "raw_data": [
+    "docs/research/containment-evidence-2026-10-05/arm1-permit/runs/",
+    "docs/research/containment-evidence-2026-10-05/arm2-hold/runs/",
+    "docs/research/containment-evidence-2026-10-05/arm3-persist/runs/"
+  ]
+}

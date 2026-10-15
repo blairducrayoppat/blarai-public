@@ -1,0 +1,340 @@
+# Self-test results, arm2-hold, 20261011 (re-run after the second independent review: wrapped-script gate, admin-only check hardening, proof checks, restart decision)
+# Each script run with -SelfTest in a fresh host, TEMP redirected to an empty folder, hard time cap, retry once on a startup hang (none occurred in this pass).
+# A self-test calls no WFP API, registers no task and changes no system state. Kept: the lines that name a check and the verdict line.
+# Conditions: one machine, Windows 11 Pro, an elevated session, PowerShell 7 and Windows PowerShell 5.1, other agents running on the machine.
+
+## pwsh spike-wfp.ps1: 106 passed, 0 failed, 0 skipped
+== extraction from the wrapped script ==
+  [PASS] all 7 wrapped functions extracted
+  [PASS] C# source extracted
+  [PASS] the wrapped script was only read (SHA-256 recorded)
+  [PASS] the WFP C# compiles in-process
+  [PASS] SDDL is exactly D:(A;;CC;;;<spike sid>)
+  [PASS] four filters, permit weight > block weight
+  [PASS] refuses non-account SIDs (Everyone, Users, SYSTEM, Authenticated Users, Administrators)
+  [PASS] SID safety: operator SID refused
+  [PASS] SID safety: group in the operator token refused
+  [PASS] SID safety: a distinct account SID accepted
+== arm 1 filter sets ==
+  [PASS] permit on: four filters, invariants hold
+  [PASS] permit off: exactly the two BLOCK filters, no loopback condition, invariants hold
+  [PASS] permit off: the block filters are the same keys as in the four-filter plan
+  [PASS] invariants: the four-filter plan labelled permit off is refused
+  [PASS] invariants: the two-filter plan labelled permit on is refused
+  [PASS] the SD is identical in both sets
+== argument validation ==
+  [PASS] no mode -> error
+  [PASS] two modes -> error
+  [PASS] -TestB with defaults valid
+  [PASS] serve hold >= block max rejected
+  [PASS] block max 0 / 901 rejected
+  [PASS] -TestC alone valid, with -NoLoopbackPermit valid
+  [PASS] -TestC with -TestB rejected; -NoLoopbackPermit with -TestB rejected
+  [PASS] server load timeout 10 / 901 rejected
+== Test B verdict table (fabricated observations; each variant must be able to fail) ==
+  [PASS] all good -> 0
+  [PASS] operator abort -> 3 (beats everything)
+  [PASS] removal unverified -> 7
+  [PASS] no baseline -> 5
+  [PASS] isolated operator failure -> 4
+  [PASS] task never started -> 4
+  [PASS] invalid result -> 4
+  [PASS] wrong SID -> 4
+  [PASS] spike not blocked -> 1
+  [PASS] listener never started -> 4
+  [PASS] operator could not reach the listener -> 4
+  [PASS] model not loaded (fixed string only) -> 8, never 0
+  [PASS] model loaded but no completion -> 4
+== Test C verdict table (fabricated observations; each variant must be able to fail) ==
+  [PASS] C: all good, client ok -> 0
+  [PASS] C: client failed WITH a socket error code -> 9 (a result)
+  [PASS] C: client failed WITHOUT a socket error code (HTTP 500 / timeout) -> 4, never 9
+  [PASS] C: after-run invalid -> 4, not 7
+  [PASS] C: operator abort -> 3 (beats everything)
+  [PASS] C: removal unverified -> 7
+  [PASS] C: no baseline -> 5
+  [PASS] C: server model not loaded -> 8, never 0 or 9
+  [PASS] C: isolated operator failure -> 4
+  [PASS] C: block run invalid -> 4
+  [PASS] C: account not blocked -> 1
+== client-mode result schema ==
+  [PASS] client result with identity, client_connect, outbound_probe is valid
+  [PASS] client result missing client_connect is refused
+  [PASS] client result still valid after a JSON round-trip on THIS host (pwsh parses timestamps into [datetime])
+  [PASS] timestamp helper: string, [datetime] and [datetimeoffset] all convert
+  [PASS] timestamp check: a bare string without offset is still refused
+  [PASS] serve result is NOT satisfied by the client step list
+== arm 2: long hold (argument rules, schedule, watchdog, outcomes, exports, Bitdefender signals, verdicts) ==
+  [PASS] -LongHold alone with defaults is valid
+  [PASS] -LongHold with -TestC rejected (exactly one mode)
+  [PASS] hold 59 and 7201 rejected; 60 and 7200 accepted
+  [PASS] sample 29 and 301 rejected; a sample longer than the hold rejected
+  [PASS] -LongHold with -NoLoopbackPermit is valid (the two-filter set)
+  [PASS] schedule 3600/60: 60 samples at 0..3540, mid export at 1800, dead-man at 3630
+  [PASS] schedule 7200/60: 120 samples, dead-man at 7230; 90/60: samples at 0 and 60
+  [PASS] watchdog: one failure does not abort
+  [PASS] watchdog: a success resets the run; fail, ok, fail never aborts (2 failures, max consecutive 1)
+  [PASS] watchdog: two consecutive failures abort
+  [PASS] watchdog: failure events are capped at 200 while the count keeps going
+  [PASS] an abort flag set inside a plain tick scriptblock IS seen by the waiting function (the form -LongHold uses)
+  [PASS] toggle: the same flag set inside a .GetNewClosure() scriptblock is NOT seen (why -LongHold does not use a closure)
+  [PASS] sample outcome: valid run as the right SID, connect failed -> blocked
+  [PASS] sample outcome: connect succeeded -> open
+  [PASS] sample outcome: invalid run, null run, or no probe -> no_result (never blocked)
+  [PASS] sample outcome: a run as another SID -> wrong_sid (never blocked)
+  [PASS] sample line: ONE line of JSON with n, a timestamp with offset, the outcome and the socket error code
+  [PASS] sample stats: 5 blocked (all code 10013), 1 open, 1 no_result, first open is sample 6
+  [PASS] export summary: every key (upper case, braces) and the marker present -> ok
+  [PASS] export summary: one key missing -> not ok, and the missing key is named
+  [PASS] export summary: keys present but the marker absent, or an empty export -> not ok
+  [PASS] export text: UTF-8 and UTF-16 (BOM) both decode
+  [PASS] Bitdefender signal: nothing changed -> none_observed (with its caveat)
+  [PASS] Bitdefender signal: an update-named process started during the hold -> named
+  [PASS] Bitdefender signal: a transient update process seen between samples counts
+  [PASS] Bitdefender signal: an update service running since BEFORE the hold is not a signal; a folder timestamp that moved is
+  [PASS] H: all good -> 0
+  [PASS] H: 54 of 60 blocked (90%) still 0; 53 of 60 -> 4
+  [PASS] H: one open sample -> 1 (the block did not hold), whatever the coverage
+  [PASS] H: operator abort -> 3 (beats everything)
+  [PASS] H: removal unverified -> 7 (beats an open sample)
+  [PASS] H: no baseline -> 5
+  [PASS] H: engine closed early -> 4, even if samples then read open
+  [PASS] H: an export missing a filter -> 4, never 0
+  [PASS] H: a 3-sample hold needs all 3 (floor of 3)
+  [PASS] probe result with identity and outbound_probe is valid
+  [PASS] probe result missing outbound_probe, or missing identity, is refused
+  [PASS] a feasibility-mode result is not satisfied by the probe step list
+  [PASS] the target account is the throwaway spike account, never blarai-coder (the real coder account's containment state is not touched)
+  [PASS] keep-awake constants (ES_CONTINUOUS 0x80000000, ES_SYSTEM_REQUIRED 0x1); nothing is called
+== Test A verdict ==
+  [PASS] all pass -> 0
+  [PASS] only the GPU step failed -> 8
+  [PASS] GPU + file denial failed -> 4
+  [PASS] schema violations -> 4
+== untrusted result files (written by the restricted account) ==
+  [PASS] reader: parses an ordinary file
+  [PASS] reader: refuses a file whose folder is a directory junction
+  [PASS] reader: refuses a symlink in the place of the file
+  [PASS] reader: refuses a hard-linked file
+  [PASS] reader: refuses a file over the size cap
+  [PASS] reader: malformed JSON throws (fail closed)
+  [PASS] port check: accepts 49580, refuses 80, 70000, a string, a float, null
+wfp selftest: all passed
+
+## pwsh spike-run-test.ps1: 13 passed, 0 failed, 0 skipped
+  [PASS] no exception -> allowed
+  [PASS] UnauthorizedAccessException -> denied
+  [PASS] DirectoryNotFoundException -> absent (NOT denied)
+  [PASS] IOException -> error (not silently denied)
+  [PASS] overall: error beats fail beats pass
+  [PASS] step has name/status/started/finished/detail/data
+  [PASS] timestamps carry a UTC offset
+  [PASS] a missing path is classified absent, not allowed
+  [PASS] JSON round-trips
+  [PASS] socket error code: innermost SocketException wins (10013 through a wrapper)
+  [PASS] socket error code: no SocketException -> 0
+  [PASS] client port: accepts 49580, refuses 80, 70000, a string, a float, null
+  [PASS] client request to a closed loopback port fails closed with an error and no status
+run-test selftest: all passed
+
+## pwsh Start-ElevatedOnce.ps1: 21 passed, 0 failed, 0 skipped
+  [PASS] task names must start with blarai- and be plain
+  [PASS] plain arguments pass; quotes, ;, &, |, $, backtick, % and newlines are refused
+  [PASS] an allowlisted script in the wrapper folder with plain arguments is accepted
+  [PASS] the 3b arming script is NOT runnable through the wrapper without a recorded restart decision, and is with one
+  [PASS] a script that is not on the allowlist is refused
+  [PASS] an allowlisted name in ANOTHER folder is refused
+  [PASS] a path with .. is refused; an argument with a shell metacharacter is refused
+  [PASS] no script named is refused
+  [PASS] arg line: a value with a space is quoted, plain ones are not
+  [PASS] log path: an ordinary path passes; a path through a directory junction is refused (the elevated write would land elsewhere)
+  [PASS] arguments round-trip through the base64 token (leading dashes survive); it never starts with a dash
+  [PASS] definition: RunLevel Highest, interactive logon, no trigger, one instance, unregisters itself
+  [PASS] definition: the inner command line names this script with -Inner, the task name, the target and the log
+  [PASS] definition: the printed target and follow-up commands are exactly what will run
+  [PASS] admin-only: SYSTEM and Administrators full control with Users read-and-execute -> no problem; Users Modify, create-files or append on the folder -> a problem each
+  [PASS] admin-only: a Deny does not excuse an Allow; a non-admin owner is a problem; on an ancestor create-files is fine but delete-child is not; inherit-only is not credited
+  [PASS] admin-only (real ACL read, no change): the user's own temp folder is NOT admin-only, and a missing folder is refused
+  [PASS] inner run: target, follow-up, then unregister LAST, exactly once; both exit codes in the log
+  [PASS] inner run: a target that throws is logged, the follow-up STILL runs, and the task is still unregistered
+  [PASS] inner run: a failing unregistration is logged loudly, not swallowed silently
+  [PASS] inner run: timestamps carry an offset
+elevated-once selftest: all passed
+
+## pwsh Convert-ToLive.ps1: 7 passed, 0 failed, 0 skipped
+  [PASS] the placeholder becomes the user name everywhere and line endings become CRLF
+  [PASS] already-CRLF input is not doubled
+  [PASS] a user name must be plain (no path or shell characters)
+  [PASS] plan: the text file is "write", the binary is "skip"
+  [PASS] plan: nothing was written by planning
+  [PASS] plan: an existing file that differs is "differs" (would not be overwritten without -Force)
+  [PASS] plan: an existing file equal to the result is "same" (idempotent)
+convert-to-live selftest: all passed
+
+## powershell spike-wfp.ps1: 106 passed, 0 failed, 0 skipped
+== extraction from the wrapped script ==
+  [PASS] all 7 wrapped functions extracted
+  [PASS] C# source extracted
+  [PASS] the wrapped script was only read (SHA-256 recorded)
+  [PASS] the WFP C# compiles in-process
+  [PASS] SDDL is exactly D:(A;;CC;;;<spike sid>)
+  [PASS] four filters, permit weight > block weight
+  [PASS] refuses non-account SIDs (Everyone, Users, SYSTEM, Authenticated Users, Administrators)
+  [PASS] SID safety: operator SID refused
+  [PASS] SID safety: group in the operator token refused
+  [PASS] SID safety: a distinct account SID accepted
+== arm 1 filter sets ==
+  [PASS] permit on: four filters, invariants hold
+  [PASS] permit off: exactly the two BLOCK filters, no loopback condition, invariants hold
+  [PASS] permit off: the block filters are the same keys as in the four-filter plan
+  [PASS] invariants: the four-filter plan labelled permit off is refused
+  [PASS] invariants: the two-filter plan labelled permit on is refused
+  [PASS] the SD is identical in both sets
+== argument validation ==
+  [PASS] no mode -> error
+  [PASS] two modes -> error
+  [PASS] -TestB with defaults valid
+  [PASS] serve hold >= block max rejected
+  [PASS] block max 0 / 901 rejected
+  [PASS] -TestC alone valid, with -NoLoopbackPermit valid
+  [PASS] -TestC with -TestB rejected; -NoLoopbackPermit with -TestB rejected
+  [PASS] server load timeout 10 / 901 rejected
+== Test B verdict table (fabricated observations; each variant must be able to fail) ==
+  [PASS] all good -> 0
+  [PASS] operator abort -> 3 (beats everything)
+  [PASS] removal unverified -> 7
+  [PASS] no baseline -> 5
+  [PASS] isolated operator failure -> 4
+  [PASS] task never started -> 4
+  [PASS] invalid result -> 4
+  [PASS] wrong SID -> 4
+  [PASS] spike not blocked -> 1
+  [PASS] listener never started -> 4
+  [PASS] operator could not reach the listener -> 4
+  [PASS] model not loaded (fixed string only) -> 8, never 0
+  [PASS] model loaded but no completion -> 4
+== Test C verdict table (fabricated observations; each variant must be able to fail) ==
+  [PASS] C: all good, client ok -> 0
+  [PASS] C: client failed WITH a socket error code -> 9 (a result)
+  [PASS] C: client failed WITHOUT a socket error code (HTTP 500 / timeout) -> 4, never 9
+  [PASS] C: after-run invalid -> 4, not 7
+  [PASS] C: operator abort -> 3 (beats everything)
+  [PASS] C: removal unverified -> 7
+  [PASS] C: no baseline -> 5
+  [PASS] C: server model not loaded -> 8, never 0 or 9
+  [PASS] C: isolated operator failure -> 4
+  [PASS] C: block run invalid -> 4
+  [PASS] C: account not blocked -> 1
+== client-mode result schema ==
+  [PASS] client result with identity, client_connect, outbound_probe is valid
+  [PASS] client result missing client_connect is refused
+  [PASS] client result still valid after a JSON round-trip on THIS host (pwsh parses timestamps into [datetime])
+  [PASS] timestamp helper: string, [datetime] and [datetimeoffset] all convert
+  [PASS] timestamp check: a bare string without offset is still refused
+  [PASS] serve result is NOT satisfied by the client step list
+== arm 2: long hold (argument rules, schedule, watchdog, outcomes, exports, Bitdefender signals, verdicts) ==
+  [PASS] -LongHold alone with defaults is valid
+  [PASS] -LongHold with -TestC rejected (exactly one mode)
+  [PASS] hold 59 and 7201 rejected; 60 and 7200 accepted
+  [PASS] sample 29 and 301 rejected; a sample longer than the hold rejected
+  [PASS] -LongHold with -NoLoopbackPermit is valid (the two-filter set)
+  [PASS] schedule 3600/60: 60 samples at 0..3540, mid export at 1800, dead-man at 3630
+  [PASS] schedule 7200/60: 120 samples, dead-man at 7230; 90/60: samples at 0 and 60
+  [PASS] watchdog: one failure does not abort
+  [PASS] watchdog: a success resets the run; fail, ok, fail never aborts (2 failures, max consecutive 1)
+  [PASS] watchdog: two consecutive failures abort
+  [PASS] watchdog: failure events are capped at 200 while the count keeps going
+  [PASS] an abort flag set inside a plain tick scriptblock IS seen by the waiting function (the form -LongHold uses)
+  [PASS] toggle: the same flag set inside a .GetNewClosure() scriptblock is NOT seen (why -LongHold does not use a closure)
+  [PASS] sample outcome: valid run as the right SID, connect failed -> blocked
+  [PASS] sample outcome: connect succeeded -> open
+  [PASS] sample outcome: invalid run, null run, or no probe -> no_result (never blocked)
+  [PASS] sample outcome: a run as another SID -> wrong_sid (never blocked)
+  [PASS] sample line: ONE line of JSON with n, a timestamp with offset, the outcome and the socket error code
+  [PASS] sample stats: 5 blocked (all code 10013), 1 open, 1 no_result, first open is sample 6
+  [PASS] export summary: every key (upper case, braces) and the marker present -> ok
+  [PASS] export summary: one key missing -> not ok, and the missing key is named
+  [PASS] export summary: keys present but the marker absent, or an empty export -> not ok
+  [PASS] export text: UTF-8 and UTF-16 (BOM) both decode
+  [PASS] Bitdefender signal: nothing changed -> none_observed (with its caveat)
+  [PASS] Bitdefender signal: an update-named process started during the hold -> named
+  [PASS] Bitdefender signal: a transient update process seen between samples counts
+  [PASS] Bitdefender signal: an update service running since BEFORE the hold is not a signal; a folder timestamp that moved is
+  [PASS] H: all good -> 0
+  [PASS] H: 54 of 60 blocked (90%) still 0; 53 of 60 -> 4
+  [PASS] H: one open sample -> 1 (the block did not hold), whatever the coverage
+  [PASS] H: operator abort -> 3 (beats everything)
+  [PASS] H: removal unverified -> 7 (beats an open sample)
+  [PASS] H: no baseline -> 5
+  [PASS] H: engine closed early -> 4, even if samples then read open
+  [PASS] H: an export missing a filter -> 4, never 0
+  [PASS] H: a 3-sample hold needs all 3 (floor of 3)
+  [PASS] probe result with identity and outbound_probe is valid
+  [PASS] probe result missing outbound_probe, or missing identity, is refused
+  [PASS] a feasibility-mode result is not satisfied by the probe step list
+  [PASS] the target account is the throwaway spike account, never blarai-coder (the real coder account's containment state is not touched)
+  [PASS] keep-awake constants (ES_CONTINUOUS 0x80000000, ES_SYSTEM_REQUIRED 0x1); nothing is called
+== Test A verdict ==
+  [PASS] all pass -> 0
+  [PASS] only the GPU step failed -> 8
+  [PASS] GPU + file denial failed -> 4
+  [PASS] schema violations -> 4
+== untrusted result files (written by the restricted account) ==
+  [PASS] reader: parses an ordinary file
+  [PASS] reader: refuses a file whose folder is a directory junction
+  [PASS] reader: refuses a symlink in the place of the file
+  [PASS] reader: refuses a hard-linked file
+  [PASS] reader: refuses a file over the size cap
+  [PASS] reader: malformed JSON throws (fail closed)
+  [PASS] port check: accepts 49580, refuses 80, 70000, a string, a float, null
+wfp selftest: all passed
+
+## powershell spike-run-test.ps1: 13 passed, 0 failed, 0 skipped
+  [PASS] no exception -> allowed
+  [PASS] UnauthorizedAccessException -> denied
+  [PASS] DirectoryNotFoundException -> absent (NOT denied)
+  [PASS] IOException -> error (not silently denied)
+  [PASS] overall: error beats fail beats pass
+  [PASS] step has name/status/started/finished/detail/data
+  [PASS] timestamps carry a UTC offset
+  [PASS] a missing path is classified absent, not allowed
+  [PASS] JSON round-trips
+  [PASS] socket error code: innermost SocketException wins (10013 through a wrapper)
+  [PASS] socket error code: no SocketException -> 0
+  [PASS] client port: accepts 49580, refuses 80, 70000, a string, a float, null
+  [PASS] client request to a closed loopback port fails closed with an error and no status
+run-test selftest: all passed
+
+## powershell Start-ElevatedOnce.ps1: 21 passed, 0 failed, 0 skipped
+  [PASS] task names must start with blarai- and be plain
+  [PASS] plain arguments pass; quotes, ;, &, |, $, backtick, % and newlines are refused
+  [PASS] an allowlisted script in the wrapper folder with plain arguments is accepted
+  [PASS] the 3b arming script is NOT runnable through the wrapper without a recorded restart decision, and is with one
+  [PASS] a script that is not on the allowlist is refused
+  [PASS] an allowlisted name in ANOTHER folder is refused
+  [PASS] a path with .. is refused; an argument with a shell metacharacter is refused
+  [PASS] no script named is refused
+  [PASS] arg line: a value with a space is quoted, plain ones are not
+  [PASS] log path: an ordinary path passes; a path through a directory junction is refused (the elevated write would land elsewhere)
+  [PASS] arguments round-trip through the base64 token (leading dashes survive); it never starts with a dash
+  [PASS] definition: RunLevel Highest, interactive logon, no trigger, one instance, unregisters itself
+  [PASS] definition: the inner command line names this script with -Inner, the task name, the target and the log
+  [PASS] definition: the printed target and follow-up commands are exactly what will run
+  [PASS] admin-only: SYSTEM and Administrators full control with Users read-and-execute -> no problem; Users Modify, create-files or append on the folder -> a problem each
+  [PASS] admin-only: a Deny does not excuse an Allow; a non-admin owner is a problem; on an ancestor create-files is fine but delete-child is not; inherit-only is not credited
+  [PASS] admin-only (real ACL read, no change): the user's own temp folder is NOT admin-only, and a missing folder is refused
+  [PASS] inner run: target, follow-up, then unregister LAST, exactly once; both exit codes in the log
+  [PASS] inner run: a target that throws is logged, the follow-up STILL runs, and the task is still unregistered
+  [PASS] inner run: a failing unregistration is logged loudly, not swallowed silently
+  [PASS] inner run: timestamps carry an offset
+elevated-once selftest: all passed
+
+## powershell Convert-ToLive.ps1: 7 passed, 0 failed, 0 skipped
+  [PASS] the placeholder becomes the user name everywhere and line endings become CRLF
+  [PASS] already-CRLF input is not doubled
+  [PASS] a user name must be plain (no path or shell characters)
+  [PASS] plan: the text file is "write", the binary is "skip"
+  [PASS] plan: nothing was written by planning
+  [PASS] plan: an existing file that differs is "differs" (would not be overwritten without -Force)
+  [PASS] plan: an existing file equal to the result is "same" (idempotent)
+convert-to-live selftest: all passed

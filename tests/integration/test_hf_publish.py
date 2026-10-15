@@ -12,6 +12,9 @@ from pathlib import Path
 import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+# This machine's identity strings, read at run time; never literals (gate lock: tests/security/test_no_host_identity_in_tree.py).
+HOST = os.environ.get("COMPUTERNAME") or __import__("platform").node()
+USER = os.environ.get("USERNAME") or __import__("getpass").getuser()
 sys.path.insert(0, str(SCRIPTS))
 
 import hf_publish  # noqa: E402
@@ -132,7 +135,7 @@ def test_preflight_catches_non_utf8_and_local_path(tmp_path, capsys):
 
 def test_preflight_cli_exit_code_via_subprocess(tmp_path):
     d = clean_dir(tmp_path)
-    (d / "n.txt").write_text("NORTHSTAR100", encoding="utf-8")
+    (d / "n.txt").write_text(HOST, encoding="utf-8")
     r = subprocess.run([sys.executable, str(SCRIPTS / "hf_publish.py"), "preflight", "--dir", str(d)], capture_output=True, text=True)
     assert r.returncode == 1 and "n.txt" in r.stdout
 
@@ -330,8 +333,8 @@ def _problems_in_place(tmp_path, name: str, body: str) -> list[str]:
     ("e.json", json.dumps({"api_key": "abcdefghijklmnop1234"}), "bearer/credential assignment"),
     ("f.txt", "contact someone.else@example.org please", "e-mail address"),
     ("g.json", json.dumps({"email": "mr.blair.do@gmail.com"}), "e-mail address"),
-    ("h.txt", "run on NORTHSTAR100", "identity string 'NORTHSTAR100'"),
-    ("i.txt", "run by Mrbla", "identity string 'mrbla'"),
+    pytest.param("h.txt", f"run on {HOST}", "identity string", id="h-host"),
+    pytest.param("i.txt", f"run by {USER.capitalize()}", "identity string", id="i-user"),
 ])
 def test_preflight_refuses_secret_and_identity_shapes(tmp_path, name, body, needle):
     assert any(needle in h for h in _problems(tmp_path, name, body))
@@ -386,7 +389,7 @@ def test_preflight_allows_long_lines_in_the_arcs_own_readme_but_still_scans_it(t
     assert any("e-mail address" in h for h in _problems_in_place(tmp_path, "README.md", prose + " mail me@example.org"))
 
 
-@pytest.mark.parametrize("msg", ["token hf_" "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789","from me@example.org", "run on NORTHSTAR100"])
+@pytest.mark.parametrize("msg", ["token hf_" "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789","from me@example.org", pytest.param(f"run on {HOST}", id="host")])
 def test_upload_refuses_a_commit_message_that_carries_a_secret_or_identity(tmp_path, fake_hf, msg):
     log, _ = fake_hf
     assert run("upload", "--dir", str(clean_dir(tmp_path)), "--config", "study", "--path-in-repo", "ds", f"--message={msg}") in (1, 2)

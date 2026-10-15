@@ -12,6 +12,8 @@ does not show).
 | `wfp-spike/` | #1671: the raw Windows Filtering Platform (WFP) block spike: script, its README, console output, 3 result files |
 | `confined-model-spike/` | #1689: the spike. `as-run/` = the scripts as they stood after the runs (the results come from these); `post-run-hardened/` = the same scripts after later hardening; `runs/` = Test A (2 runs), Test B (1 run), in-process control |
 | `arm1-permit/` | arm 1 (the permit filter's role; the confined account as CLIENT of a real local server over loopback while blocked): `scripts/` = the changed scripts (`README.md` there lists the changes and the run order), `runs/` = the result files |
+| `arm2-hold/` | arm 2 (the long hold: does the SID-keyed block stay enforced for up to two hours while Bitdefender runs): `scripts/` = the changed scripts plus the elevated-once wrapper and the sanitised-to-live converter (`README.md` there), `selftest/` = the saved self-test results, `runs/` = the result files once the arm has run (NOT RUN yet) |
+| `arm3-persist/` | arm 3 (a persistent filter set, a restart, fail-closed on absence): `DESIGN.md` (written first), `scripts/` (arm 3a, the 3b arming / post-reboot / veto scripts, the rollback proof gate; `README.md` there has the manual rollback), `selftest/`, `runs/` (NOT RUN yet) |
 | `preflight/` | #775 read-only pre-flight (account, task, ACL listing, offline suites), 2026-10-05 |
 | `reviews/` | review reports behind the negative results: agentic-setup fused leg; #1690 rules tooling (copy from the unmerged branch `feat/1690-install-hardening` at `22efaac9`, not on main) |
 | `CHANGES.md`, `make_changes.py` | generated table of what was changed in each file, and the generator (the test regenerates it); `as-run/MANIFEST.sha256` pins the as-run set |
@@ -28,6 +30,15 @@ domains became shape-valid placeholder domains (relative ids kept); JSON files w
 characters. Fabricated test SIDs in the scripts were left alone, so the scripts' own `-SelfTest` runs. Anything else would be
 a defect. No password or credential is in any file (the spike password was generated at run time and held only in the
 scheduled-task vault).
+
+### NEP-0005 code files: SID constants rewritten after the run (2026-10-13, #1765)
+
+Four NEP-0005 code files carry the test account's SID (and, in the harness, one mock SID on the same domain) as recorded constants that their guards compare against. They ran with the real machine domain in those constants; on 2026-10-13 the domain was rewritten to the placeholder `S-1-5-21-1000000001-1000000002-1000000003` in place (relative ids 1271 and 1272 kept), by `scripts/rewrite_sid_domain.py` over the whole repository. Nothing else in them changed. Because the constants changed, the files no longer hash-equal the reviewed bytes; `nep0005-open-questions/runs/AS_RUN.md` records both hashes (reviewed and rewritten) for each, and the per-file occurrence counts are in `docs/reviews/1765-sid-rewrite-log-2026-10-13.md`:
+- `nep0005-open-questions/harness/halfset.rs` (3 occurrences; `harness/tests/refusals.ps1` matches the SID compiled into it, 1)
+- `nep0005-open-questions/scripts/spike-nep5-connect-probe.ps1` (1)
+- `nep0005-open-questions/scripts/spike-nep5-lib.ps1` (2)
+
+The test `tests/security/test_containment_evidence_bundle.py` has no per-file exemption: it fails on any machine domain other than the placeholder and fabricated ones, written in the usual text form (`S-1-5-21-` and three numbers, any letter case), in any bundle file. It does not see SIDs written another way (without the prefix, split across lines, or in UTF-16 files); `tests/security/test_no_machine_sid_domain_in_tree.py` catches the bare-digit form of this machine's domain across every tracked file.
 
 ## Known gaps in the raw data (read before relying on it)
 
@@ -51,7 +62,13 @@ scheduled-task vault).
 4. Arm 1 (needs the provisioned account and the same venv and model): `arm1-permit\scripts\spike-wfp.ps1 -DryRun [-NoLoopbackPermit]`,
    then `Run-Arm1-AsAdmin.cmd` there (six `-TestC` runs, conditions interleaved), then the cleanup of step 3. See `arm1-permit\scripts\README.md`.
 
-Every WFP object lives in a dynamic session: closing the engine, killing the operator process or rebooting removes it.
+5. Arm 2 (needs the same provisioned account; the task needs the probe-mode `spike-run-test.ps1`): `arm2-hold\scripts\spike-wfp.ps1 -DryRun -HoldSeconds 3600`, then
+   `-LongHold` through `Start-ElevatedOnce.ps1` or `Run-Arm2-AsAdmin.cmd`. See `arm2-hold\scripts\README.md`.
+6. Arm 3 (machine-wide state; read `arm3-persist\DESIGN.md` first): `arm3-persist\scripts\spike-wfp-persist.ps1 -SelfTest -WriteProof`, `-DryRun`, `-Arm3a`; then, only after
+   3a is clean, `spike-arm3b-arm.ps1`. See `arm3-persist\scripts\README.md` for the order, the exit codes and the manual rollback.
+
+Every WFP object of the spikes, arm 1 and arm 2 lives in a dynamic session: closing the engine, killing the operator process or rebooting removes it. Arm 3's objects are
+PERSISTENT by design and are removed by key (`spike-wfp-persist.ps1 -Remove`, the 3b post-reboot and veto tasks, the manual snippet in the arm 3 README).
 
 ## Integrity gate
 

@@ -22,7 +22,7 @@
   },
   "config": {
     "cache_mechanism": "--cache_dir (OVMS folds it into the CB-LLM node plugin_config as CACHE_DIR)",
-    "cache_dir_path_format": "FORWARD-SLASH (C:/Users/mrbla/agentic-setup/state/ovms-model-cache). A Windows BACKSLASH path makes the folded plugin_config JSON invalid (\\U is not a valid JSON escape) -> 'Plugin config is in wrong format' (the #740/W7 revert cause).",
+    "cache_dir_path_format": "FORWARD-SLASH (C:/Users/__USER__/agentic-setup/state/ovms-model-cache). A Windows BACKSLASH path makes the folded plugin_config JSON invalid (\\U is not a valid JSON escape) -> 'Plugin config is in wrong format' (the #740/W7 revert cause).",
     "cache_artifacts": ".cl_cache (compiled GPU kernels)",
     "cache_size_approx": "~16 GB across 19 .cl_cache files",
     "other_flags": "--cache_size 4 (KV-cache POOL, separate concern), --kv_cache_precision u8, --enable_prefix_caching true, --enable_tool_guided_generation true"

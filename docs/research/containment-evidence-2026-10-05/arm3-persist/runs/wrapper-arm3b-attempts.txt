@@ -1,0 +1,18 @@
+=== wrapper-arm3b-log.txt
+2026-10-12T14:38:32.936-04:00 inner run started
+2026-10-12T14:38:33.868-04:00 target threw: C:\ProgramData\BlarAI\trackb-live\spike-arm3b-arm.ps1 : A parameter cannot be found that matches parameter name 'Live 
+2026-10-12T14:38:33.868-04:00 target exit code: -1
+2026-10-12T14:38:33.868-04:00 unregistering this task (last act)
+2026-10-12T14:38:40.044-04:00 task unregistered
+
+=== wrapper-arm3b-log2.txt
+2026-10-12T14:38:52.731-04:00 inner run started
+2026-10-12T14:38:57.699-04:00 | ROLLBACK FACT: the set is PERSISTENT. Rollbacks: this script (input aborts it), the veto watchdog task, spike-wfp-persist.ps1 -Remove, then the README manual rollback.
+2026-10-12T14:38:57.699-04:00 | RESULT: exit 2: refused: the script folder is writable by non-administrators, so the SYSTEM tasks would run attacker-editable code: output folder: C:\Users\_OPERATOR_\blarai-research-data\arm3-persist: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it); output folder: C:\Users\_OPERATOR_\blarai-research-data\arm3-persist\arm3a-20261011-165130-filters-after-removal.xml: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it); output folder: C:\Users\_OPERATOR_\blarai-research-data\arm3-persist\arm3a-20261011-165130-filters-before-removal.xml: S-1-5-21-1000000001-1000000002-1000000003-1001 is allowed rights 0x1F01FF (on the folder or a file in it). Nothing added
+2026-10-12T14:38:57.712-04:00 target exit code: 2
+2026-10-12T14:38:57.714-04:00 unregistering this task (last act)
+2026-10-12T14:38:58.745-04:00 task unregistered
+
+=== wrapper-arm3b-log3.txt
+2026-10-12T14:39:11.511-04:00 inner run started
+

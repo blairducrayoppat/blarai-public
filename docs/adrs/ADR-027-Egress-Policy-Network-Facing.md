@@ -1,5 +1,69 @@
 # ADR-027 — Egress Policy (Network-Facing Posture)
 
+> **DATED HISTORY (written 2026-06-07 to 2026-07-02; last revised 2026-09-20, commit `ac24330c`).**
+> Everything below this block, the header, the Context, the Decision, Amendment 1 and the 2026-07-02
+> activation record, is the record of what was decided and true on the dates it carries. It is kept as written. Where a sentence says "NOT YET
+> ACTIVE", "air-gapped today", "dormant" or "empty allowlist", it describes the date of that
+> section, not today. This block says what has changed since.
+>
+> **Status as of 2026-10-11** (each point re-read in code on that date; lines can move, so the symbol
+> is the pointer):
+>
+> - **The three base activation gates now all hold.** Gate (a) the #598 air-gap sign-off was
+>   recorded 2026-06-10. Gate (b) the Sprint-17 machinery was built. Gate (c) is worded in this
+>   ADR as "the policy enforces when the first web feature (W4 Kagi search) ships under #556"
+>   (the further conditions, endpoint added to the allowlist and kill-switch armed, are the wording
+>   of `docs/security/egress_machinery.md` and `egress_activation.md`, not this ADR); it first held
+>   on **2026-07-02** (git: `9a7eed8c` merged the `LiveKagiAdapter` go-live build; `0f578d83`
+>   activated the allowlist).
+> - **Sequence, from git and the journal:** 2026-06-07 policy accepted and machinery staged.
+>   **2026-06-12 first sanctioned external fetch** (`scripts/uc003_live_fetch_smoke.py`, commit
+>   `c64f7867`: one hard-registered host, `egress_guard` deliberately not armed, the Lead Architect
+>   (LA) present), which ran under Amendment 1's separate four preconditions, not under gate (c).
+>   The same day the operator-driven path was built: `c6fe7e97` (operator `/ingest` activation plus an
+>   armed-guard egress-door fix) and `f95c0350` (the `--go-live` flag and
+>   `scripts/run_winui_golive.bat`). **2026-06-15** the operator ran `/ingest` in the production
+>   app (`docs/archive/journal/2026-06.md`, "The door that stayed shut when the wire went dead"):
+>   one attempt with the network down was refused fail-closed, and the next widened
+>   `www.bleepingcomputer.com:443` for one fetch and revoked it about a second later (Vikunja #659 is
+>   the go-live ticket). **2026-07-02 first standing allowlist entry** (`kagi.com`) for the
+>   model-callable `web_search`. So the paste path has run more than once, and not only in a
+>   disarmed harness.
+> - **Live scope today:** `web_search` (configured by `[web_search]` in
+>   `services/assistant_orchestrator/config/default.toml`; it registers only when a Kagi key is
+>   provisioned). The standing Policy Agent allowlist is the class attribute
+>   `DeterministicPolicyChecker._EGRESS_ALLOWLIST` in `services/policy_agent/src/gpu_inference.py`;
+>   read that symbol and `docs/runbooks/web_search_go_live.md` for the current contents, not this
+>   text.
+> - **Socket layer:** the socket-level external allowlist in `shared/security/egress_guard.py` is
+>   empty at rest. Its only non-test caller of `allow_external_endpoint` is
+>   `shared/security/guarded_fetch.py`, which widens it for one host and port per fetch and revokes
+>   in a `finally`. It is a different list from the standing Policy Agent allowlist above.
+> - **Operator-pasted URL class (Amendment 1), what holds it shut at rest.** A normal launcher boot
+>   never reads `[guest_parser]`: `_maybe_start_guest_parser` in `launcher/__main__.py` has one call
+>   site, inside `if _go_live_requested():` (the `--go-live` flag), and that path first sets
+>   `BLARAI_GUEST_PARSER_ENABLED=true`, an on-only override in `launcher/guest_parser.py`. So
+>   `[guest_parser] enabled = false` closes nothing by itself. At rest the class is closed because
+>   the parser is not brought up without `--go-live`, so the capability gate in
+>   `ingest_coordinator._handle_url_ingest` refuses before any fetch, plus the fixed fetch purpose
+>   (`tests/security/test_purpose_unforgeable.py`).
+> - **The adjudicator for that class does not consult the standing list.** The Assistant
+>   Orchestrator (AO) registers the request-keyed adjudicator (`make_request_keyed_url_adjudicate`)
+>   when `web_search` is enabled, a Kagi key loads and the slot is empty; the launcher registers it
+>   when the guest parser reaches READY. For purpose `uc003-url-ingest` it builds the allowlist from
+>   the request's own host, so emptying `_EGRESS_ALLOWLIST` does not deny that purpose. The door
+>   (`guarded_fetch.fetch_external`) still refuses at step 1 (`_validate_url`: not HTTPS, userinfo in
+>   the URL, raw IP (Internet Protocol) host, port other than 443 or 8443) and at step 2.5 (named hosts that resolve to internal
+>   ranges). Redesign of the levers that do not control this door is #1751; this documentation fix
+>   is #1749.
+> - **Exfil screen:** it screens plaintext sockets only and is never invoked for HTTPS (encrypted web traffic) (claim-register
+>   row 12). It is wired at every boot by `_arm_egress_guard` in `launcher/__main__.py`.
+> - **What `python -m shared.governance.permission_profile` shows:** the live web_search host and
+>   the line "Every other outbound address is refused by rule, whatever any setting says." That
+>   sentence is universal and is false for the operator-pasted class in a `--go-live` session (a
+>   probe with the standing list emptied still let the paste purpose through to a host chosen by the
+>   request); it is true at rest. The code line is covered by #1751.
+
 **Status:** ACCEPTED 2026-06-07 (Lead-Architect-decided via interactive walkthrough); **Amendment 1
 ACCEPTED 2026-06-10** (the held hybrid option adopted for the operator-pasted-URL action class,
 implemented as the one-door fetch seam + "URL = authorization" + resolution-pinning + charset-correct
@@ -94,6 +158,15 @@ and the exfil screen; (c) the policy enforces when the first web feature (W4 Kag
 Until all three hold, the air-gap stays up and the allowlist remains loopback + vsock only.
 
 ## Amendment 1 (2026-06-10) — User-directed URL egress: per-action adjudication via the one-door fetch seam
+
+> **DATED HISTORY (written 2026-06-10 to 2026-07-02; last revised 2026-09-20, commit `ac24330c`).**
+> This Amendment, including its "Until these hold, `INGEST_FETCH` does not exist" sentence, the
+> 2026-06-12 verification note listing three implementation locks (with the 2026-09-20 note about the
+> removed adjudicator symbol inside it) and the 2026-07-02 activation record, is kept as it stood on
+> those dates. See the "Status as of 2026-10-11" block at
+> the top of this file for what holds today; in particular the `[guest_parser].enabled=false` lock and
+> the "adjudicator never registered" lock named in the 2026-06-12 note are no longer a description of
+> the live wiring.
 
 **Status:** ACCEPTED 2026-06-10 (Lead-Architect-ratified at the #655 UC-003/UC-002 program
 comprehension gate; implementing mechanics built same day under #577 and merged 2026-06-10 — the two

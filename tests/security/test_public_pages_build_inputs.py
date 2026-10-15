@@ -2,8 +2,8 @@
 
 Pages renders every file that starts with front matter through Liquid; one document with an
 unparseable tag fails the whole build and the site stops updating. The mirror also serves
-demo.html, which the README links to, and the snapshot is a tree-for-tree replacement of the
-public repo, so the file has to live in this tree.
+demo.html, kept until the operator decides on it (#1722), and the snapshot is a tree-for-tree
+replacement of the public repo, so the file has to live in this tree.
 """
 from __future__ import annotations
 
@@ -61,9 +61,11 @@ def _offenders(excluded: list[str]) -> list[str]:
     return found
 
 
-def test_the_demo_page_the_readme_links_to_is_in_the_tree() -> None:
-    assert "demo.html" in _tracked(), "README links to the Pages demo player; a snapshot without it deletes it"
-    assert "demo.html" in (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+def test_the_demo_page_stays_in_the_tree_until_the_operator_decides() -> None:
+    # The README no longer links demo.html (#1722 removed the video embeds); the page and the
+    # demo-film-v1 release are kept until the operator decides on them (#1722 "Not in scope"),
+    # and a snapshot built from a tree without the file deletes the published Pages player.
+    assert "demo.html" in _tracked(), "the Pages demo player must stay tracked until the operator decides (#1722)"
 
 
 def test_no_rendered_document_carries_liquid_tags() -> None:

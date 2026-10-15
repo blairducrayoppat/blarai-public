@@ -1,8 +1,8 @@
 {
-  "python": "C:/Users/mrbla/BlarAI/.venv/Scripts/python.exe",
+  "python": "C:/Users/__USER__/BlarAI/.venv/Scripts/python.exe",
   "arms": {
-    "old": "C:/Users/mrbla/BlarAI-worktrees/gate-old-3be0e22e",
-    "new": "C:/Users/mrbla/BlarAI-worktrees/gate-new-ca4fab46"
+    "old": "C:/Users/__USER__/BlarAI-worktrees/gate-old-3be0e22e",
+    "new": "C:/Users/__USER__/BlarAI-worktrees/gate-new-ca4fab46"
   },
   "runs": [
     {
@@ -14,7 +14,7 @@
       "started": "2026-10-07 17:07:04 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 993,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run01-old.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run01-old.log",
       "gate_pid": 7984,
       "gate_ctime": 1791407224.6465805,
       "ended": "2026-10-07 17:18:47 -0400",
@@ -35,7 +35,7 @@
       "started": "2026-10-07 17:22:05 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 1894,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run02-new.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run02-new.log",
       "gate_pid": 27496,
       "gate_ctime": 1791408125.2127175,
       "ended": "2026-10-07 17:49:16 -0400",
@@ -56,7 +56,7 @@
       "started": "2026-10-07 17:52:04 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 3693,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run03-old.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run03-old.log",
       "gate_pid": 23792,
       "gate_ctime": 1791409924.7253163,
       "ended": "2026-10-07 18:03:37 -0400",
@@ -77,7 +77,7 @@
       "started": "2026-10-07 18:07:04 -0400",
       "power_at_start": "AC",
       "idle_at_start_s": 4593,
-      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run04-new.log",
+      "log": "C:\\Users\\__USER__\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run04-new.log",
       "gate_pid": 9008,
       "gate_ctime": 1791410824.79531,
       "ended": "2026-10-07 18:35:12 -0400",

@@ -118,7 +118,7 @@ raw/README.md = GEN                (any file named README.md at any depth is exe
 a.yaml / a.tsv / LOG (no ext)      (only identity/secret regexes apply)
 {"turns":[{"c": GEN[:400]}]}       (<500 under an unlisted key)
 hf_<34 chars>.json, mr.blair.do@gmail.com.json   (file names are checked for identity strings only, not secret/e-mail shapes)
-{"k":"mr.blair.do\u0040gmail.com"}, {"k":"hf\u005f..."}, {"k":"NORTHSTAR\u003100"}   (JSON escapes; the scan reads raw text)
+{"k":"mr.blair.do\u0040gmail.com"}, {"k":"hf\u005f..."}, {"k":"__HOST__"}   (JSON escapes; the scan reads raw text)
 ```
 The module docstring says it "refuses credential and e-mail shapes anywhere in the tree". It does not do so for file names
 or escaped JSON. No current dataset is affected: the real 9B dataset passes cleanly by content.

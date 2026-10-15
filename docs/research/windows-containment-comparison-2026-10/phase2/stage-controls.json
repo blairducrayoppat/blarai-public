@@ -1,0 +1,39 @@
+{
+ "stage": "controls",
+ "runs_per_variant": 5,
+ "started": "2026-10-11T11:06:36-04:00",
+ "variants": [
+  {
+   "variant": "D-fixture",
+   "arm": "D",
+   "argv": [
+    "C:/Python314/python.exe",
+    "-I",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\tools\\probes\\containment_arms\\run_arm.py",
+    "--arm",
+    "D",
+    "--runs",
+    "5",
+    "--phase2",
+    "--out",
+    "C:\\Users\\__USER__\\BlarAI-worktrees\\phase2-arms\\docs\\research\\windows-containment-comparison-2026-10\\phase2\\arm-D-fixture",
+    "--label",
+    "D-fixture",
+    "--toolchain",
+    "fixture"
+   ],
+   "started": "2026-10-11T11:06:36-04:00",
+   "rc": 0,
+   "stdout_tail": [
+    "D-20261011T110637-r1 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.072, \"listener_accepts\": 1}",
+    "D-20261011T110646-r2 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.416, \"listener_accepts\": 1}",
+    "D-20261011T110654-r3 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 8.729, \"listener_accepts\": 1}",
+    "D-20261011T110703-r4 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.047, \"listener_accepts\": 1}",
+    "D-20261011T110712-r5 {\"exit_code\": 0, \"timed_out\": false, \"wall_secs\": 9.016, \"listener_accepts\": 1}"
+   ],
+   "stderr_tail": []
+  }
+ ],
+ "finished": "2026-10-11T11:07:21-04:00",
+ "rc": 0
+}

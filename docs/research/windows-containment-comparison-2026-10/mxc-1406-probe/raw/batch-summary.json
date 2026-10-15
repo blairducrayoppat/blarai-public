@@ -1,0 +1,227 @@
+[
+ {
+  "tag": "L-off-c-r1-132514",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-a-r1-132518",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-b-r1-132522",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "T-on-r1-132526",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 5,
+   "loop18099_direct_marker": true,
+   "loop18099_proxied_request_lines": [
+    "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-urllib HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-curl HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-winhttp0 HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r1-132526-winhttp4 HTTP/1.1"
+   ],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "V100-r1-132531",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-c-r2-132535",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-a-r2-132540",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-b-r2-132544",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "T-on-r2-132548",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 5,
+   "loop18099_direct_marker": true,
+   "loop18099_proxied_request_lines": [
+    "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-urllib HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-curl HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-winhttp0 HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r2-132548-winhttp4 HTTP/1.1"
+   ],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "V100-r2-132552",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-c-r3-132556",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-a-r3-132601",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "L-off-b-r3-132605",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "T-on-r3-132609",
+  "dry_rc": 0,
+  "launch_rc": 0,
+  "verdict": {
+   "loop18099_hits": 5,
+   "loop18099_direct_marker": true,
+   "loop18099_proxied_request_lines": [
+    "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-urllib HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-curl HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-winhttp0 HTTP/1.1",
+    "GET http://mxc-proxy-probe.invalid/T-on-r3-132609-winhttp4 HTTP/1.1"
+   ],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ },
+ {
+  "tag": "V100-r3-132614",
+  "dry_rc": 1,
+  "launch_rc": null,
+  "verdict": {
+   "loop18099_hits": 0,
+   "loop18099_direct_marker": false,
+   "loop18099_proxied_request_lines": [],
+   "loop18100_hits": 0,
+   "lan18099_hits": 0
+  },
+  "verify_clean_rc": 0,
+  "state_changed": []
+ }
+]

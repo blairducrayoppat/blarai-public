@@ -1,0 +1,310 @@
+{
+  "question": "Open questions of NEP-0005 (#1763): how do Windows Filtering Platform (WFP) filter sets that are only part of the srt-win four-object set, and sets we build ourselves, behave for a throwaway account's loopback connects on IPv4 and IPv6; what does srt-win's own status word say for each; and can that account's standard (non-elevated) token add or delete a filter?",
+  "date": "2026-10-13",
+  "clock": "-04:00 local; halfset 10:46:31 to 10:49:05, ours 10:49:30 to 10:51:15, n1 10:51:27 to 10:52:51",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V",
+    "ram_gb": 31.3,
+    "gpu": "not relevant to this measurement (no GPU or model work)",
+    "os": "Windows 11 Pro 10.0.26200, display version 25H2, update build revision 9457 (read 2026-10-13 10:56)",
+    "host_shell_per_proof": "PowerShell 7.6.6 (ConsoleHost, Core) as recorded by the rollback proof",
+    "uptime_hours_at_halfset_start": 19.8,
+    "last_boot": "2026-10-12 14:59:49 (the arm 3b restart's boot)"
+  },
+  "software": {
+    "code_commit": "716fd87a6e1f4b530185fcebfcf0b052ccad6120",
+    "srt_win_pin": "24eb39e94a6de386e83d126c52317d8e0fa49522",
+    "halfset_rs_sha256": "e0d560fcb24bbe49f87509c272cd3ed8d058623601732e0d17a7d72c4bd1d44f",
+    "halfset_rs_sha256_note": "hash of the bytes that were built and ran; the bundled copy docs/research/containment-evidence-2026-10-05/nep0005-open-questions/harness/halfset.rs hashes cbd6ad65760bf2f297a35c5330f7ca23b0ef5339098f0818a3c910b227be7b2c since 2026-10-13, when its three SID constants were rewritten from the real machine domain to the placeholder domain (#1765); nothing else changed",
+    "halfset_exe_sha256": "ebe029802387a86f986bab161b1903f30d24d6c4583d8016d426152d6d07229f",
+    "cargo_lock_sha256": "c41cf41050c2b1e2986ed7ca690a703415cabadfed9219788a451df0da0967ec"
+  },
+  "antivirus": "Bitdefender processes present when read at 10:58 the same day (bdagent, bdntwrk, bdredline, bdservicehost, bduserhost); state during the runs not recorded",
+  "method": "Throwaway local account blarai-spike (relative id 1271). Per state and pass: direct sweep of three test sublayers (S1 srt-win harness, S2 ours, S3 ours) and a netsh export must read clean; control (account and operator connect to six loopback targets before any filter); add the state; record srt-win status, enumeration and our key reads; account connects to six targets (127.0.0.1 and [::1] at ports 61763, 61764, 60085 where 60085 is inside the srt-win permit range 60080-60089); remove by key; sweep again. Three passes per state, back to back. Account probes ran through a secondary (interactive-type) logon with a fresh in-memory session password, not the task's batch logon. N1: the account's own standard token makes one direct FwpmFilterAdd0 and one direct FwpmFilterDeleteByKey0 against S2.",
+  "run_counts": {
+    "states_halfset": 8,
+    "states_ours": 6,
+    "states_n1": 1,
+    "passes_per_state": 3,
+    "cycles": 42,
+    "n1_cycles": 3,
+    "account_control_rows": 252,
+    "account_during_rows": 252
+  },
+  "results": {
+    "account_control_rows_connected": "252 of 252",
+    "account_during_rows": {
+      "connected": 150,
+      "blocked": 102,
+      "blocked_error_code": "10013 in all 102",
+      "probe_ms_range": [
+        1,
+        41
+      ]
+    },
+    "operator": {
+      "loopback_before_filters_all_ok_cycles": "42 of 42",
+      "loopback_during_all_ok_cycles": "42 of 42",
+      "outside_permit_range_before": "3 of 3 in each of 42 cycles"
+    },
+    "watchdog": {
+      "failures": 0,
+      "connects_per_cycle": "1 or 2",
+      "aborted": false
+    },
+    "post_state_direct_checks": "clean after removal in 45 of 45 cycles (42 connect cycles and 3 N1): S1, S2, S3 0 filters and sublayers absent, provider absent, export hits 0, no foreign filter",
+    "states": {
+      "R0": {
+        "title": "no filters (control)",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "absent",
+        "srt_win_filters_on_S1": 0,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "open",
+          "v4:61764": "open",
+          "v6:61764": "open",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        }
+      },
+      "R1": {
+        "title": "full set from install_filters",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "installed",
+        "srt_win_filters_on_S1": 4,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "blocked",
+          "v6:61763": "blocked",
+          "v4:61764": "blocked",
+          "v6:61764": "blocked",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        }
+      },
+      "R2": {
+        "title": "V4 block deleted (V6 block and both permits remain)",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "installed",
+        "srt_win_filters_on_S1": 3,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "blocked",
+          "v4:61764": "open",
+          "v6:61764": "blocked",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        }
+      },
+      "R3": {
+        "title": "V6 block deleted (V4 block and both permits remain)",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "installed",
+        "srt_win_filters_on_S1": 3,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "blocked",
+          "v6:61763": "open",
+          "v4:61764": "blocked",
+          "v6:61764": "open",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        }
+      },
+      "R4": {
+        "title": "both blocks deleted, permits remain",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "absent",
+        "srt_win_filters_on_S1": 2,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "open",
+          "v4:61764": "open",
+          "v6:61764": "open",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        }
+      },
+      "R5": {
+        "title": "permits deleted, blocks remain",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "installed",
+        "srt_win_filters_on_S1": 2,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "blocked",
+          "v6:61763": "blocked",
+          "v4:61764": "blocked",
+          "v6:61764": "blocked",
+          "v4:60085": "blocked",
+          "v6:60085": "blocked"
+        }
+      },
+      "R6": {
+        "title": "stale: full set for the stale test SID",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "installed",
+        "srt_win_filters_on_S1": 4,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "open",
+          "v4:61764": "open",
+          "v6:61764": "open",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        }
+      },
+      "R7": {
+        "title": "S3: our unlabelled blocks for the account; srt-win status read on S1 (empty)",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": "absent",
+        "srt_win_filters_on_S1": 0,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "blocked",
+          "v6:61763": "blocked",
+          "v4:61764": "blocked",
+          "v6:61764": "blocked",
+          "v4:60085": "blocked",
+          "v6:60085": "blocked"
+        }
+      },
+      "O1": {
+        "title": "S2 set: V4 block only",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": null,
+        "srt_win_filters_on_S1": null,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "blocked",
+          "v6:61763": "open",
+          "v4:61764": "blocked",
+          "v6:61764": "open",
+          "v4:60085": "blocked",
+          "v6:60085": "open"
+        }
+      },
+      "O2": {
+        "title": "S2 set: V6 block only",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": null,
+        "srt_win_filters_on_S1": null,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "blocked",
+          "v4:61764": "open",
+          "v6:61764": "blocked",
+          "v4:60085": "open",
+          "v6:60085": "blocked"
+        }
+      },
+      "O3": {
+        "title": "S2 set: permit without a block",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": null,
+        "srt_win_filters_on_S1": null,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "open",
+          "v4:61764": "open",
+          "v6:61764": "open",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        }
+      },
+      "O4": {
+        "title": "S2 set: both blocks + an exact-port permit (127.0.0.1, no user condition)",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": null,
+        "srt_win_filters_on_S1": null,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "blocked",
+          "v4:61764": "blocked",
+          "v6:61764": "blocked",
+          "v4:60085": "blocked",
+          "v6:60085": "blocked"
+        }
+      },
+      "O5": {
+        "title": "S2: a block with no provider, attempted (the engine's answer is the result)",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": null,
+        "srt_win_filters_on_S1": null,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "blocked",
+          "v6:61763": "open",
+          "v4:61764": "blocked",
+          "v6:61764": "open",
+          "v4:60085": "blocked",
+          "v6:60085": "open"
+        },
+        "attempt_engine_answer": "added"
+      },
+      "O6": {
+        "title": "a filter naming a missing sublayer, attempted (the engine's answer is the result)",
+        "passes": 3,
+        "passes_identical": true,
+        "srt_win_status_on_S1": null,
+        "srt_win_filters_on_S1": null,
+        "account_connect_with_state_in_place": {
+          "v4:61763": "open",
+          "v6:61763": "open",
+          "v4:61764": "open",
+          "v6:61764": "open",
+          "v4:60085": "open",
+          "v6:60085": "open"
+        },
+        "attempt_engine_answer": "error: FwpmFilterAdd0 0x80320007"
+      },
+      "N1": {
+        "title": "non-elevated add and delete by the account's own standard token against S2",
+        "passes": 3,
+        "passes_identical": true,
+        "add": {
+          "verdict": "denied",
+          "code": "0x00000005",
+          "phase": "call"
+        },
+        "delete": {
+          "verdict": "denied",
+          "code": "0x00000005",
+          "phase": "call"
+        }
+      }
+    }
+  },
+  "exports": {
+    "count": 95,
+    "distinct_sha256": 1,
+    "sha256": "2fd651444b67f5de3592191dafadede2b8e907afc83fadeb4a0a0622ee48b310",
+    "bytes_each": 3557094,
+    "taken": "before adding and after removal only",
+    "bundled": false
+  },
+  "not_measured": [
+    "any target beyond loopback (no internet address, no other host)",
+    "UDP, DNS and other ports than 61763, 61764 and 60085",
+    "persistence: each state stood seconds; no restart, hold or sleep",
+    "variation across boots or days (three back-to-back passes on one boot)",
+    "the batch-logon token of the account's scheduled task under these states",
+    "the Network Configuration Operators row (not run)",
+    "whether the session was elevated, the launch command lines, other machine load and the Bitdefender state during the runs (not recorded)",
+    "engine access list dumps",
+    "exports while a state stood",
+    "speed (connect results take 1 to 41 ms)"
+  ],
+  "replication_note": "Three passes per state ran minutes apart on one boot and agreed in every state; that is a repeat, not independent replication. No variation across conditions was measured.",
+  "raw_data": [
+    "docs/research/containment-evidence-2026-10-05/nep0005-open-questions/runs/"
+  ]
+}

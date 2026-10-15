@@ -15,13 +15,13 @@
       "source": "Win32_PnPSignedDriver, measured 2026-08-06 20:31 local"
     },
     "hardware": "Intel Core Ultra 7 258V (Lunar Lake), Arc 140V iGPU (16GB), Intel AI Boost NPU, 32 GB LPDDR5X",
-    "ovms_model_cache": "enabled (C:/Users/mrbla/agentic-setup/state/ovms-model-cache)",
+    "ovms_model_cache": "enabled (C:/Users/__USER__/agentic-setup/state/ovms-model-cache)",
     "measured_tree": {
       "blarai": "85677aeb",
       "blarai_on_main": "yes",
       "blarai_tree": "clean",
       "agentic_setup_driver": "8a919835",
-      "pin": "#1181 pinned driver tree C:/Users/mrbla/agentic-battery-measured"
+      "pin": "#1181 pinned driver tree C:/Users/__USER__/agentic-battery-measured"
     }
   },
   "methodology": {

@@ -1,0 +1,1641 @@
+{
+ "instrument": "tools/probes/containment_arms/effective_access.py",
+ "ticket": "#1740",
+ "measured_at": "2026-10-10T22:12:42-04:00",
+ "host": "__HOST__",
+ "os": "Windows-11-10.0.26200-SP0",
+ "python": "3.14.3",
+ "meta": {
+  "write_restricting_sid": "S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337",
+  "appcontainer_package_sid": "S-1-15-2-511693013-2200191202-2337640276-3919116112-352687333-1876379925-252797497",
+  "operator_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+  "coder_sid": "S-1-5-21-1000000001-1000000002-1000000003-1009",
+  "tokens": {
+   "V_elevated_full": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-114",
+     "S-1-5-32-544",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [],
+    "restricting_sids": [],
+    "integrity": "S-1-16-12288",
+    "appcontainer_sid": "",
+    "privileges": [
+     "SeIncreaseQuotaPrivilege",
+     "SeSecurityPrivilege",
+     "SeTakeOwnershipPrivilege",
+     "SeLoadDriverPrivilege",
+     "SeSystemProfilePrivilege",
+     "SeSystemtimePrivilege",
+     "SeProfileSingleProcessPrivilege",
+     "SeIncreaseBasePriorityPrivilege",
+     "SeCreatePagefilePrivilege",
+     "SeBackupPrivilege",
+     "SeRestorePrivilege",
+     "SeShutdownPrivilege",
+     "SeDebugPrivilege",
+     "SeSystemEnvironmentPrivilege",
+     "SeChangeNotifyPrivilege",
+     "SeRemoteShutdownPrivilege",
+     "SeUndockPrivilege",
+     "SeManageVolumePrivilege",
+     "SeImpersonatePrivilege",
+     "SeCreateGlobalPrivilege",
+     "SeIncreaseWorkingSetPrivilege",
+     "SeTimeZonePrivilege",
+     "SeCreateSymbolicLinkPrivilege",
+     "SeDelegateSessionUserImpersonatePrivilege"
+    ]
+   },
+   "D_real_limited": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [
+     "S-1-5-114",
+     "S-1-5-32-544"
+    ],
+    "restricting_sids": [],
+    "integrity": "S-1-16-8192",
+    "appcontainer_sid": "",
+    "privileges": [
+     "SeShutdownPrivilege",
+     "SeChangeNotifyPrivilege",
+     "SeUndockPrivilege",
+     "SeIncreaseWorkingSetPrivilege",
+     "SeTimeZonePrivilege"
+    ]
+   },
+   "D_limited_equivalent": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [
+     "S-1-5-114",
+     "S-1-5-32-544"
+    ],
+    "restricting_sids": [],
+    "integrity": "S-1-16-8192",
+    "appcontainer_sid": "",
+    "privileges": [
+     "SeChangeNotifyPrivilege"
+    ]
+   },
+   "B1_safer_normaluser": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-114",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [
+     "S-1-5-32-544"
+    ],
+    "restricting_sids": [],
+    "integrity": "S-1-16-12288",
+    "appcontainer_sid": "",
+    "privileges": [
+     "SeChangeNotifyPrivilege"
+    ]
+   },
+   "B2_write_restricted": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [
+     "S-1-5-114",
+     "S-1-5-32-544"
+    ],
+    "restricting_sids": [
+     "S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337"
+    ],
+    "integrity": "S-1-16-8192",
+    "appcontainer_sid": "",
+    "privileges": [
+     "SeChangeNotifyPrivilege"
+    ]
+   },
+   "B2e_write_restricted_everyone": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [
+     "S-1-5-114",
+     "S-1-5-32-544"
+    ],
+    "restricting_sids": [
+     "S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337",
+     "S-1-1-0",
+     "S-1-5-12"
+    ],
+    "integrity": "S-1-16-8192",
+    "appcontainer_sid": "",
+    "privileges": [
+     "SeChangeNotifyPrivilege"
+    ]
+   },
+   "C_appcontainer_PREDICTION": {
+    "user": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+    "groups_enabled": [
+     "S-1-1-0",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545",
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-11",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-5-5-0-273776",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ],
+    "groups_deny_only": [
+     "S-1-5-114",
+     "S-1-5-32-544"
+    ],
+    "restricting_sids": [],
+    "integrity": "S-1-16-4096",
+    "appcontainer_sid": "S-1-15-2-511693013-2200191202-2337640276-3919116112-352687333-1876379925-252797497",
+    "privileges": [
+     "SeChangeNotifyPrivilege"
+    ]
+   }
+  },
+  "authz_groups": {
+   "D_authz_from_sid": {
+    "computed": [
+     "S-1-1-0",
+     "S-1-5-11",
+     "S-1-5-21-1000000001-1000000002-1000000003-513",
+     "S-1-5-32-544",
+     "S-1-5-32-578",
+     "S-1-5-32-559",
+     "S-1-5-32-545"
+    ],
+    "added": [
+     "S-1-5-4",
+     "S-1-2-1",
+     "S-1-5-15",
+     "S-1-11-96-3623454863-58364-18864-2661722203-1597581903-1366353439-1241100684-1696328449-2635233468-1786154370",
+     "S-1-5-113",
+     "S-1-2-0",
+     "S-1-5-64-36"
+    ]
+   },
+   "A_dedicated_account": {
+    "computed": [
+     "S-1-1-0",
+     "S-1-5-11",
+     "S-1-5-21-1000000001-1000000002-1000000003-513",
+     "S-1-5-32-545"
+    ],
+    "added": [
+     "S-1-2-0",
+     "S-1-5-15",
+     "S-1-5-3"
+    ]
+   }
+  }
+ },
+ "rows": [
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\grant-A",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1009)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\deny-A",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(D;OICI;DCLCRPCR;;;S-1-5-21-1000000001-1000000002-1000000003-1009)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1009)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001300a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\grant-D",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\deny-D",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(D;OICI;DCLCRPCR;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f00e9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001700a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001700a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001700a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f00e9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\grant-B2",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;OICI;0x1301bf;;;S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\deny-B2",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(D;OICI;DCLCRPCR;;;S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;OICI;0x1301bf;;;S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001300a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001300a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": true,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\grant-C",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;OICI;0x1301bf;;;S-1-15-2-511693013-2200191202-2337640276-3919116112-352687333-1876379925-252797497)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\instrument\\deny-C",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(D;OICI;DCLCRPCR;;;S-1-15-2-511693013-2200191202-2337640276-3919116112-352687333-1876379925-252797497)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;OICI;0x1301bf;;;S-1-15-2-511693013-2200191202-2337640276-3919116112-352687333-1876379925-252797497)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\leak\\models",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;ID;FA;;;BA)(A;OICIIOID;GA;;;BA)(A;ID;FA;;;SY)(A;OICIIOID;GA;;;SY)(A;ID;0x1301bf;;;AU)(A;OICIIOID;SDGXGWGR;;;AU)(A;ID;0x1200a9;;;BU)(A;OICIIOID;GXGR;;;BU)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\leak\\fleet",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1009)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIID;0x1200a9;;;BU)(A;ID;0x1301bf;;;AU)(A;OICIIOID;SDGXGWGR;;;AU)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\leak\\projects",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1009)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;S-1-5-21-1000000001-1000000002-1000000003-1001)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200e9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200e9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\leak\\windows-temp-today",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x00060000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\leak\\authenticated-users-modify",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;AU)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\leak\\windows-temp-classic",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;CI;0x100026;;;BU)(A;OICIIO;FA;;;CO)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x00160026",
+     "read": false,
+     "write": true,
+     "create_subfolder": true,
+     "delete": false,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x00160026",
+     "read": false,
+     "write": true,
+     "create_subfolder": true,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x00160026",
+     "read": false,
+     "write": true,
+     "create_subfolder": true,
+     "delete": false,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x00100020",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x00100020",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x00100026",
+     "read": false,
+     "write": true,
+     "create_subfolder": true,
+     "delete": false,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\leak\\users-modify",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;BU)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001200a9",
+     "read": true,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x00000000",
+     "read": false,
+     "write": false,
+     "create_subfolder": false,
+     "delete": false,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  },
+  {
+   "kind": "fixture",
+   "path": "C:\\blarai-spike-1740\\worktree",
+   "status": "ok",
+   "is_dir": true,
+   "sddl": "O:S-1-5-21-1000000001-1000000002-1000000003-1001G:S-1-5-21-1000000001-1000000002-1000000003-1001D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1001)(A;OICI;0x1301bf;;;S-1-5-21-1000000001-1000000002-1000000003-1009)(A;OICI;0x1301bf;;;S-1-5-80-405025382-4035130529-4158543710-3016580376-1481815337)(A;OICI;0x1301bf;;;S-1-15-2-511693013-2200191202-2337640276-3919116112-352687333-1876379925-252797497)",
+   "access": {
+    "V_elevated_full": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_real_limited": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "D_limited_equivalent": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B1_safer_normaluser": {
+     "mask": "0x001701bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "B2_write_restricted": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    },
+    "B2e_write_restricted_everyone": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    },
+    "C_appcontainer_PREDICTION": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    },
+    "D_authz_from_sid": {
+     "mask": "0x001f01ff",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": true
+    },
+    "A_dedicated_account": {
+     "mask": "0x001301bf",
+     "read": true,
+     "write": true,
+     "create_subfolder": true,
+     "delete": true,
+     "change_permissions": false
+    }
+   },
+   "instrument_agreement": {
+    "limited_equivalent_vs_real": true,
+    "authz_vs_elevated": true
+   }
+  }
+ ]
+}

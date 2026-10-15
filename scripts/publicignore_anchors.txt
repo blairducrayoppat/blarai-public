@@ -1,0 +1,7 @@
+# Paths the public posts and the dataset card cite. The list in .publicignore may not exclude any of them (a trailing slash
+# names everything beneath); the lock reads this file from the index and the publisher reads it from the source ref.
+README.md
+LICENSE.md
+docs/research/account-level-containment-evidence-2026-10-05.md
+docs/research/containment-evidence-2026-10-05/
+docs/research/windows-containment-comparison-2026-10/

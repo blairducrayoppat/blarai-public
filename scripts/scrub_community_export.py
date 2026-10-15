@@ -11,8 +11,9 @@ integrity gate `scripts/verify_community_scrub.py`, which adversarially checks t
 result against the original. Do NOT merge the two — a scrub that self-certifies is
 not a check; independence is the entire point.
 
-INTERNAL TOOL — embeds local-path patterns (incl. the username + hostname). Do NOT
-publish it. Keep SUBSTITUTIONS in sync (independently) with the verifier's list.
+The operator and host names are not embedded: the path patterns read them from the
+machine and apply_subs also replaces any token identity_lock recognises by digest, so the
+scrub holds under any account. Keep SUBSTITUTIONS in sync (independently) with the verifier.
 
 Usage:
   python scripts/scrub_community_export.py --out-dir <dir> <file> [<file> ...]
@@ -25,9 +26,15 @@ running this, run the verifier on every (original, scrubbed) pair; exit 0 requir
 from __future__ import annotations
 
 import argparse
+import getpass
+import os
+import platform
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import identity_lock as _il  # noqa: E402  (digest recognition of this machine's names; works under any account)
 
 # Enumerated machine-local-path -> placeholder substitutions: the ONLY string changes
 # the scrub is permitted to make. Most-specific FIRST. Patterns match the parsed file
@@ -37,13 +44,17 @@ from pathlib import Path
 # backslash (`\\` in the on-disk text), or a forward slash. Match all three so the
 # scrub works on raw JSON text (where separators are `\\`) AND plain text / Unix paths.
 _SEP = r"(?:\\{1,2}|/)"
+# The operator user name and the host name are read from the machine, never held as literals (gate lock: tests/security/test_no_host_identity_in_tree.py).
+# Set USERNAME / COMPUTERNAME to scrub another machine's names.
+_USER = re.escape(os.environ.get("USERNAME") or getpass.getuser())
+_HOST = re.escape(os.environ.get("COMPUTERNAME") or platform.node())
 SUBSTITUTIONS: list[tuple[str, str]] = [
-    (rf"[A-Za-z]:{_SEP}Users{_SEP}mrbla{_SEP}AppData{_SEP}Local{_SEP}Temp{_SEP}claude{_SEP}[^\"'\s]*", "<scratch>"),
-    (rf"[A-Za-z]:{_SEP}Users{_SEP}mrbla{_SEP}tools{_SEP}intel-ut[^\"'\s]*", "<ut-home>"),
-    (rf"[A-Za-z]:{_SEP}Users{_SEP}mrbla{_SEP}(?:blarai|BlarAI)", "<repo>"),
-    (rf"[A-Za-z]:{_SEP}Users{_SEP}mrbla", "<home>"),
-    (r"(?i)\bNORTHSTAR100\b", "<host>"),
-    (r"\bmrbla\b", "<user>"),
+    (rf"[A-Za-z]:{_SEP}Users{_SEP}{_USER}{_SEP}AppData{_SEP}Local{_SEP}Temp{_SEP}claude{_SEP}[^\"'\s]*", "<scratch>"),
+    (rf"[A-Za-z]:{_SEP}Users{_SEP}{_USER}{_SEP}tools{_SEP}intel-ut[^\"'\s]*", "<ut-home>"),
+    (rf"[A-Za-z]:{_SEP}Users{_SEP}{_USER}{_SEP}(?:blarai|BlarAI)", "<repo>"),
+    (rf"[A-Za-z]:{_SEP}Users{_SEP}{_USER}", "<home>"),
+    (rf"(?i)\b{_HOST}\b", "<host>"),
+    (rf"(?i)\b{_USER}\b", "<user>"),
 ]
 
 
@@ -52,6 +63,13 @@ def apply_subs(text: str) -> tuple[str, int]:
     n = 0
     for pat, repl in SUBSTITUTIONS:
         out, k = re.subn(pat, repl, out)
+        n += k
+    hosts, users = _il.find_hits(out.encode('utf-8', 'surrogatepass'))
+    for tok in sorted(hosts, key=len, reverse=True):
+        out, k = re.subn(re.escape(tok.decode()), '<host>', out, flags=re.IGNORECASE)
+        n += k
+    for tok in sorted(users, key=len, reverse=True):
+        out, k = re.subn(r'(?<![A-Za-z])' + re.escape(tok.decode()) + r'(?![A-Za-z])', '<user>', out, flags=re.IGNORECASE)
         n += k
     return out, n
 

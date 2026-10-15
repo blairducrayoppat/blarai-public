@@ -1,7 +1,10 @@
 """Rotate a dated append-log's tail into monthly archive volumes + a one-line index.
 
 The standing instrument for the monthly retrospective's rotation step (#945 D1/D5,
-LA-approved 2026-07-19). Byte-preserving: entries are moved verbatim, never rewritten.
+LA-approved 2026-07-19). Byte-preserving: entries are moved verbatim, never rewritten; an entry carrying the host name or
+the operator account name (scripts/identity_lock.py) is REFUSED before any volume is written, because the volume would be
+a new file outside scripts/identity_user_baseline.json: edit the hot entry to read __USER__ (then drop the hot file from
+the baseline if it carried nothing else) and run again.
 
 An entry starts at a line matching '### YYYY-MM-DD'. Everything before the first entry
 (the file's preamble) always stays in the hot file. Entries whose month is older than
@@ -121,6 +124,15 @@ def main() -> int:
     if args.dry_run:
         print("dry-run: no files written")
         return 0
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts"))
+    import identity_lock as il  # noqa: E402
+
+    carrying = [e["date"] for e in cold if any(il.find_hits(e["text"].encode("utf-8")))]
+    if carrying:
+        print(f"REFUSED: {len(carrying)} entr(ies) to move carry the host or operator account name ({', '.join(carrying)}); "
+              "edit them to read __USER__ / __HOST__ in the hot file first (scripts/identity_user_baseline.json only shrinks)")
+        return 2
 
     os.makedirs(args.archive_dir, exist_ok=True)
     for month in sorted(volumes):
