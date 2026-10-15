@@ -46,7 +46,7 @@ STATUS_RE = re.compile(r"OBSERVED|STATIC|NOT ESTABLISHED|CONTRADICTED")
 PATH_RE = re.compile(r"`((?:docs|tests|scripts|services|shared)/[^`\s]+?)`")
 CUT = 100
 MARKER = "...[truncated to 100 chars]"
-META = {"README.md", "CHANGES.md", "make_changes.py"}  # authored here (top level), not copies
+META = {"README.md", "CHANGES.md", "make_changes.py", "LICENSE-CC-BY-4.0.txt", "LICENSE-APACHE-2.0.txt"}  # authored here (top level), not copies
 AS_RUN = "confined-model-spike/as-run"
 # The NEP-0005 code files (#1763) carry the test account's SID as a recorded constant on the placeholder domain, the same domain the run
 # data was sanitised to; the hashes of the reviewed bytes and of the rewritten bytes are both recorded in nep0005-open-questions/runs/AS_RUN.md.

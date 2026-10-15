@@ -38,7 +38,7 @@ For the other scripts there is no timestamp evidence of edits between provisioni
 - Line endings: the originals were CRLF; every text file here is stored LF (the folder is pinned `eol=lf` in `.gitattributes`, and
   all hashes, counts and diffs use LF-normalised bytes). A UTF-8 BOM is kept where the source had one. Script content is otherwise
   unchanged apart from the replacements above.
-- `README.md`, `CHANGES.md` and `make_changes.py` are authored here, not copied.
+- `README.md`, `CHANGES.md` and `make_changes.py` are authored here, not copied; `LICENSE-CC-BY-4.0.txt` and `LICENSE-APACHE-2.0.txt` are the licence texts, fetched unchanged.
 - The counts below are of the placeholders present in each bundled file; the test recounts them.
 
 | File | Kind | User-name | Machine-name | SID-domain | Model-text cut | Hardened vs as-run (arm 1 vs hardened, arm 2 vs arm 1, arm 3 vs arm 2) |

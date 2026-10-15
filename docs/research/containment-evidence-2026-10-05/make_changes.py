@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent
 USER_PH, MACH_PH = "_OPERATOR_", "_MACHINE_"
 PH_DOMAINS = ("1000000001-1000000002-1000000003", "1000000004-1000000005-1000000006")
 MARKER = "...[truncated to 100 chars]"
-META = {"README.md", "CHANGES.md", "make_changes.py"}
+META = {"README.md", "CHANGES.md", "make_changes.py", "LICENSE-CC-BY-4.0.txt", "LICENSE-APACHE-2.0.txt"}
 AS_RUN = "confined-model-spike/as-run"
 HARDENED = "confined-model-spike/post-run-hardened"
 ARM1 = "arm1-permit/scripts"
@@ -73,7 +73,7 @@ For the other scripts there is no timestamp evidence of edits between provisioni
 - Line endings: the originals were CRLF; every text file here is stored LF (the folder is pinned `eol=lf` in `.gitattributes`, and
   all hashes, counts and diffs use LF-normalised bytes). A UTF-8 BOM is kept where the source had one. Script content is otherwise
   unchanged apart from the replacements above.
-- `README.md`, `CHANGES.md` and `make_changes.py` are authored here, not copied.
+- `README.md`, `CHANGES.md` and `make_changes.py` are authored here, not copied; `LICENSE-CC-BY-4.0.txt` and `LICENSE-APACHE-2.0.txt` are the licence texts, fetched unchanged.
 - The counts below are of the placeholders present in each bundled file; the test recounts them.
 
 """

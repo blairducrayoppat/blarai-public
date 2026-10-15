@@ -1,7 +1,7 @@
 # Containment evidence bundle (2026-10-05)
 
-Required Notice: Copyright (c) 2026 Blair DuCray-Oppat. This bundle is covered by the repository licence
-(`LICENSE.md`); commercial use requires a separate license (`COMMERCIAL-LICENSE.md`). Companion to
+Required Notice: Copyright (c) 2026 Blair DuCray-Oppat. Licence of this bundle (LA ruling 2026-10-13, #1741): the run data, records, claims and write-ups in it are licensed under CC BY 4.0 (`LICENSE-CC-BY-4.0.txt`); the measurement scripts, harness, driver and the srt-win patches are licensed under Apache-2.0 (`LICENSE-APACHE-2.0.txt`), the licence of anthropics/sandbox-runtime, so the patches can be contributed to it. The Apache-2.0 files are the code: the scripts in `wfp-spike/`, `arm1-permit/scripts/`, `arm2-hold/scripts/`, `arm3-persist/scripts/`, `confined-model-spike/as-run/` and `confined-model-spike/post-run-hardened/` and `nep0005-open-questions/scripts/`, the harness in `nep0005-open-questions/harness/`, the code in `nep0005-open-questions/srtcli/` (the driver, its deploy and export scripts, the `fix/*.mjs` test scripts and the srt-win patches `srtcli/fix/*.patch` and `srtcli/fix/pr/*.patch`), and `make_changes.py`. Everything else in this bundle is CC BY 4.0. The srt-win patches modify Apache-2.0 code from anthropics/sandbox-runtime (Copyright 2025 Anthropic) and keep its licence. The rest of the repository stays under `LICENSE.md`.
+Companion to
 `docs/research/account-level-containment-evidence-2026-10-05.md` (read that first: it states what each file does and
 does not show).
 

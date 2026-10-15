@@ -3,6 +3,8 @@
 Status: evidence record, not a proof and not a decision. Author: a Claude session for the Lead Architect (LA). Nothing in
 BlarAI's runtime changes because of this document. Every raw-data file cited is in `docs/research/containment-evidence-2026-10-05/`.
 
+Licence (LA ruling 2026-10-13, #1741): this write-up and the run data are CC BY 4.0; the scripts, harness, driver and srt-win patches are Apache-2.0. The bundle README's licence section (`docs/research/containment-evidence-2026-10-05/README.md`) lists which files are which.
+
 ## 1. Outcome in plain language
 
 On this one laptop, in these runs, an outbound IPv4 TCP port 443 connect from a dedicated low-privilege account failed
