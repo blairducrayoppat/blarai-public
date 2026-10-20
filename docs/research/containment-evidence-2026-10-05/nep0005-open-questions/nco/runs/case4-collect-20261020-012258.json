@@ -1,0 +1,309 @@
+{
+  "kind": "nep5-case4-collect",
+  "at": "2026-10-20T01:22:58.9446405-04:00",
+  "code": 0,
+  "probe_stop_lines": [],
+  "probe_left_behind": [],
+  "prepare": {
+    "ok": true,
+    "name": "case4-prepare-20261020-004848.json",
+    "problem": ""
+  },
+  "valid": [
+    {
+      "file": "case4-A-20261020-052240-21428.json",
+      "sha256": "52651cf17dbd537f4ad9f80dd849d4cf7e4ab920fa6f328d3fd5cc31848acc02",
+      "elevation_type": 2
+    },
+    {
+      "file": "case4-A-20261020-052241-23964.json",
+      "sha256": "109fd0b02fdc1f13ef4d85b293c3097c010b2b2ce84de31b864a2ee7c86f5b18",
+      "elevation_type": 2
+    },
+    {
+      "file": "case4-A-20261020-052242-13572.json",
+      "sha256": "14b93647b388135f01851161bf63ba0730052a419126b69837e241b818fdcdaa",
+      "elevation_type": 2
+    },
+    {
+      "file": "case4-F-20261020-050515-23756.json",
+      "sha256": "6c08e046e63596b024ae8eb5612cf16a7a7f963d06acf81fa5bc21583744c9dc",
+      "elevation_type": 3
+    },
+    {
+      "file": "case4-F-20261020-051400-5880.json",
+      "sha256": "2201e9304509d6f9fa620c598137fc118cfcf15992236b7fcae31fd5cf92f8c5",
+      "elevation_type": 3
+    },
+    {
+      "file": "case4-F-20261020-051424-25640.json",
+      "sha256": "f18fab4a0ae776c1b5c891bb22598f98efb14e8f2d326a045887acf04f226a90",
+      "elevation_type": 3
+    },
+    {
+      "file": "case4-F-20261020-051440-28652.json",
+      "sha256": "566e616d073050ffa2e51bc57f44bdbcb86bca27689ef8c309a4d8c8a5bae7ed",
+      "elevation_type": 3
+    },
+    {
+      "file": "case4-S-20261020-052145-19624.json",
+      "sha256": "d5fa551bed8d4bdc6fe03cb3e9dd889fc429e007c780799f597ee9ce0612f6a2",
+      "elevation_type": 3
+    },
+    {
+      "file": "case4-S-20261020-052147-18812.json",
+      "sha256": "8f4846906b9011fdf11187dc10952e20f1880b9c36c923520f29b227fe760c99",
+      "elevation_type": 3
+    },
+    {
+      "file": "case4-S-20261020-052148-15020.json",
+      "sha256": "a3b54ce7176a481645ffc6aceff67a2e98f6d47693e4db7c536be062f51d1bd2",
+      "elevation_type": 3
+    }
+  ],
+  "invalid": [],
+  "invalid_by_kind": {},
+  "wrong_account": [],
+  "e_elevated_as_account": [],
+  "elevation_refused": {
+    "given": true,
+    "counted": true,
+    "note": "Windows elevation prompt from the nco-probe console offered only the administrator accounts of this machine, with no field to name nco-probe; the operator cancelled it, four times",
+    "contradicted_by": [],
+    "reason": "counted as the E result: no E record shows the account's elevated token"
+  },
+  "copies": [
+    {
+      "file": "case4-A-20261020-052240-21428.json",
+      "sha256": "52651cf17dbd537f4ad9f80dd849d4cf7e4ab920fa6f328d3fd5cc31848acc02",
+      "status": "written"
+    },
+    {
+      "file": "case4-A-20261020-052241-23964.json",
+      "sha256": "109fd0b02fdc1f13ef4d85b293c3097c010b2b2ce84de31b864a2ee7c86f5b18",
+      "status": "written"
+    },
+    {
+      "file": "case4-A-20261020-052242-13572.json",
+      "sha256": "14b93647b388135f01851161bf63ba0730052a419126b69837e241b818fdcdaa",
+      "status": "written"
+    },
+    {
+      "file": "case4-F-20261020-050515-23756.json",
+      "sha256": "6c08e046e63596b024ae8eb5612cf16a7a7f963d06acf81fa5bc21583744c9dc",
+      "status": "written"
+    },
+    {
+      "file": "case4-F-20261020-051400-5880.json",
+      "sha256": "2201e9304509d6f9fa620c598137fc118cfcf15992236b7fcae31fd5cf92f8c5",
+      "status": "written"
+    },
+    {
+      "file": "case4-F-20261020-051424-25640.json",
+      "sha256": "f18fab4a0ae776c1b5c891bb22598f98efb14e8f2d326a045887acf04f226a90",
+      "status": "written"
+    },
+    {
+      "file": "case4-F-20261020-051440-28652.json",
+      "sha256": "566e616d073050ffa2e51bc57f44bdbcb86bca27689ef8c309a4d8c8a5bae7ed",
+      "status": "written"
+    },
+    {
+      "file": "case4-S-20261020-052145-19624.json",
+      "sha256": "d5fa551bed8d4bdc6fe03cb3e9dd889fc429e007c780799f597ee9ce0612f6a2",
+      "status": "written"
+    },
+    {
+      "file": "case4-S-20261020-052147-18812.json",
+      "sha256": "8f4846906b9011fdf11187dc10952e20f1880b9c36c923520f29b227fe760c99",
+      "status": "written"
+    },
+    {
+      "file": "case4-S-20261020-052148-15020.json",
+      "sha256": "a3b54ce7176a481645ffc6aceff67a2e98f6d47693e4db7c536be062f51d1bd2",
+      "status": "written"
+    }
+  ],
+  "left_behind": [],
+  "foreign": [],
+  "residue": {
+    "readable": true,
+    "problems": [],
+    "provider_present": true,
+    "s2_present": true,
+    "enum_skipped": false,
+    "probe_key_present": false
+  },
+  "rows": [
+    {
+      "cond": "A",
+      "file": "case4-A-20261020-052240-21428.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "elevation_type": "2 full",
+      "integrity": "high",
+      "linked_token": true,
+      "nco_group": "absent",
+      "admins_group": "0x0000000F enabled",
+      "add": "0x00000000 succeeded",
+      "delete": "0x00000000 succeeded",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "A",
+      "file": "case4-A-20261020-052241-23964.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "elevation_type": "2 full",
+      "integrity": "high",
+      "linked_token": true,
+      "nco_group": "absent",
+      "admins_group": "0x0000000F enabled",
+      "add": "0x00000000 succeeded",
+      "delete": "0x00000000 succeeded",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "A",
+      "file": "case4-A-20261020-052242-13572.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "elevation_type": "2 full",
+      "integrity": "high",
+      "linked_token": true,
+      "nco_group": "absent",
+      "admins_group": "0x0000000F enabled",
+      "add": "0x00000000 succeeded",
+      "delete": "0x00000000 succeeded",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "F",
+      "file": "case4-F-20261020-050515-23756.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-2250",
+      "elevation_type": "3 limited",
+      "integrity": "medium",
+      "linked_token": true,
+      "nco_group": "0x00000010 deny-only",
+      "admins_group": "absent",
+      "add": "0x00000005 denied",
+      "delete": "0x80320003 not_found",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "F",
+      "file": "case4-F-20261020-051400-5880.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-2250",
+      "elevation_type": "3 limited",
+      "integrity": "medium",
+      "linked_token": true,
+      "nco_group": "0x00000010 deny-only",
+      "admins_group": "absent",
+      "add": "0x00000005 denied",
+      "delete": "0x80320003 not_found",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "F",
+      "file": "case4-F-20261020-051424-25640.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-2250",
+      "elevation_type": "3 limited",
+      "integrity": "medium",
+      "linked_token": true,
+      "nco_group": "0x00000010 deny-only",
+      "admins_group": "absent",
+      "add": "0x00000005 denied",
+      "delete": "0x80320003 not_found",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "F",
+      "file": "case4-F-20261020-051440-28652.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-2250",
+      "elevation_type": "3 limited",
+      "integrity": "medium",
+      "linked_token": true,
+      "nco_group": "0x00000010 deny-only",
+      "admins_group": "absent",
+      "add": "0x00000005 denied",
+      "delete": "0x80320003 not_found",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "S",
+      "file": "case4-S-20261020-052145-19624.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "elevation_type": "3 limited",
+      "integrity": "medium",
+      "linked_token": true,
+      "nco_group": "absent",
+      "admins_group": "0x00000010 deny-only",
+      "add": "0x00000005 denied",
+      "delete": "0x80320003 not_found",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "S",
+      "file": "case4-S-20261020-052147-18812.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "elevation_type": "3 limited",
+      "integrity": "medium",
+      "linked_token": true,
+      "nco_group": "absent",
+      "admins_group": "0x00000010 deny-only",
+      "add": "0x00000005 denied",
+      "delete": "0x80320003 not_found",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "S",
+      "file": "case4-S-20261020-052148-15020.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "elevation_type": "3 limited",
+      "integrity": "medium",
+      "linked_token": true,
+      "nco_group": "absent",
+      "admins_group": "0x00000010 deny-only",
+      "add": "0x00000005 denied",
+      "delete": "0x80320003 not_found",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    }
+  ]
+}

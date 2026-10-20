@@ -833,6 +833,7 @@ def test_file_name_scan_toggle_a_sid_name_is_accepted_when_the_scan_is_gone(tmp_
     d = _plain_dir(tmp_path, f"{SID_DOMAIN}.csv", "arm,visit\narm2,1\n")
     assert hf_publish.preflight(d)
     monkeypatch.setattr(hf_publish, "_SID", re.compile("(?!)"))
+    monkeypatch.setattr(hf_publish._il, "find_sid_hits", lambda data: False)
     assert hf_publish.preflight(d) == []
 
 
@@ -1179,3 +1180,196 @@ def test_source_head_read_toggle_an_unreadable_head_passes_when_the_failure_is_i
 
     monkeypatch.setattr(hf_publish, "_blobs", lenient)
     assert hf_publish.mirror_problems(d, repo=mirror, source_repo=plain) == []
+
+
+# ------------------------------------------------------------------------ machine account SID in any container (#1799)
+
+ACCOUNT_SID = "S-1-5-21-4111222333-4222333444-4333444555-1001"
+SID_RECORD = json.dumps({"user_sid": ACCOUNT_SID, "integrity": "S-1-16-8192"}, indent=1)
+SID_CONTAINERS = {
+    "plain": lambda t: t.encode("utf-8"),
+    "gzip": lambda t: __import__("gzip").compress(t.encode("utf-8")),
+    "utf16_bom": lambda t: t.encode("utf-16"),
+    "utf16_le_no_bom": lambda t: t.encode("utf-16-le"),
+    "gzip_of_utf16": lambda t: __import__("gzip").compress(t.encode("utf-16")),
+}
+
+
+def _sid_ds(tmp_path: Path, name: str, data: bytes) -> Path:
+    d = tmp_path / "sidds"
+    d.mkdir()
+    (d / name).write_bytes(data)
+    return d
+
+
+def _sid_refusals(argv_dir: Path, capsys) -> tuple[int, list[str]]:
+    rc = run("preflight", "--dir", str(argv_dir))
+    out = capsys.readouterr().out
+    return rc, [ln for ln in out.splitlines() if ln.startswith("FAIL") and "account SID" in ln]
+
+
+@pytest.mark.parametrize("container", sorted(SID_CONTAINERS))
+def test_preflight_refuses_a_machine_sid_in_every_container(tmp_path, capsys, container):
+    """Entry point: ``hf_publish.py preflight`` refuses with a SID finding, whichever way the file wraps the record."""
+    d = _sid_ds(tmp_path, "run.json", SID_CONTAINERS[container](SID_RECORD))
+    rc, sid_lines = _sid_refusals(d, capsys)
+    assert rc == 1 and sid_lines, f"preflight accepted or mislabelled a SID in a {container} file"
+    assert "4111222333" not in "".join(sid_lines), "a refusal echoed the sub-authorities"
+
+
+def test_preflight_refuses_a_machine_sid_in_a_file_name_of_any_suffix(tmp_path, capsys):
+    d = _sid_ds(tmp_path, f"acl-{ACCOUNT_SID}.json", b"{}")
+    rc, sid_lines = _sid_refusals(d, capsys)
+    assert rc == 1 and sid_lines
+
+
+def test_preflight_passes_the_scrubbed_placeholder_and_the_generic_sids(tmp_path, capsys):
+    record = json.dumps({"user_sid": "S-1-5-21-__MACHINE__-1001", "domain": "S-1-5-21-__MACHINE__", "integrity": "S-1-16-8192",
+                         "low": "S-1-16-4096", "appcontainer": "S-1-15-2-969871995-3242822759-583047763-1618006129-3578262429",
+                         "builtin": "S-1-5-32-544"}, indent=1)
+    d = _sid_ds(tmp_path, "run.json", record.encode("utf-8"))
+    rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 0 and "preflight: CLEAN" in out, out
+
+
+@pytest.mark.parametrize("container", sorted(SID_CONTAINERS))
+def test_sid_rule_toggle_the_refusal_comes_from_the_sid_rule(tmp_path, capsys, monkeypatch, container):
+    """Toggle: with both SID rules removed from the preflight, no finding labelled SID remains for any container, so the SID
+    refusals above come from those rules and not from another check that happens to refuse the file."""
+    d = _sid_ds(tmp_path, "run.json", SID_CONTAINERS[container](SID_RECORD))
+    monkeypatch.setattr(hf_publish._il, "find_sid_hits", lambda data: False)
+    monkeypatch.setattr(hf_publish, "_SID", re.compile("(?!)"))
+    rc, sid_lines = _sid_refusals(d, capsys)
+    assert not sid_lines, f"a SID finding survives with the SID rule removed ({container}): the test does not isolate the rule"
+
+
+# ------------------------------------------------------------------ unreadable input and redaction (#1799 round 4)
+
+def _damaged_gzip() -> bytes:
+    good = __import__("gzip").compress(b"abc")
+    return good[:10] + b"\xff" * 20 + good[-8:]
+
+
+UNREADABLE_FILES = {
+    "damaged_deflate": _damaged_gzip,
+    "trailing_bytes": lambda: __import__("gzip").compress(b"x") + b"trailing",
+    "nul_odd_binary": lambda: b"\0" * 20 + b"\x01",
+    "utf16_lone_surrogate": lambda: b"\xff\xfe\x00\xd8a\0",
+}
+
+
+@pytest.mark.parametrize("name", sorted(UNREADABLE_FILES))
+def test_preflight_names_unreadable_input_and_keeps_its_full_list(tmp_path, capsys, name):
+    """Entry point: an unreadable file is a named finding, never a traceback, and the other refusals are still printed."""
+    d = _sid_ds(tmp_path, "a.json", UNREADABLE_FILES[name]())
+    (d / "b.csv").write_text("arm,visit\nx,C:/Users/someone/x\n", encoding="utf-8")
+    rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "a.json: unreadable" in out, out
+    assert "b.csv" in out, "the problem list stopped at the unreadable file"
+    assert not any("a.json" in ln and "SID" in ln for ln in out.splitlines()), "an unreadable file was labelled a SID"
+
+
+@pytest.mark.parametrize("rel", [f"acl-{ACCOUNT_SID}.json", f"{ACCOUNT_SID}/run.json", f"{ACCOUNT_SID.lower()}.json"])
+def test_preflight_never_prints_a_sid_carried_by_a_file_name(tmp_path, capsys, rel):
+    d = tmp_path / "ds"
+    (d / Path(rel).parent).mkdir(parents=True)
+    (d / rel).write_text("{}", encoding="utf-8")
+    rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 1 and "account SID" in out
+    assert "4111222333" not in out and "file #" in out, out
+
+
+# ------------------------------------------------------------------ round 5: the preflight never raises, never prints a SID name
+
+import contextlib  # noqa: E402
+import subprocess  # noqa: E402
+
+
+@contextlib.contextmanager
+def _denied(path: Path):
+    who = os.environ.get("USERNAME") or USER
+    subprocess.run(["icacls", str(path), "/deny", f"{who}:(R)"], check=True, capture_output=True)
+    try:
+        yield
+    finally:
+        subprocess.run(["icacls", str(path), "/remove:d", who], check=True, capture_output=True)
+
+
+def _other_problem_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "ds"
+    d.mkdir()
+    (d / "b.csv").write_text("arm,visit\nx,C:/Users/someone/x\n", encoding="utf-8")
+    return d
+
+
+def test_preflight_oversize_file_with_a_sid_name_is_shown_as_file_number(tmp_path, capsys, monkeypatch):
+    d = tmp_path / "ds"
+    d.mkdir()
+    (d / f"acl-{ACCOUNT_SID}.csv").write_bytes(b"a,b\n" + b"1,2\n" * 400)
+    rc = run("preflight", "--dir", str(d), "--max-bytes", "1000")
+    out = capsys.readouterr().out
+    assert rc == 1 and "exceeds cap" in out and "4111222333" not in out and "file #0" in out, out
+    # Toggle: with the name rule removed the same line prints the sub-authorities, so the assertion reads the redaction.
+    monkeypatch.setattr(hf_publish._il, "find_sid_hits", lambda data: False)
+    run("preflight", "--dir", str(d), "--max-bytes", "1000")
+    assert "4111222333" in capsys.readouterr().out
+
+
+def test_preflight_names_a_permission_denied_file_and_keeps_its_list(tmp_path, capsys):
+    d = _other_problem_dir(tmp_path)
+    z = d / "a.json"
+    z.write_text("{}", encoding="utf-8")
+    with _denied(z):
+        rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 1 and "a.json: could not be checked (PermissionError)" in out and "b.csv" in out, out
+
+
+def test_preflight_names_a_file_whose_name_cannot_be_encoded_and_keeps_its_list(tmp_path, capsys):
+    d = _other_problem_dir(tmp_path)
+    (d / "z\udc80.json").write_text("{}", encoding="utf-8")
+    rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 1 and "file #0: could not be checked (UnicodeEncodeError)" in out and "b.csv" in out, out
+
+
+@pytest.mark.parametrize("suffix", [".json", ".jsonl"])
+def test_preflight_names_a_json_document_nested_past_the_recursion_limit(tmp_path, capsys, suffix):
+    d = _other_problem_dir(tmp_path)
+    (d / f"deep{suffix}").write_text("[" * 200000 + "]" * 200000, encoding="utf-8")
+    rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 1 and f"deep{suffix}: could not be checked (RecursionError)" in out and "b.csv" in out, out
+
+
+UTF32_FILES = {
+    "utf32_le_no_bom": lambda t: t.encode("utf-32-le"),
+    "utf32_be_no_bom": lambda t: t.encode("utf-32-be"),
+    "utf32_le_bom": lambda t: t.encode("utf-32"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(UTF32_FILES))
+def test_preflight_refuses_a_sid_and_the_host_name_in_utf32_text(tmp_path, capsys, name):
+    d = tmp_path / "ds"
+    d.mkdir()
+    (d / "README.md").write_bytes(UTF32_FILES[name](f"computer {HOST} sid {ACCOUNT_SID} end " * 3))
+    rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 1 and "account SID" in out and "4111222333" not in out, out
+
+
+def test_preflight_a_sid_free_gzip_nested_past_the_cap_is_unreadable_not_a_sid(tmp_path, capsys):
+    gz = b"hello world\n"
+    for _ in range(5):
+        gz = __import__("gzip").compress(gz)
+    d = tmp_path / "ds"
+    d.mkdir()
+    (d / "z.json").write_bytes(gz)
+    rc = run("preflight", "--dir", str(d))
+    out = capsys.readouterr().out
+    assert rc == 1 and "nesting depth" in out and "account SID" not in out, out

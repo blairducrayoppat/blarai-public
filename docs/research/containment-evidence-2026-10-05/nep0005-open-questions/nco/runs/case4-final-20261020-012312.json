@@ -1,0 +1,182 @@
+{
+  "kind": "nep5-case4-final",
+  "at": "2026-10-20T01:23:12.2954093-04:00",
+  "collect": {
+    "code": 0,
+    "valid": 10,
+    "invalid": [],
+    "wrong_account": [],
+    "left_behind": [],
+    "foreign": [],
+    "elevation_refused": {
+      "given": true,
+      "counted": true,
+      "note": "Windows elevation prompt from the nco-probe console offered only the administrator accounts of this machine, with no field to name nco-probe; the operator cancelled it, four times",
+      "contradicted_by": [],
+      "reason": "counted as the E result: no E record shows the account's elevated token"
+    },
+    "record": "C:\\ProgramData\\BlarAI\\trackb-live\\nep5-out\\case4\\case4-collect-20261020-012313.json"
+  },
+  "probe_key_delete": "not_found",
+  "removal": {
+    "ok": true,
+    "steps": [
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0002",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0003",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0004",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0005",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0006",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0021",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0011",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0012",
+        "status": "not_found"
+      },
+      {
+        "step": "sublayer",
+        "via": "harness",
+        "key": "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+        "status": "deleted"
+      },
+      {
+        "step": "sublayer",
+        "via": "harness",
+        "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+        "status": "deleted"
+      },
+      {
+        "step": "sublayer",
+        "via": "harness",
+        "key": "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+        "status": "deleted"
+      },
+      {
+        "step": "provider",
+        "via": "engine",
+        "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96360",
+        "status": "deleted"
+      }
+    ],
+    "errors": []
+  },
+  "manual": null,
+  "sweep": {
+    "label": "finish",
+    "at": "2026-10-20T01:23:16.835-04:00",
+    "clean": true,
+    "stop": false,
+    "unreadable": false,
+    "not_clean": [],
+    "problems": [],
+    "sublayers": {
+      "S1": {
+        "filter_keys": [],
+        "present": false
+      },
+      "S2": {
+        "filter_keys": [],
+        "present": false
+      },
+      "S3": {
+        "filter_keys": [],
+        "present": false
+      }
+    },
+    "provider_present": false,
+    "foreign": [],
+    "export": {
+      "ok": true,
+      "sha256": "2C9C03D291DEA174375680F9FE55AAD187378893F018D4276EAE8C4B2EAA7724",
+      "bytes": 2000945,
+      "hits": {
+        "marker": 0,
+        "srt_win": 0,
+        "provider": 0,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0,
+        "total": 0
+      },
+      "error": null
+    }
+  },
+  "probe_key_after": false,
+  "engine_sd": {
+    "now": {
+      "ok": true,
+      "command": "netsh wfp show security type=engine",
+      "netsh_text": "\r\nO:LSG:LSD:AI(A;;0xf07ff;;;BA)(A;OICIIO;GA;;;BA)(A;;0x307ff;;;NO)(A;OICIIO;GXGWGR;;;NO)(A;;0x307ff;;;S-1-5-80-3088073201-1464728630-1879813800-1107566885-823218052)(A;OICIIO;GXGWGR;;;S-1-5-80-3088073201-1464728630-1879813800-1107566885-823218052)(A;;0x203f4;;;S-1-5-80-3635958274-2059881490-2225992882-984577281-633327304)(A;OICIIO;GXGR;;;S-1-5-80-3635958274-2059881490-2225992882-984577281-633327304)(A;;0x307ff;;;S-1-5-80-3044542841-3639452079-4096941652-1606687743-1256249853)(A;OICIIO;GXGWGR;;;S-1-5-80-3044542841-3639452079-4096941652-1606687743-1256249853)(A;;0x307ff;;;S-1-5-80-979556362-403687129-3954533659-2335141334-1547273080)(A;OICIIO;GXGWGR;;;S-1-5-80-979556362-403687129-3954533659-2335141334-1547273080)(A;;0x203f4;;;S-1-5-80-3139157870-2983391045-3678747466-658725712-1809340420)(A;OICIIO;GXGR;;;S-1-5-80-3139157870-2983391045-3678747466-658725712-1809340420)(A;;0x307ff;;;S-1-5-80-1510742542-3632397484-604094731-3920060944-1272132581)(A;OICIIO;GXGWGR;;;S-1-5-80-1510742542-3632397484-604094731-3920060944-1272132581)(A;OICI;RPDT;;;WD)\r\n",
+      "tries": [
+        {
+          "command": "netsh wfp show security type=engine",
+          "exit": 0,
+          "netsh_text": "\r\nO:LSG:LSD:AI(A;;0xf07ff;;;BA)(A;OICIIO;GA;;;BA)(A;;0x307ff;;;NO)(A;OICIIO;GXGWGR;;;NO)(A;;0x307ff;;;S-1-5-80-3088073201-1464728630-1879813800-1107566885-823218052)(A;OICIIO;GXGWGR;;;S-1-5-80-3088073201-1464728630-1879813800-1107566885-823218052)(A;;0x203f4;;;S-1-5-80-3635958274-2059881490-2225992882-984577281-633327304)(A;OICIIO;GXGR;;;S-1-5-80-3635958274-2059881490-2225992882-984577281-633327304)(A;;0x307ff;;;S-1-5-80-3044542841-3639452079-4096941652-1606687743-1256249853)(A;OICIIO;GXGWGR;;;S-1-5-80-3044542841-3639452079-4096941652-1606687743-1256249853)(A;;0x307ff;;;S-1-5-80-979556362-403687129-3954533659-2335141334-1547273080)(A;OICIIO;GXGWGR;;;S-1-5-80-979556362-403687129-3954533659-2335141334-1547273080)(A;;0x203f4;;;S-1-5-80-3139157870-2983391045-3678747466-658725712-1809340420)(A;OICIIO;GXGR;;;S-1-5-80-3139157870-2983391045-3678747466-658725712-1809340420)(A;;0x307ff;;;S-1-5-80-1510742542-3632397484-604094731-3920060944-1272132581)(A;OICIIO;GXGWGR;;;S-1-5-80-1510742542-3632397484-604094731-3920060944-1272132581)(A;OICI;RPDT;;;WD)\r\n",
+          "accepted": true
+        }
+      ]
+    },
+    "compared_with": "case4-prepare-20261020-004848.json",
+    "compare": {
+      "same": true,
+      "removed": [],
+      "added": []
+    }
+  },
+  "folder": {
+    "uncopied": [],
+    "drop_acl": {
+      "set": "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)",
+      "read_back": "O:BAD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)",
+      "removed_sids": [
+        "S-1-5-21-1000000001-1000000002-1000000003-2250",
+        "S-1-5-21-1000000001-1000000002-1000000003-1001"
+      ]
+    }
+  },
+  "verified": false,
+  "code": 7,
+  "error": "Exception calling \"RemoveTree\" with \"1\" argument(s): \"Exception calling \"Delete\" with \"2\" argument(s): \"The process cannot access the file 'C:\\ProgramData\\BlarAI\\case4-pub' because it is being used by another process.\"\""
+}

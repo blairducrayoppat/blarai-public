@@ -1,0 +1,178 @@
+{
+  "kind": "remove-by-key",
+  "at": "2026-10-19T16:47:28.228-04:00",
+  "init_error": null,
+  "harness_trusted": true,
+  "notes": [],
+  "removal": {
+    "ok": true,
+    "steps": [
+      {
+        "step": "filter",
+        "via": "harness-failed(not_armed); engine",
+        "key": "c5036a7f-a8cd-499f-b738-da2725027e11",
+        "status": "deleted"
+      },
+      {
+        "step": "filter",
+        "via": "harness-failed(not_armed); engine",
+        "key": "3d800fa4-6bb4-461c-8dde-a5faadf923be",
+        "status": "deleted"
+      },
+      {
+        "step": "filter",
+        "via": "harness-failed(not_armed); engine",
+        "key": "500bcf04-467c-4b5d-864e-a75f6752545f",
+        "status": "deleted"
+      },
+      {
+        "step": "filter",
+        "via": "harness-failed(not_armed); engine",
+        "key": "6caf1c55-a3b9-47a5-82fb-1111fb05603e",
+        "status": "deleted"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0001",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0002",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0003",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0004",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0005",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0006",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0021",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0011",
+        "status": "not_found"
+      },
+      {
+        "step": "filter",
+        "via": "engine-fixed-key",
+        "key": "f1763001-0000-4d8e-9a31-2b6d4c8e0012",
+        "status": "not_found"
+      },
+      {
+        "step": "sublayer",
+        "via": "harness-failed(not_armed); engine",
+        "key": "c971a69f-d6ab-4885-9b49-506d8aa51c86",
+        "status": "deleted"
+      },
+      {
+        "step": "sublayer",
+        "via": "harness-failed(not_armed); engine",
+        "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96359",
+        "status": "not_found"
+      },
+      {
+        "step": "sublayer",
+        "via": "harness-failed(not_armed); engine",
+        "key": "6cf901ba-a6cd-4846-81a5-2598c55bdef5",
+        "status": "not_found"
+      },
+      {
+        "step": "provider",
+        "via": "engine",
+        "key": "3e29ae7e-fd9f-413a-8b8d-da9bd3a96360",
+        "status": "not_found"
+      }
+    ],
+    "errors": []
+  },
+  "manual": null,
+  "sweep": {
+    "label": "remove",
+    "at": "2026-10-19T16:47:31.646-04:00",
+    "clean": true,
+    "stop": false,
+    "unreadable": false,
+    "not_clean": [],
+    "problems": [],
+    "sublayers": {
+      "S1": {
+        "filter_keys": [],
+        "present": false,
+        "readable": true
+      },
+      "S2": {
+        "filter_keys": [],
+        "present": false,
+        "readable": true
+      },
+      "S3": {
+        "filter_keys": [],
+        "present": false,
+        "readable": true
+      }
+    },
+    "provider_present": false,
+    "foreign": [],
+    "export": {
+      "ok": true,
+      "path": null,
+      "sha256": "9A5B5D92F84636743D1CE230E6B2D12960737D2774A3C89971FDA1B2CD9F3A1B",
+      "bytes": 1997225,
+      "hits": {
+        "marker": 0,
+        "srt_win": 0,
+        "provider": 0,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0,
+        "total": 0
+      },
+      "error": null
+    }
+  },
+  "session": {
+    "Ok": true,
+    "TaskRestored": true,
+    "RestoreWhy": "",
+    "TaskNow": "original",
+    "DefinitionMatches": true,
+    "Reprovision": null,
+    "StartedInOriginalForm": {
+      "Ok": true,
+      "Detail": "the restored task started as the account and returned a valid result"
+    },
+    "Files": {
+      "Ok": true,
+      "Left": []
+    },
+    "At": "2026-10-19T16:47:37.368-04:00"
+  },
+  "state_file": "C:\\ProgramData\\BlarAI\\trackb-live\\nep5-out\\remove-20261019-164737.json"
+}

@@ -6,14 +6,14 @@ area: governance
 
 # Active sprint — live pointer
 
-**Last refresh (2026-10-02)** · Maintained by: the merging session that changes sprint
+**Last refresh (2026-10-16)** · Maintained by: the merging session that changes sprint
 state — refresh the date line whenever this file's claims change; the doctrine-freshness
 gate (`tests/security/test_doctrine_freshness.py`) fails if this file falls more than two
 weeks behind the repository's latest commit, or if it exceeds its 4,000-byte budget.
 
 > **This file REPLACES its contents; it never appends.** Prior refresh narratives live in git
-> history. This refresh is a state change, not a re-read: the previous body said Sprint 19 was
-> running, and the board says it is not.
+> history. The 2026-10-16 refresh is a re-read, not a state change: no kickoff brief or sprint
+> folder exists after `sprint_19/`, so no named sprint has opened since the 2026-10-02 body.
 
 ## Current state: NO NAMED SPRINT IS OPEN
 

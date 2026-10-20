@@ -40,7 +40,9 @@ Known limits of the path and SID rules (they read raw text; the identity lock al
 escapes): a ``Users`` path written with backslashes and no drive letter (``<backslash>Users<backslash>someone``) is accepted in prose, in every dataset. A SID split
 by a space or a line break, percent-encoded (``S%2D1%2D5%2D21...``), written with a non-breaking hyphen (U+2011) or with a
 zero-width space after ``S-1-5-21-`` is accepted in prose, and so is a percent-encoded path in the prose of a declared
-dataset. An Entra ID account SID (``S-1-12-1-...``) is accepted: the rule covers machine SIDs. A hex status code in
+dataset. A Microsoft-account or Entra ID account SID (``S-1-11-96-...``, ``S-1-12-1-...``) is refused by the same lock's account
+rule (``identity_lock.find_account_sid_hits``), under the same limits; not seen either are its binary or ``hex:01,..``
+registry-export form and a SID glued after a letter or digit. A hex status code in
 lower case (``0x8032000a``) in a declared dataset's cell is refused by the ``_HEX_CODE`` column check, so a builder that
 copies one produces a dataset this script blocks. A ``manifest.json`` spelled ``MANIFEST.json`` declares the schema only
 on a case-insensitive file system; elsewhere the directory is refused for unknown columns (the fail-closed direction).
@@ -52,6 +54,7 @@ import argparse
 import getpass
 import json
 import os
+import functools
 import platform
 import re
 import subprocess
@@ -427,7 +430,26 @@ def _walk_json(node, rel: str, hits: list[str], where: str, allow: frozenset[str
             hits.append(f"{rel}: string of {n} chars under key '{key}' ({where}); free text outside the authored-note keys")
 
 
+@functools.lru_cache(maxsize=1)
+def _serial_digests() -> frozenset[str]:
+    return _il.serial_digests()
+
+
+def _scan_serials(rel: str, data: bytes, hits: list[str], what: str = "content") -> None:
+    """Volume serial numbers (identity_lock.find_serial_hits): this machine's, and any 'Volume Serial Number is' header. A machine
+    whose serials cannot be read refuses, because the preflight would otherwise certify what it cannot see."""
+    digests = _serial_digests()
+    if not digests:
+        hits.append(f"{rel}: volume serials are not readable on this machine; the preflight cannot rule out a serial")
+    kinds = _il.find_serial_hits(data, digests)
+    if "live" in kinds:
+        hits.append(f"{rel}: {what} carries a volume serial number of this machine")
+    if "header" in kinds:
+        hits.append(f"{rel}: {what} carries a 'Volume Serial Number is' header")
+
+
 def _scan_identity(rel: str, text: str, hits: list[str]) -> None:
+    _scan_serials(rel, text.encode('utf-8', 'surrogatepass'), hits)
     hosts, users = _il.find_hits(text.encode('utf-8', 'surrogatepass'))
     if hosts:
         hits.append(f"{rel}: identity string (host name, digest match)")
@@ -469,9 +491,23 @@ def preflight(root: Path, max_bytes: int = DEFAULT_MAX_BYTES, extra_deny: tuple[
               allow_keys: tuple[str, ...] = ()) -> list[str]:
     """Return the list of problems ('<file>: <reason>'); empty means clean. Empty dir is a problem.
 
-    ``allow_keys`` exempts named text keys (e.g. grader diagnostics) and is always an explicit, visible flag."""
+    ``allow_keys`` exempts named text keys (e.g. grader diagnostics) and is always an explicit, visible flag.
+
+    Unreadable input (a gzip member that does not decompress, wide-character text that does not decode) and any per-file failure
+    (permission, an unencodable name, a JSON document nested past the recursion limit) is a named problem, never an exception, and the
+    rest of the problem list is still produced. A file name that carries a SID is shown as ``file #n`` on every line.
+
+    SIDs: a file whose content or name carries any ``S-1-5-21-<a>-<b>-<c>`` (``identity_lock.find_sid_hits``: the lock the scrub's
+    ``--check`` uses, so it reads the plain bytes, gzip members, UTF-16 with or without a BOM and the escaped shapes the rewrite
+    clears) is refused. It does not compare against the running machine's own domain: ``S-1-5-21`` is the machine-or-domain
+    account authority, so a foreign value names a real machine or domain just as this machine's does, and the scrub rewrites every
+    such value, not only this machine's. A check keyed on the live domain would pass a foreign SID and would refuse nothing when
+    the domain cannot be read. The scrubbed ``S-1-5-21-__MACHINE__`` and the integrity, AppContainer and BUILTIN SIDs
+    (``S-1-16-*``, ``S-1-15-*``, ``S-1-5-32-*``) do not match and pass. A Microsoft-account or Entra ID account SID
+    (``identity_lock.find_account_sid_hits``) in the content or the name is refused the same way; ``__ACCOUNT__`` passes."""
     allow = frozenset(k.lower() for k in allow_keys)
     hits: list[str] = []
+    sid_named: dict[str, str] = {}  # names that carry a SID; every FAIL line shows them as ``file #n``
     if not root.is_dir():
         return [f"{root}: not a directory"]
     files = _files(root)
@@ -480,63 +516,87 @@ def preflight(root: Path, max_bytes: int = DEFAULT_MAX_BYTES, extra_deny: tuple[
     deny = DENY_STRINGS + env_identity_strings() + tuple(extra_deny)
     for p in files:
         rel = p.relative_to(root).as_posix()
-        size = p.stat().st_size
-        if size > max_bytes:
-            hits.append(f"{rel}: {size} bytes exceeds cap {max_bytes}")
-            continue
-        raw = p.read_bytes()
         try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            hits.append(f"{rel}: not valid UTF-8 (binary or other encoding)")
-            continue
-        for d in deny:  # the file NAME can leak too: identity strings and credential/e-mail shapes
-            if d.lower() in rel.lower():
-                hits.append(f"{rel}: file name contains identity string '{d}'")
-        name_hosts, name_users = _il.find_hits(rel.encode("utf-8"))  # by digest: holds under any account
-        if name_hosts or name_users:
-            hits.append(f"{rel}: file name carries this machine's identity (digest match)")
-        for label, pat in _SECRET_PATTERNS:
-            if pat.search(rel):
-                hits.append(f"{rel}: file name matches a {label}")
-        wide = _declares_nep5(root, p)
-        name_path = find_abs_path(rel, wide=True)  # a file name can carry a path or a machine SID as well as content
-        if name_path:
-            hits.append(f"{rel}: file name carries an absolute local path '{name_path}'")
-        if _SID.search(rel):
-            hits.append(f"{rel}: file name carries a machine-domain SID shape")
-        _scan_text(rel, text, deny, hits, wide)
-        suffix = p.suffix.lower()
-        if suffix not in ALLOWED_SUFFIXES:
-            hits.append(f"{rel}: file type '{suffix or '(none)'}' is not accepted (allowed: {', '.join(sorted(ALLOWED_SUFFIXES))})")
-            continue
-        if suffix in (".md", ".txt") and rel.lower() != "readme.md":  # only the dataset's own root README is authored prose
-            _scan_prose(rel, text, suffix, hits)
-        if suffix == ".json":
+            rel.encode("utf-8")
+            hidden = _il.find_sid_hits(rel.encode("utf-8")) or _il.find_account_sid_hits(rel.encode("utf-8"))
+        except UnicodeEncodeError:
+            hidden = True
+        if hidden:  # a name that carries a SID, or cannot be encoded, is shown as ``file #n`` on every line, size-cap line included
+            sid_named[rel] = f"file #{len(sid_named)}"
+        try:
+            size = p.stat().st_size
+            if size > max_bytes:
+                hits.append(f"{rel}: {size} bytes exceeds cap {max_bytes}")
+                continue
+            raw = p.read_bytes()
+            unreadable = _il.unreadable_reason(raw)
+            if unreadable:
+                hits.append(f"{rel}: {unreadable}")
+            if _il.find_sid_hits(raw):
+                hits.append(f"{rel}: machine/domain account SID (S-1-5-21-...) in the content, plain, gzip, UTF-16 or escaped")
+            if _il.find_sid_hits(rel.encode("utf-8")):
+                hits.append(f"{rel}: file name carries a machine/domain account SID (S-1-5-21-...)")
+            if _il.find_account_sid_hits(raw):
+                hits.append(f"{rel}: Microsoft-account or Entra ID account SID (S-1-11-96-... / S-1-12-1-...) in the content, plain, gzip, UTF-16 or escaped")
+            if _il.find_account_sid_hits(rel.encode("utf-8")):
+                hits.append(f"{rel}: file name carries a Microsoft-account or Entra ID account SID")
             try:
-                strings: list[str] = []
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                hits.append(f"{rel}: not valid UTF-8 (binary or other encoding)")
+                continue
+            for d in deny:  # the file NAME can leak too: identity strings and credential/e-mail shapes
+                if d.lower() in rel.lower():
+                    hits.append(f"{rel}: file name contains identity string '{d}'")
+            name_hosts, name_users = _il.find_hits(rel.encode("utf-8"))  # by digest: holds under any account
+            if name_hosts or name_users:
+                hits.append(f"{rel}: file name carries this machine's identity (digest match)")
+            _scan_serials(rel, rel.encode("utf-8"), hits, "file name")
+            for label, pat in _SECRET_PATTERNS:
+                if pat.search(rel):
+                    hits.append(f"{rel}: file name matches a {label}")
+            wide = _declares_nep5(root, p)
+            name_path = find_abs_path(rel, wide=True)  # a file name can carry a path or a machine SID as well as content
+            if name_path:
+                hits.append(f"{rel}: file name carries an absolute local path '{name_path}'")
+            if _SID.search(rel):
+                hits.append(f"{rel}: file name carries a machine-domain SID shape")
+            _scan_text(rel, text, deny, hits, wide)
+            suffix = p.suffix.lower()
+            if suffix not in ALLOWED_SUFFIXES:
+                hits.append(f"{rel}: file type '{suffix or '(none)'}' is not accepted (allowed: {', '.join(sorted(ALLOWED_SUFFIXES))})")
+                continue
+            if suffix in (".md", ".txt") and rel.lower() != "readme.md":  # only the dataset's own root README is authored prose
+                _scan_prose(rel, text, suffix, hits)
+            if suffix == ".json":
+                try:
+                    strings: list[str] = []
+                    budget = [0, 0]
+                    _walk_json(json.loads(text), rel, hits, "json", allow, None, strings, budget)
+                    _check_budget(rel, budget, hits)
+                    _scan_text(rel, chr(10).join(strings), deny, hits, wide)
+                except json.JSONDecodeError:
+                    hits.append(f"{rel}: invalid JSON")
+            elif suffix == ".jsonl":
+                strings = []
                 budget = [0, 0]
-                _walk_json(json.loads(text), rel, hits, "json", allow, None, strings, budget)
+                for n, line in enumerate(text.splitlines(), 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        _walk_json(json.loads(line), rel, hits, f"line {n}", allow, None, strings, budget)
+                    except json.JSONDecodeError:
+                        hits.append(f"{rel}: invalid JSON on line {n}")
+                        break
                 _check_budget(rel, budget, hits)
                 _scan_text(rel, chr(10).join(strings), deny, hits, wide)
-            except json.JSONDecodeError:
-                hits.append(f"{rel}: invalid JSON")
-        elif suffix == ".jsonl":
-            strings = []
-            budget = [0, 0]
-            for n, line in enumerate(text.splitlines(), 1):
-                if not line.strip():
-                    continue
-                try:
-                    _walk_json(json.loads(line), rel, hits, f"line {n}", allow, None, strings, budget)
-                except json.JSONDecodeError:
-                    hits.append(f"{rel}: invalid JSON on line {n}")
-                    break
-            _check_budget(rel, budget, hits)
-            _scan_text(rel, chr(10).join(strings), deny, hits, wide)
-        elif suffix == ".csv":
-            _scan_csv(rel, text, allow, hits, nep5=wide)
-    return list(dict.fromkeys(hits))
+            elif suffix == ".csv":
+                _scan_csv(rel, text, allow, hits, nep5=wide)
+        except (OSError, UnicodeError, ValueError, RecursionError, MemoryError) as e:
+            hits.append(f"{rel}: could not be checked ({type(e).__name__}); refused")
+    for real, label in sid_named.items():
+        hits = [h.replace(real, label) for h in hits]
+    return list(dict.fromkeys(_il.redact_serials(h, _serial_digests()) for h in hits))  # a finding that names a file never prints its serial
 
 
 def _check_budget(rel: str, budget: list[int], hits: list[str]) -> None:

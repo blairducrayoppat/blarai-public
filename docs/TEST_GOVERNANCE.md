@@ -70,9 +70,15 @@ proven runner).
 >     order within a group (some tests leave module state a later test expects clean, which sequential order had hidden: #1707);
 >     files that bind the fixed ports 5000/5001 run alone after the parallel phase.
 
-> **LIVE_GATE_BASELINE: 13317 passed / 0 failed / 3 skipped / 620 deselected**
+> **LIVE_GATE_BASELINE: 14668 passed / 1 failed / 0 skipped / 621 deselected**
 >
-> *(**MERGED `main` at `ce925cf2`, REAL checkout**, 2026-10-09, 20:04 to 20:16 -04:00, **NON-ELEVATED** (the 3 skips are the
+> *(**MERGED `main` at `7c4a8a34`, REAL checkout**, 2026-10-20, 03:39 to 03:57 -04:00, **ELEVATED** (0 skips), app down, `LOCALAPPDATA` redirected, `scripts/run_standing_gate.py` (6 groups + serial tail), launched DETACHED from the harness (its memory-pressure reaper stopped the first attempt at 9882e0fe): 14668 passed / 1 failed / 0 skipped / 621 deselected in 1097.1 s. The 1 failed is `tests/integration/test_swap_state.py::test_driver_liveness_exited_child_is_dead_or_reused`, which passed in the run at `9882e0fe` 20 minutes earlier and passes 3 of 3 alone afterwards: a parallel-load flake, ticket #1803, not a regression (the case-4 merge touched no code under services/, shared/ or launcher/). The run at `9882e0fe` (03:18 to 03:37) read 14668 / 1 / 0 / 621 with a different single failure, the roadmap refresh lock, fixed at `7c4a8a34`. Total 14669 = 14669 of the 10-18 stamp: the case-4 branch adds no tests. The branch gate in a clean worktree at `dff247de` read 14638 / 5 / 26 of the same total, the 5 and the 26 being the model-absent and sibling-link environment deltas that pass in the real checkout.)*
+>
+> *(Previous stamp: **MERGED `main` at `7580d07c`, REAL checkout**, 2026-10-18, 00:54 to 01:13 -04:00, **ELEVATED** (0 skips), app down, `LOCALAPPDATA` redirected, `scripts/run_standing_gate.py` (6 groups + serial tail): 14669 passed / 0 failed / 0 skipped / 621 deselected in 1148.2 s, predicted exactly before the run. NOT a quiet box (the q1-insider VM was running Windows Insider updates), so the wall time is not comparable. The rise from 14308 came from merges since `4b9c793a` plus the account-SID scrub tests (#1793) and is not re-attributed here. The land-branch worktree read 14638 / 5 / 26 of the same 14669: absent model weights (26 skips, 3 failures) and the worktree-depth relative link in ADR-013 (2 failures); the same 5 tests pass in the primary checkout.)*
+>
+> *(Previous stamp: **MERGED `main` at `4b9c793a`, REAL checkout**, 2026-10-15, about 19:30 to 19:50 -04:00, **ELEVATED** (0 skips; the non-elevated reading of this tree is predicted 14305 / 0 / 3 and has not been taken), app down, `LOCALAPPDATA` redirected, `scripts/run_standing_gate.py` (6 groups + serial tail): 14308 passed / 0 failed / 0 skipped / 621 deselected in 1196.3 s. NOT a quiet box (review agents and a dataset upload ran alongside), so the wall time is not comparable with the 10-09 figure. The count includes the 185 research-tracker lock tests (#1791, #1795) merged at `0d40f20b`; the remainder of the rise from 13317 came from merges between `ce925cf2` and `2168ec96` and is not re-attributed here.)*
+>
+> *(Previous stamp: **MERGED `main` at `ce925cf2`, REAL checkout**, 2026-10-09, 20:04 to 20:16 -04:00, **NON-ELEVATED** (the 3 skips are the
 > symlink delta; the elevated reading of this tree is predicted 13320 / 0 / 0 and has not been taken), app down, `LOCALAPPDATA`
 > redirected, `scripts/run_standing_gate.py` (6 groups + serial tail): 13317 passed / 0 failed / 3 skipped / 620 deselected in
 > 695.9 s; 13320 = 13302 + 9 tests from the #1716 merges + 9 from #1718 (arm 1 bundle self-tests for four scripts on two
@@ -95,7 +101,10 @@ proven runner).
 > `non_elevated_passed + 3 = elevated_passed` before calling either stale.
 > A branch WORKTREE reads lower again by the gitignored-asset skips (rule 5: the worktree figure
 > plus its skips must reconcile to the elevated total); a WORKTREE FIGURE IS NOT THIS NUMBER.
-> A live app adds 7 port-5001 skips. An unexplained skip is a defect, never a rounding error.
+> A live app adds 7 port-5001 skips. A run under an account whose token carries no Microsoft-account or
+> Entra ID SID (the coder fleet's local `blarai-coder`, a local sign-in) adds 1 skip, reason "no account SID in this token":
+> `tests/security/test_account_sid_scrub.py::test_no_long_sub_authority_of_the_live_account_sid_is_in_any_tracked_file`
+> has no subject there (#1793). An unexplained skip is a defect, never a rounding error.
 >
 > Earlier per-merge entries and their lessons (prediction by collection, the skip column, the nested-checkout
 > walk, the 21:32 loaded gate, retractions) are in `docs/archive/test-governance-baseline-history.md`; rules 1-9 above

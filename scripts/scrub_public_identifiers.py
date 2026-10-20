@@ -1,18 +1,44 @@
-"""Scrub this machine's host name and the operator's account name from TRACKED files, in place, deterministically, and hold
+"""Scrub this machine's host name, volume serial numbers and the operator's account name from TRACKED files, in place, deterministically, and hold
 the line on where the account name may appear.
 
 Run:  python scripts/scrub_public_identifiers.py                 (rewrites; log to docs/reviews/public-identifier-scrub-log-<stamp>.md)
       python scripts/scrub_public_identifiers.py --check         (exit 1 if anything in scope still carries an identifier)
       python scripts/scrub_public_identifiers.py --log <path>    (rewrites; named log)
+      python scripts/scrub_public_identifiers.py --dir <path> [--check]   (a directory outside git, every file in it, all rules)
 
 Recognition is ``scripts/identity_lock.py`` (digests plus the live machine; every view of the bytes, gzip members and UTF-16
 included). The rewrite uses the live names and REFUSES unless each live name's digest is pinned there: run under another account
-it would otherwise rewrite that account's name into the operator's placeholder. Two rewrites, nothing else:
+it would otherwise rewrite that account's name into the operator's placeholder. Five rewrites, nothing else:
   1. HOST NAME, every tracked file: becomes ``__HOST__``, any letter case, including glue (``<host>x``).
+  3. VOLUME SERIAL, every tracked file: the serial in a ``Volume Serial Number is`` header (any machine's) and each live fixed
+     volume's serial in the dashed, bare-hex and decimal forms become ``XXXX-XXXX``; the log names the file and the count, never
+     the serial. A serial in an encoded view the rewrite does not cover is reported for a hand edit, as a name is.
   2. OPERATOR ACCOUNT NAME, inside ``USER_SCOPE`` only (the containment studies and the performance records): becomes
      ``__USER__`` as a word (letters are the boundary; a JSON escape, an ANSI colour code, a percent-escape or a digit beside it
      does not hide it). A credential-store row (``"kind": "secret"``) is clean when its path no longer carries the name:
      ``C:\\Users\\__USER__\\.ssh``. The store names themselves are standard and hide nothing (see the round-2 review).
+  4. MACHINE ACCOUNT SID, inside ``SID_SCOPE`` (and every file of a ``--dir`` run): ``S-1-5-21-<a>-<b>-<c>[-<rid>]`` becomes
+     ``S-1-5-21-__MACHINE__[-<rid>]``; the relative id stays (it says which account, not which machine). Well-known SIDs
+     (``S-1-5-32-*``, ``S-1-16-*``, ``S-1-15-2-*``, ``S-1-5-18``) do not match and stay. Tracked files outside ``SID_SCOPE`` carry
+     placeholder and foreign-domain SIDs as evidence and are guarded by ``tests/security/test_no_machine_sid_domain_in_tree.py``.
+     The rewrite reads the raw bytes at the boundaries the lock reads its decoded views at (after a JSON escape, a percent-escape,
+     an ANSI colour code; the first letter may be a JSON unicode or hex escape); a SID in any other encoding is reported for a hand edit.
+     ``--dir`` also fails closed on a SID in a file or folder NAME, on a gzip member it cannot decompress and on an archive: a
+     readable zip is scanned member by member and never rewritten, any other archive format is reported (unpack, scrub, repack).
+  5. MICROSOFT-ACCOUNT AND ENTRA ID ACCOUNT SID, every tracked file (and every file of a ``--dir`` run): ``S-1-11-96-<...>`` and
+     ``S-1-12-1-<...>`` become ``S-1-11-__ACCOUNT__`` and ``S-1-12-__ACCOUNT__``. Every sub-authority names one person's
+     cloud account, so none is kept. Same boundaries and escapes as rule 4; any other encoding, a file NAME carrying one and a
+     binary file carrying one are reported for a hand edit and the run exits 1; ``--check`` and the gate fail while one remains.
+     ``--check``, the gate and the tree-mode residual check open gzip, bzip2, xz, zip and tar in every tracked file, nested to
+     ``identity_lock.ACCOUNT_CONTAINER_MAX_DEPTH``, and fail on any container they cannot read
+     (``identity_lock.account_sid_container_problems``); the rewrite never edits inside an archive.
+     HONEST LIMIT of rule 5, beyond the encodings ``identity_lock`` names: not seen are the binary SID structure (revision byte
+     ``01``, then the sub-authority count and little-endian sub-authorities) and its registry-export form (``hex:01,..``); a SID
+     glued after a letter or a digit (``userS-1-11-96-...`` is one token, as for rule 4); the sub-authority digits without
+     their ``S-1-11-96`` / ``S-1-12-1`` prefix. The last is held, for sub-authorities of eight digits or more, by
+     ``tests/security/test_account_sid_scrub.py`` when the current token carries a Microsoft-account or Entra ID SID (no long
+     sub-authority of it appears in any tracked file; the test skips, naming why, under a token without one); shorter
+     sub-authorities, and a SID that is not the live account's, are not seen in those shapes.
 
 Outside the scope the account name is a working path this checkout needs, under a RATCHET: ``scripts/identity_user_baseline.json``
 records, per file, how many tokens carried the name when the lock was set. ``--check`` and the gate fail when a file not listed
@@ -35,11 +61,14 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import io
 import json
 import re
 import subprocess
 import sys
+import zipfile
 import zlib
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -47,6 +76,7 @@ import identity_lock as il  # noqa: E402
 
 HOST_PLACEHOLDER = b"__HOST__"
 USER_PLACEHOLDER = b"__USER__"
+SERIAL_PLACEHOLDER = il.SERIAL_PLACEHOLDER
 USER_BASELINE_PATH = "scripts/identity_user_baseline.json"
 
 # Where the operator's account name is scrubbed. A path that names a file is that file; a directory is everything under it.
@@ -56,6 +86,14 @@ USER_SCOPE: tuple[str, ...] = (
     "docs/research/containment-evidence-2026-10-05",
     "docs/performance",
     "PERFORMANCE_LOG.md",
+)
+
+# Where a machine/domain account SID is scrubbed and locked in tracked files (same path semantics as USER_SCOPE; an entry ending
+# in ``*`` is a name prefix). Every entry matches a tracked file (tests/security/test_machine_sid_scrub.py).
+SID_SCOPE: tuple[str, ...] = (
+    "docs/performance/mxc_proxy_egress*",
+    "docs/performance/mxc_1406_probe_2026-10-11",
+    "docs/research/windows-containment-comparison-2026-10/mxc-1406-probe",
 )
 
 # Boundaries for the account name: letters never touch it; a JSON escape, an ANSI colour code (up to seven bytes between
@@ -104,7 +142,7 @@ def json_secret_paths(data: bytes) -> list[str]:
     if data.startswith(il.GZIP_MAGIC):
         try:
             data = gzip.decompress(data)
-        except (OSError, EOFError):
+        except il.READ_ERRORS:
             return []
     try:
         doc = json.loads(data.decode("utf-8-sig"))
@@ -132,32 +170,50 @@ def secret_rows_carrying_the_name(data: bytes, user_digests: frozenset[str]) -> 
 
 # ---- rewrite -----------------------------------------------------------------------------------------------------------------
 
-def scrub_text(data: bytes, *, host: str | None, user: str | None, in_scope: bool) -> tuple[bytes, dict[str, int]]:
-    counts = {"host": 0, "user": 0}
+def scrub_text(data: bytes, *, host: str | None, user: str | None, in_scope: bool,
+               serials: frozenset[int] = frozenset(), sid_scope: bool = False) -> tuple[bytes, dict[str, int]]:
+    counts = {"host": 0, "user": 0, "serial": 0, "sid": 0, "account": 0}
+    data, n = il.SERIAL_HEADER_RE.subn(lambda m: m.group(0)[:m.start(1) - m.start(0)] + SERIAL_PLACEHOLDER, data)
+    counts["serial"] += n
+    for pat in il.serial_res(serials):
+        data, n = pat.subn(SERIAL_PLACEHOLDER, data)
+        counts["serial"] += n
     if host:
         data, n = host_re(host).subn(HOST_PLACEHOLDER, data)
         counts["host"] += n
     if user and in_scope:
         data, n = user_re(user).subn(USER_PLACEHOLDER, data)
         counts["user"] += n
+    if sid_scope:
+        data, n = il.rewrite_machine_sids(data)
+        counts["sid"] += n
+    data, n = il.rewrite_account_sids(data)
+    counts["account"] += n
     return data, counts
 
 
-def scrub_bytes(data: bytes, **kw) -> tuple[bytes, dict[str, int]]:
-    """Dispatch on container: gzip member, UTF-16 text, or plain bytes."""
+def scrub_bytes(data: bytes, _depth: int = 0, **kw) -> tuple[bytes, dict[str, int]]:
+    """Dispatch on container: gzip member, wide-character text (UTF-16 or UTF-32), or plain bytes. Input it cannot read
+    (``il.unreadable_reason``) comes back unchanged with ``counts['unreadable']`` set; it never raises on content."""
+    unreadable = {"host": 0, "user": 0, "serial": 0, "sid": 0, "account": 0, "unreadable": 1}
     if data.startswith(il.GZIP_MAGIC):
         try:
             inner = gzip.decompress(data)
-        except (OSError, EOFError):
-            return data, {"host": 0, "user": 0, "unreadable": 1}  # a member with trailing bytes: reported, never silently kept
-        new, counts = scrub_bytes(inner, **kw)
+        except il.READ_ERRORS:
+            return data, unreadable  # a member with trailing bytes or damage: reported, never silently kept
+        if _depth >= il.GZIP_MAX_DEPTH:
+            return data, unreadable
+        new, counts = scrub_bytes(inner, _depth + 1, **kw)
         if new == inner:
             return data, counts
         return gzip_bytes(new), counts
     enc = il.looks_utf16(data)
     if enc:
-        bom = data[:2] if data[:2] in (b"\xff\xfe", b"\xfe\xff") else b""
-        text = data[len(bom):].decode(enc)
+        bom, body = il.split_bom(data, enc)
+        try:
+            text = body.decode(enc)
+        except UnicodeError:
+            return data, unreadable
         new, counts = scrub_text(text.encode("utf-8"), **kw)
         return bom + new.decode("utf-8").encode(enc), counts
     return scrub_text(data, **kw)
@@ -165,6 +221,72 @@ def scrub_bytes(data: bytes, **kw) -> tuple[bytes, dict[str, int]]:
 
 def is_opaque_binary(data: bytes) -> bool:
     return b"\0" in data and not data.startswith(il.GZIP_MAGIC) and il.looks_utf16(data) is None
+
+
+# ---- containers the lock cannot read -----------------------------------------------------------------------------------------
+
+_ARCHIVE_MAGICS: tuple[tuple[bytes, str], ...] = (
+    (b"PK\x03\x04", "zip"), (b"PK\x05\x06", "zip"), (b"7z\xbc\xaf\x27\x1c", "7z"), (b"Rar!", "rar"), (b"BZh", "bzip2"),
+    (b"\xfd7zXZ\x00", "xz"), (b"\x28\xb5\x2f\xfd", "zstd"),
+)
+_ARCHIVE_SUFFIXES = {".zip": "zip", ".jar": "zip", ".whl": "zip", ".7z": "7z", ".rar": "rar", ".tar": "tar", ".tgz": "tar",
+                     ".bz2": "bzip2", ".xz": "xz", ".zst": "zstd", ".cab": "cab"}
+_ZIP_MAX_BYTES = 256 * 1024 * 1024
+
+
+def archive_kind(data: bytes, name: str = "") -> str | None:
+    """The archive format the bytes (or, failing that, the file name's suffix) say, else None. gzip is not an archive here."""
+    for magic, kind in _ARCHIVE_MAGICS:
+        if data.startswith(magic):
+            return kind
+    if data[257:262] == b"ustar":
+        return "tar"
+    return _ARCHIVE_SUFFIXES.get(Path(name).suffix.lower())
+
+
+def container_problems(data: bytes, name: str, hd: frozenset[str], ud: frozenset[str], sd: frozenset[str], depth: int = 0) -> list[str]:
+    """Why a file cannot be certified clean because of its container; empty for plain text, UTF-16 and a gzip member the lock reads.
+    Fails closed: a gzip member that cannot be decompressed (trailing bytes, damage), UTF-16 text that does not decode, an archive format this script does not read
+    (unpack, scrub and repack by hand), a zip that cannot be opened, is encrypted or is oversized. A readable zip is scanned
+    member by member (names and contents) and never rewritten."""
+    if data.startswith(il.GZIP_MAGIC):
+        try:
+            inner = gzip.decompress(data)
+        except il.READ_ERRORS:
+            return ["unreadable: gzip member that cannot be read (trailing bytes or damage); its content is not checked"]
+        if depth >= il.GZIP_MAX_DEPTH:
+            return ["unreadable (nesting depth): gzip nested deeper than four; its content is not checked"]
+        return container_problems(inner, "", hd, ud, sd, depth + 1)
+    kind = archive_kind(data, name)
+    if kind is None:
+        problem = il.utf16_problem(data)
+        return [problem] if problem else []
+    if kind != "zip" or depth >= 3:
+        return [f"{kind} archive: its members are not read here; unpack, scrub and repack by hand"]
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            infos = z.infolist()
+            if sum(i.file_size for i in infos) > _ZIP_MAX_BYTES:
+                return ["zip archive over the size this script reads"]
+            out: list[str] = []
+            for n, info in enumerate(infos):
+                if info.flag_bits & 0x1:
+                    return ["zip archive with an encrypted member: its content is not checked"]
+                label = f"zip member #{n}"
+                member = info.filename.encode("utf-8")
+                if (il.name_in_path(info.filename, hd, ud) or il.find_sid_hits(member) or il.find_account_sid_hits(member)
+                        or il.find_serial_hits(member, sd)):
+                    out.append(f"{label}: NAME carries an identifier")
+                if info.is_dir():
+                    continue
+                body = z.read(info)
+                hosts, users = il.find_hits(body, hd, ud)
+                if hosts or users or il.find_serial_hits(body, sd) or il.find_sid_hits(body) or il.find_account_sid_hits(body):
+                    out.append(f"{label}: identifier present")
+                out += [f"{label}: {m}" for m in container_problems(body, info.filename, hd, ud, sd, depth + 1)]
+            return out
+    except (zipfile.BadZipFile, NotImplementedError, RuntimeError, OSError, EOFError, zlib.error):
+        return ["zip archive that cannot be opened: its content is not checked"]
 
 
 # ---- ratchet -----------------------------------------------------------------------------------------------------------------
@@ -324,26 +446,198 @@ def ratchet_violations(root: Path, files: list[Path], user_digests: frozenset[st
 
 # ---- check -------------------------------------------------------------------------------------------------------------------
 
-def check(root: Path, files: list[Path], host: str | None, user: str | None) -> list[str]:
+def check(root: Path, files: list[Path], host: str | None, user: str | None,
+          serial_digests: frozenset[str] | None = None) -> list[str]:
     hd, ud = il.digests_with_live(host, user)
+    sd = il.serial_digests() if serial_digests is None else serial_digests
     problems: list[str] = []
+    if not sd:
+        problems.append("volume serials: no local fixed volume serial is readable on this machine; the lock cannot see its subject")
     for p in files:
         r = rel(root, p)
         if il.name_in_path(r, hd, ud):
             problems.append(f"{r}: file NAME carries an identifier (rename it)")
+        if il.find_sid_hits(r.encode("utf-8")):
+            problems.append(f"{r}: file NAME carries a machine/domain account SID (rename it)")
+        if il.find_account_sid_hits(r.encode("utf-8")):
+            problems.append(f"{r}: file NAME carries a Microsoft-account or Entra ID account SID (rename it)")
+        if il.find_serial_hits(r.encode("utf-8"), sd):
+            problems.append(f"{r}: file NAME carries a volume serial number (rename it; tracked file #{files.index(p)})")
         data = p.read_bytes()
         hosts, users = il.find_hits(data, hd, ud)
         if hosts:
             problems.append(f"{r}: host name present")
         if users and il.path_in_scope(r, USER_SCOPE):
             problems.append(f"{r}: operator user name present")
+        if il.path_in_scope(r, SID_SCOPE) and il.find_sid_hits(data):
+            problems.append(f"{r}: machine/domain account SID present (S-1-5-21-...)")
+        account = il.account_sid_container_problems(data, r)
+        if il.path_in_scope(r, SID_SCOPE):
+            account = [m for m in account if "unreadable" not in m]  # container_problems below names what it cannot read here
+        problems += [f"{r}: {m}" for m in account]
+        if il.path_in_scope(r, SID_SCOPE):
+            problems += [f"{r}: {m}" for m in container_problems(data, r, hd, ud, sd)]
+        kinds = il.find_serial_hits(data, sd)
+        if "live" in kinds:
+            problems.append(f"{r}: volume serial present (a live fixed volume's)")
+        if "header" in kinds:
+            problems.append(f"{r}: volume serial present (a 'Volume Serial Number is' header)")
         if p.suffix.lower() in (".json", ".gz"):
             bad = secret_rows_carrying_the_name(data, ud)
             if bad:
                 problems.append(f"{r}: {bad} credential-store row(s) carry the operator name")
     reference, reason = reference_baseline(root)
     problems += ratchet_violations(root, files, ud, load_user_baseline(root), reference, reason, fork_baseline(root))
-    return problems
+    return [il.redact_serials(p, sd) for p in problems]  # a report that names a file never prints a serial the name carries
+
+
+# ---- a directory outside git ------------------------------------------------------------------------------------------------
+
+def run_dir(ap: argparse.ArgumentParser, directory: Path, *, check_only: bool, log_path: Path | None = None) -> int:
+    """Rewrite (or, with ``check_only``, only report) every file under ``directory``: host name, account name, volume serials and
+    machine and cloud account SIDs. Files are walked, not taken from git; the account-name ratchet does not apply. Names are never printed.
+    Fails closed on what it cannot read: a file or folder NAME carrying an identifier, a gzip member it cannot decompress, an
+    archive it cannot open (a readable zip is scanned, never rewritten), and a SID or other identifier left in a shape the
+    rewrite does not clear. A rewriting run writes a log (file index, name hash and before/after hashes; no names)."""
+    directory = directory.resolve()
+    if not directory.is_dir():
+        ap.error(f"{directory} is not a directory")
+    host, user = il.live_names()
+    if host is None or user is None:
+        ap.error("the host or user name is not readable on this machine (COMPUTERNAME / USERNAME); refusing")
+    if not check_only:
+        host_pinned, user_pinned = il.live_names_are_pinned()
+        if not (host_pinned and user_pinned):
+            ap.error("the live host or user name is not one of the pinned identities in scripts/identity_lock.py; refusing to rewrite")
+        if log_path is None:
+            try:
+                default_root = repo_root(Path.cwd())
+            except (subprocess.CalledProcessError, OSError):
+                print("scrub_public_identifiers --dir: no --log given and the working directory is not inside a git checkout; "
+                      "pass --log with a path outside the folder", file=sys.stderr)
+                return 1
+            log_path = default_root / "docs" / "reviews" / f"public-identifier-scrub-dir-log-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.md"
+        if directory in log_path.resolve().parents:
+            ap.error("the log would be written inside the folder being scrubbed; give --log a path outside it")
+    hd, ud = il.digests_with_live(host, user)
+    serials = il.live_volume_serials()
+    sd = il.serial_digests(serials)
+    if not sd:
+        ap.error("no local fixed volume serial is readable on this machine; refusing")
+    # Stage first, write last. Every precondition of the rewrite is proven for every file before any byte is written: the name can be
+    # encoded and logged, the file can be read, its content is readable, and a file that would change can be opened for writing. Any
+    # failure is a named refusal of the whole run (nothing rewritten, the log still written); a write that fails afterwards is rolled back.
+    walk = sorted(x for x in directory.rglob("*") if x.is_file())
+    items: list[dict] = []
+    refused: list[str] = []
+    for n, p in enumerate(walk):
+        rel_name = p.relative_to(directory).as_posix()
+        try:
+            name_b = rel_name.encode("utf-8")
+            encodable = True
+        except UnicodeEncodeError:
+            name_b = rel_name.encode("utf-8", "surrogatepass")
+            encodable = False
+        sid_name = il.find_sid_hits(name_b)
+        account_name = il.find_account_sid_hits(name_b)
+        r = f"file #{n}" if (sid_name or account_name or not encodable) else il.redact_serials(rel_name, sd)  # such a name is never printed
+        item = {"n": n, "p": p, "rel_name": rel_name, "name_b": name_b, "r": r, "sid_name": sid_name, "account_name": account_name, "encodable": encodable,
+                "data": None, "new": None, "archive": False}
+        items.append(item)
+        if not encodable:
+            refused.append(f"{r}: file NAME cannot be encoded as UTF-8, so it cannot be logged (rename it)")
+        try:
+            data = p.read_bytes()
+        except OSError as e:
+            refused.append(f"{r}: unreadable: cannot be read ({type(e).__name__})")
+            continue
+        item["data"] = data
+        item["archive"] = archive_kind(data, rel_name) is not None
+        if item["archive"] or is_opaque_binary(data):
+            continue
+        reason = il.unreadable_reason(data)
+        if reason:
+            refused.append(f"{r}: {reason}")
+            continue
+        if check_only:
+            continue
+        try:
+            new, _ = scrub_bytes(data, host=host, user=user, in_scope=True, serials=serials, sid_scope=True)
+        except (OSError, UnicodeError, ValueError, RecursionError) as e:
+            refused.append(f"{r}: could not be processed ({type(e).__name__})")
+            continue
+        if new != data:
+            try:
+                with open(p, "r+b"):
+                    pass
+            except OSError as e:
+                refused.append(f"{r}: cannot be written ({type(e).__name__})")
+                continue
+            item["new"] = new
+    changed = 0
+    rows: list[str] = []
+    if not check_only and not refused:
+        written: list[dict] = []
+        for item in items:
+            if item["new"] is None:
+                continue
+            try:
+                item["p"].write_bytes(item["new"])
+            except OSError as e:
+                refused.append(f"{item['r']}: write failed ({type(e).__name__}); the files already written were restored")
+                for done in written:
+                    try:
+                        done["p"].write_bytes(done["data"])
+                    except OSError:
+                        refused.append(f"{done['r']}: could not be restored after a failed run; restore it from its source")
+                written = []
+                break
+            written.append(item)
+        if not refused:
+            for item in written:
+                changed += 1
+                rows.append(f"| {item['n']} | `{hashlib.sha256(item['name_b']).hexdigest()[:16]}` | `{lf_sha256(item['data'])}` | `{lf_sha256(item['new'])}` |")
+    findings: list[str] = []
+    for item in items:
+        r, rel_name, data = item["r"], item["rel_name"], item["data"]
+        if data is None:
+            continue
+        if il.name_in_path(rel_name, hd, ud) if item["encodable"] else False:
+            findings.append(f"{r}: file NAME carries an identifier (rename it)")
+        if item["sid_name"]:
+            findings.append(f"{r}: file or folder NAME carries a machine/domain account SID (rename it)")
+        if item["account_name"]:
+            findings.append(f"{r}: file or folder NAME carries a Microsoft-account or Entra ID account SID (rename it)")
+        findings += [f"{r}: {m}" for m in container_problems(data, rel_name, hd, ud, sd)]
+        if item["archive"]:
+            continue  # reported above; its bytes are not rewritten and a zip's members were scanned
+        if item["new"] is not None and changed:
+            data = item["new"]
+        hosts, users = il.find_hits(data, hd, ud)
+        sid = il.find_sid_hits(data) or il.find_account_sid_hits(data)
+        if hosts or users or il.find_serial_hits(data, sd) or sid:
+            what = "machine/domain or cloud account SID in a shape the rewrite does not clear" if sid and not (hosts or users) and not check_only else "identifier present"
+            findings.append(f"{r}: {what}" + (" (binary, not rewritten)" if is_opaque_binary(data) else ""))
+    if refused:
+        findings = refused + [f"run refused: {len(refused)} problem(s) stopped the rewrite, so nothing was rewritten"] + findings
+    findings = list(dict.fromkeys(findings))  # a file named by the stage and by the container check counts once
+    for line in findings:
+        print("FAIL", line)
+    print(f"scrub_public_identifiers --dir{' --check' if check_only else ''}: {changed} file(s) rewritten, {len(findings)} finding(s)")
+    if not check_only:
+        log_lines = [
+            "# Public-identifier scrub log (--dir)", "",
+            f"Rewrote {changed} file(s) of a folder outside git; {len(findings)} finding(s) remain. Names and identifiers are not written here: "
+            "files are identified by their index in the sorted walk and the first 16 hex digits of the sha256 of the relative name.", "",
+            f"Interpreter: Python {sys.version.split()[0]}, zlib {zlib.ZLIB_RUNTIME_VERSION}.", "",
+            "| index | name sha256 | sha256 before (LF) | sha256 after (LF) |", "|---|---|---|---|", *rows,
+        ]
+        if findings:
+            log_lines += ["", "Findings (exit 1):", *[f"- {f}" for f in findings]]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("\n".join(log_lines) + "\n", encoding="utf-8", newline="\n")
+        print(f"log {log_path}")
+    return 1 if findings else 0
 
 
 # ---- main --------------------------------------------------------------------------------------------------------------------
@@ -353,7 +647,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--check", action="store_true", help="report, change nothing; exit 1 on any finding")
     ap.add_argument("--log", type=Path, help="Markdown log to write (default: docs/reviews/public-identifier-scrub-log-<stamp>.md)")
     ap.add_argument("--repo", type=Path, default=Path.cwd())
+    ap.add_argument("--dir", type=Path, help="a directory outside git: every file in it is in scope for every rule (no ratchet); a rewriting run writes --log")
     args = ap.parse_args(argv)
+
+    if args.dir is not None:
+        return run_dir(ap, args.dir, check_only=args.check, log_path=args.log)
 
     root = repo_root(args.repo)
     host, user = il.live_names()
@@ -375,55 +673,65 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("the live host or user name is not one of the pinned identities in scripts/identity_lock.py; refusing to rewrite "
                  "(running as another account would rewrite that account's name into the operator's placeholder)")
 
-    from datetime import datetime
-
     log_path = args.log or root / "docs" / "reviews" / f"public-identifier-scrub-log-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.md"
     hd, ud = il.digests_with_live(host, user)
     rows: list[str] = []
     skipped: list[str] = []
     residual: list[str] = []
     named: list[str] = []
-    totals = {"host": 0, "user": 0}
+    totals = {"host": 0, "user": 0, "serial": 0, "sid": 0, "account": 0}
+    serials = il.live_volume_serials()
+    if not serials:
+        ap.error("no local fixed volume serial is readable on this machine; refusing (the rewrite could not clear a live serial)")
+    sd = il.serial_digests(serials)
     for p in files:
         r = rel(root, p)
         if r == USER_BASELINE_PATH:
             continue
-        if il.name_in_path(r, hd, ud):
-            named.append(r)
+        shown = il.redact_serials(r, sd)  # the log and the console never print a serial the file name carries
+        name_sid = il.find_sid_hits(r.encode("utf-8")) or il.find_account_sid_hits(r.encode("utf-8"))
+        if il.name_in_path(r, hd, ud) or il.find_serial_hits(r.encode("utf-8"), sd) or name_sid:
+            named.append("a file name carrying a SID" if name_sid else shown)
         data = p.read_bytes()
         in_scope = il.path_in_scope(r, USER_SCOPE)
+        sid_scope = il.path_in_scope(r, SID_SCOPE)
+        if sid_scope and archive_kind(data, r) is not None:
+            skipped.append(f"{shown} (archive, not rewritten)")  # a tracked archive in SID_SCOPE: its bytes are never rewritten
+            continue
         if is_opaque_binary(data):
             hosts, users = il.find_hits(data, hd, ud)
-            if hosts or (users and in_scope):
-                skipped.append(r)
+            if (hosts or (users and in_scope) or il.find_serial_hits(data, sd) or (sid_scope and il.find_sid_hits(data))
+                    or il.account_sid_container_problems(data, r)):
+                skipped.append(shown)
             continue
-        new, counts = scrub_bytes(data, host=host, user=user, in_scope=in_scope)
+        new, counts = scrub_bytes(data, host=host, user=user, in_scope=in_scope, serials=serials, sid_scope=sid_scope)
         if counts.get("unreadable"):
             hosts, users = il.find_hits(data, hd, ud)
-            if hosts or (users and in_scope):
-                skipped.append(f"{r} (gzip member with trailing bytes)")
+            if hosts or (users and in_scope) or il.find_serial_hits(data, sd) or sid_scope or il.account_sid_container_problems(data, r):
+                skipped.append(f"{shown} (unreadable: gzip member with trailing bytes or damage, or UTF-16 text that does not decode)")
             continue
         hosts, users = il.find_hits(new, hd, ud)
-        if hosts or (users and in_scope):
-            residual.append(r)  # a shape the lock sees and the rewrite does not clear (identity_lock HONEST LIMIT)
+        if (hosts or (users and in_scope) or il.find_serial_hits(new, sd) or (sid_scope and il.find_sid_hits(new))
+                or il.account_sid_container_problems(new, r)):
+            residual.append(shown)  # a shape the lock sees and the rewrite does not clear (identity_lock HONEST LIMIT)
         if new == data:
             continue
         p.write_bytes(new)
         for k in totals:
             totals[k] += counts[k]
-        rows.append(f"| `{r}` | {counts['host']} | {counts['user']} | `{lf_sha256(data)}` | `{lf_sha256(new)}` |")
+        rows.append(f"| `{shown}` | {counts['host']} | {counts['user']} | {counts['serial']} | {counts['sid']} | {counts['account']} | `{lf_sha256(data)}` | `{lf_sha256(new)}` |")
 
     log_lines = [
         "# Public-identifier scrub log",
         "",
-        f"Rewrote {len(rows)} tracked file(s): host-name occurrences {totals['host']} (whole tree), operator user-name occurrences {totals['user']} (USER_SCOPE only). "
-        "Identifiers are not written here; `scripts/scrub_public_identifiers.py --check` and `tests/security/test_no_host_identity_in_tree.py` verify the result.",
+        f"Rewrote {len(rows)} tracked file(s): host-name occurrences {totals['host']} (whole tree), operator user-name occurrences {totals['user']} (USER_SCOPE only), volume-serial occurrences {totals['serial']} (whole tree), machine-SID occurrences {totals['sid']} (SID_SCOPE only), cloud-account-SID occurrences {totals['account']} (whole tree). "
+        "Identifiers and serials are not written here; `scripts/scrub_public_identifiers.py --check` and `tests/security/test_no_host_identity_in_tree.py` verify the result.",
         "",
         f"Interpreter: Python {sys.version.split()[0]}, zlib {zlib.ZLIB_RUNTIME_VERSION} (gzip bodies are reproducible with this zlib build; "
         "the decompressed content is what the lock certifies).",
         "",
-        "| file | host | user | sha256 before (LF) | sha256 after (LF) |",
-        "|---|---|---|---|---|",
+        "| file | host | user | serial | sid | account sid | sha256 before (LF) | sha256 after (LF) |",
+        "|---|---|---|---|---|---|---|---|",
         *rows,
     ]
     if skipped:

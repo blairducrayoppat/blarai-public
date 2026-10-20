@@ -64,6 +64,12 @@ def apply_subs(text: str) -> tuple[str, int]:
     for pat, repl in SUBSTITUTIONS:
         out, k = re.subn(pat, repl, out)
         n += k
+    serials = _il.live_volume_serials()
+    if not serials:
+        raise SystemExit("scrub_community_export: no local fixed volume serial is readable; refusing (a live serial could not be cleared)")
+    raw, k = _il.rewrite_serials(out.encode('utf-8', 'surrogatepass'), serials)
+    out = raw.decode('utf-8', 'surrogatepass')
+    n += k
     hosts, users = _il.find_hits(out.encode('utf-8', 'surrogatepass'))
     for tok in sorted(hosts, key=len, reverse=True):
         out, k = re.subn(re.escape(tok.decode()), '<host>', out, flags=re.IGNORECASE)

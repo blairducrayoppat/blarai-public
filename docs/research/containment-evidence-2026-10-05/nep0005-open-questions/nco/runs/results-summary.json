@@ -1,0 +1,455 @@
+{
+  "question": "NEP-0005 Q2 for a delegated non-administrator: can a member of Network Configuration Operators (S-1-5-32-556) add and delete a WFP filter in the test sublayer S2, and under which token state",
+  "date": "2026-10-20",
+  "clock": "-04:00 local; runs 01:05:15 to 01:22:43; collect 01:22:58; finish 01:23:12; part D 01:42:16",
+  "conditions": {
+    "F": "the account via a secondary logon (filtered token)",
+    "E": "the account elevated (its full token)",
+    "S": "the operator, non-elevated console",
+    "A": "the operator, elevated console",
+    "N1": "standard non-administrator token (blarai-spike), the matrix phase n1 re-run 2026-10-19 16:49"
+  },
+  "counts": {
+    "A": 3,
+    "F": 4,
+    "S": 3,
+    "E": 0,
+    "N1": 3
+  },
+  "per_condition": {
+    "F": {
+      "n": 4,
+      "elevation_type": [
+        3
+      ],
+      "nco_group_attributes": [
+        "0x00000010"
+      ],
+      "add_rc": [
+        "0x00000005"
+      ],
+      "delete_rc": [
+        "0x80320003"
+      ],
+      "left_behind": false
+    },
+    "E": {
+      "n": 0,
+      "result": "elevation_refused",
+      "note": "the elevation request made from inside the account's own console showed Windows' credential prompt listing only this machine's administrator accounts, with no field to name the account; the operator cancelled it, four times; no E record reached the engine"
+    },
+    "S": {
+      "n": 3,
+      "elevation_type": [
+        3
+      ],
+      "administrators_attributes": [
+        "0x00000010"
+      ],
+      "add_rc": [
+        "0x00000005"
+      ],
+      "delete_rc": [
+        "0x80320003"
+      ]
+    },
+    "A": {
+      "n": 3,
+      "elevation_type": [
+        2
+      ],
+      "administrators_attributes": [
+        "0x0000000F"
+      ],
+      "add_rc": [
+        "0x00000000"
+      ],
+      "delete_rc": [
+        "0x00000000"
+      ],
+      "left_behind": false
+    },
+    "N1": {
+      "n": 3,
+      "add_rc": [
+        "0x00000005"
+      ],
+      "delete_rc": [
+        "0x00000005"
+      ],
+      "records": [
+        {
+          "pass": 1,
+          "class": "ok",
+          "add": "0x00000005",
+          "delete": "0x00000005"
+        },
+        {
+          "pass": 2,
+          "class": "ok",
+          "add": "0x00000005",
+          "delete": "0x00000005"
+        },
+        {
+          "pass": 3,
+          "class": "ok",
+          "add": "0x00000005",
+          "delete": "0x00000005"
+        }
+      ]
+    }
+  },
+  "records": [
+    {
+      "file": "case4-A-20261020-052240-21428.json",
+      "sha256_lf": "2de60b9a02d29b66afe2c56f891e3351a71b04ecd50880bfc2031e8771da5c2e",
+      "cond": "A",
+      "clock_start_utc": "2026-10-20T05:22:40.609Z",
+      "elevation_type": 2,
+      "elevation_label": "full",
+      "integrity": "high",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": false,
+        "attributes": null,
+        "use_for_deny_only": null
+      },
+      "administrators": {
+        "present": true,
+        "attributes": "0x0000000F",
+        "enabled": true
+      },
+      "is_expected_account": false,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000000",
+        "class": "succeeded",
+        "present_after": true
+      },
+      "delete": {
+        "rc": "0x00000000",
+        "class": "succeeded",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-A-20261020-052241-23964.json",
+      "sha256_lf": "3c6fc24a75a609aceddd3e8755087f9b80da90d0537c6e5fe6a14809df3cfeed",
+      "cond": "A",
+      "clock_start_utc": "2026-10-20T05:22:41.808Z",
+      "elevation_type": 2,
+      "elevation_label": "full",
+      "integrity": "high",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": false,
+        "attributes": null,
+        "use_for_deny_only": null
+      },
+      "administrators": {
+        "present": true,
+        "attributes": "0x0000000F",
+        "enabled": true
+      },
+      "is_expected_account": false,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000000",
+        "class": "succeeded",
+        "present_after": true
+      },
+      "delete": {
+        "rc": "0x00000000",
+        "class": "succeeded",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-A-20261020-052242-13572.json",
+      "sha256_lf": "b5513899d8d8a6a3f87fa0bbdfd4685f613c355c58bf1ebee25606387eb62966",
+      "cond": "A",
+      "clock_start_utc": "2026-10-20T05:22:42.986Z",
+      "elevation_type": 2,
+      "elevation_label": "full",
+      "integrity": "high",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": false,
+        "attributes": null,
+        "use_for_deny_only": null
+      },
+      "administrators": {
+        "present": true,
+        "attributes": "0x0000000F",
+        "enabled": true
+      },
+      "is_expected_account": false,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000000",
+        "class": "succeeded",
+        "present_after": true
+      },
+      "delete": {
+        "rc": "0x00000000",
+        "class": "succeeded",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-F-20261020-050515-23756.json",
+      "sha256_lf": "a19208ce72bbdcd98662d50086857c5425a80c8237d05399b733db4529c8217d",
+      "cond": "F",
+      "clock_start_utc": "2026-10-20T05:05:15.899Z",
+      "elevation_type": 3,
+      "elevation_label": "limited",
+      "integrity": "medium",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": true,
+        "attributes": "0x00000010",
+        "use_for_deny_only": true
+      },
+      "administrators": {
+        "present": false,
+        "attributes": null,
+        "enabled": null
+      },
+      "is_expected_account": true,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000005",
+        "class": "denied",
+        "present_after": false
+      },
+      "delete": {
+        "rc": "0x80320003",
+        "class": "not_found",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-F-20261020-051400-5880.json",
+      "sha256_lf": "60363fc2df402d823bf95944323831c2052ff2a9c1a78983182b47029c933105",
+      "cond": "F",
+      "clock_start_utc": "2026-10-20T05:14:00.292Z",
+      "elevation_type": 3,
+      "elevation_label": "limited",
+      "integrity": "medium",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": true,
+        "attributes": "0x00000010",
+        "use_for_deny_only": true
+      },
+      "administrators": {
+        "present": false,
+        "attributes": null,
+        "enabled": null
+      },
+      "is_expected_account": true,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000005",
+        "class": "denied",
+        "present_after": false
+      },
+      "delete": {
+        "rc": "0x80320003",
+        "class": "not_found",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-F-20261020-051424-25640.json",
+      "sha256_lf": "3b01382f788b9b39d1932812622021b264c52a2e23e95287c3a5c3eca54b851d",
+      "cond": "F",
+      "clock_start_utc": "2026-10-20T05:14:24.264Z",
+      "elevation_type": 3,
+      "elevation_label": "limited",
+      "integrity": "medium",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": true,
+        "attributes": "0x00000010",
+        "use_for_deny_only": true
+      },
+      "administrators": {
+        "present": false,
+        "attributes": null,
+        "enabled": null
+      },
+      "is_expected_account": true,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000005",
+        "class": "denied",
+        "present_after": false
+      },
+      "delete": {
+        "rc": "0x80320003",
+        "class": "not_found",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-F-20261020-051440-28652.json",
+      "sha256_lf": "a494e7f42a8674e33e5fbcbf4dc38a5cd257d76843cae83fd8f0929ec108a198",
+      "cond": "F",
+      "clock_start_utc": "2026-10-20T05:14:40.750Z",
+      "elevation_type": 3,
+      "elevation_label": "limited",
+      "integrity": "medium",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": true,
+        "attributes": "0x00000010",
+        "use_for_deny_only": true
+      },
+      "administrators": {
+        "present": false,
+        "attributes": null,
+        "enabled": null
+      },
+      "is_expected_account": true,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000005",
+        "class": "denied",
+        "present_after": false
+      },
+      "delete": {
+        "rc": "0x80320003",
+        "class": "not_found",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-S-20261020-052145-19624.json",
+      "sha256_lf": "8be10f9159e73e147ca1678baa8a5974218e8a806beaad18cee96e226f0c4da0",
+      "cond": "S",
+      "clock_start_utc": "2026-10-20T05:21:45.619Z",
+      "elevation_type": 3,
+      "elevation_label": "limited",
+      "integrity": "medium",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": false,
+        "attributes": null,
+        "use_for_deny_only": null
+      },
+      "administrators": {
+        "present": true,
+        "attributes": "0x00000010",
+        "enabled": false
+      },
+      "is_expected_account": false,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000005",
+        "class": "denied",
+        "present_after": false
+      },
+      "delete": {
+        "rc": "0x80320003",
+        "class": "not_found",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-S-20261020-052147-18812.json",
+      "sha256_lf": "170349d6b0ea8826d260633d371d033a542a19be6ce1ec8922a40029a608937e",
+      "cond": "S",
+      "clock_start_utc": "2026-10-20T05:21:47.818Z",
+      "elevation_type": 3,
+      "elevation_label": "limited",
+      "integrity": "medium",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": false,
+        "attributes": null,
+        "use_for_deny_only": null
+      },
+      "administrators": {
+        "present": true,
+        "attributes": "0x00000010",
+        "enabled": false
+      },
+      "is_expected_account": false,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000005",
+        "class": "denied",
+        "present_after": false
+      },
+      "delete": {
+        "rc": "0x80320003",
+        "class": "not_found",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    },
+    {
+      "file": "case4-S-20261020-052148-15020.json",
+      "sha256_lf": "67f586a56e5b3180ec51930f3f4359a9da1c6c08f2f00bed4b7769405b5844b0",
+      "cond": "S",
+      "clock_start_utc": "2026-10-20T05:21:48.871Z",
+      "elevation_type": 3,
+      "elevation_label": "limited",
+      "integrity": "medium",
+      "linked_token_present": true,
+      "nco_group": {
+        "present": false,
+        "attributes": null,
+        "use_for_deny_only": null
+      },
+      "administrators": {
+        "present": true,
+        "attributes": "0x00000010",
+        "enabled": false
+      },
+      "is_expected_account": false,
+      "engine_open_rc": "0x00000000",
+      "add": {
+        "rc": "0x00000005",
+        "class": "denied",
+        "present_after": false
+      },
+      "delete": {
+        "rc": "0x80320003",
+        "class": "not_found",
+        "present_after": false
+      },
+      "overall": "ok",
+      "residue": "absent",
+      "exit": 0
+    }
+  ],
+  "sanitisation": "machine account-domain SID rewritten to the bundle placeholder domain 1000000001-1000000002-1000000003 by rewrite_sid_domain.py (in scripts/) (log docs/reviews/case4-sid-rewrite-log-2026-10-20.md); host and operator names rewritten by scrub_public_identifiers.py (in scripts/); the fabricated stale SID S-1-5-21-17630000-17630001-17630002-91763 is not a machine SID and is unchanged; nothing else altered; in the prepare, final and part-D copies every netsh output key 'text' is renamed 'netsh_text' (values unchanged) because the bundle lock reserves 'text' for model output"
+}

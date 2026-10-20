@@ -128,10 +128,14 @@ def main() -> int:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts"))
     import identity_lock as il  # noqa: E402
 
-    carrying = [e["date"] for e in cold if any(il.find_hits(e["text"].encode("utf-8")))]
+    serial_digests = il.serial_digests()
+    if not serial_digests:
+        print("REFUSED: no local fixed volume serial is readable on this machine; the rotation cannot rule out a serial in an entry to move")
+        return 2
+    carrying = [e["date"] for e in cold if any(il.find_hits(e["text"].encode("utf-8"))) or il.find_serial_hits(e["text"].encode("utf-8"), serial_digests)]
     if carrying:
-        print(f"REFUSED: {len(carrying)} entr(ies) to move carry the host or operator account name ({', '.join(carrying)}); "
-              "edit them to read __USER__ / __HOST__ in the hot file first (scripts/identity_user_baseline.json only shrinks)")
+        print(f"REFUSED: {len(carrying)} entr(ies) to move carry the host or operator account name or a volume serial number ({', '.join(carrying)}); "
+              "edit them to read __USER__ / __HOST__ / XXXX-XXXX in the hot file first (scripts/identity_user_baseline.json only shrinks)")
         return 2
 
     os.makedirs(args.archive_dir, exist_ok=True)

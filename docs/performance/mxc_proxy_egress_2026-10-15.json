@@ -1,0 +1,973 @@
+{
+ "record": "mxc_proxy_egress",
+ "date": "2026-10-15",
+ "status": "FINAL",
+ "question": "With runtimeConfig.networkProxy pointing at a loopback proxy the run controls (no allowedProxyPeer, ingress.default allow, ingress.hostLoopback allow, egress.default deny, no egress rules): is the policy accepted, and if so is non-proxy egress from inside the container blocked? Judged for the signed v1.0.0 launcher (arm A) and a launcher built from microsoft/mxc main at 525d0f25763b2edaab56e29651fb7c12c4cbbd93 (arm B), under two security-software conditions.",
+ "hardware": {
+  "cpu": "Intel Core Ultra 7 258V",
+  "ram_gb": 31.3,
+  "note": "hardware description from the host record; the raw batch headers do not carry it. No GPU or model work."
+ },
+ "windows": {
+  "build_with_ubr": "26200.9711",
+  "product_name_registry": "Windows 10 Pro",
+  "note": "ProductName is read from the registry as written by Windows; the build number is 26200 (Windows 11 family). Identical in both conditions."
+ },
+ "summary": "Identical results in both conditions: both launchers accept the policy at --dry-run 3 of 3 and launch it 3 of 3; B2 (requests through the proxy) 9 of 9 per arm; B3, B4(i) and B4(ii) each refused with WinError 10013 in 3 of 3 runs per arm; unfenced controls connected every time; harness verdict HOLD for both arms in both conditions.",
+ "launchers": {
+  "A": {
+   "path": "C:\\blarai-spike-mxc\\dl\\x64\\wxc-exec.exe",
+   "sha256": "aa444c0fc4b7f155fd8631068ffafb453d71d8b47fc47d417a74c9545a344031",
+   "size_bytes": 12003128,
+   "authenticode": "Valid|CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+   "source": {
+    "release_tag": "v1.0.0 (operator-designated signed release; the launcher reports no version)"
+   },
+   "probe_verbatim": {
+    "tier": "base-container",
+    "needsDaclAugmentation": false,
+    "warnings": [],
+    "probes": {
+     "baseContainerApiPresent": true,
+     "nativeCaptureAvailable": true,
+     "guardedCaptureAvailable": false,
+     "bfscfgPresent": false,
+     "bfsCompiledIn": false,
+     "baseContainerSupportsDenyPaths": true,
+     "baseContainerSupportsEnumeratePaths": true,
+     "baseContainerSupportsIngressHostLoopbackAllow": true,
+     "isolationSessionAvailable": true,
+     "hyperlightAvailable": true,
+     "uiCapabilities": {
+      "canBlockClipboardRead": true,
+      "canBlockClipboardWrite": true,
+      "canBlockInputInjection": true,
+      "canBlockInputMethodChanges": true,
+      "canBlockExternalUiObjects": true,
+      "canBlockGlobalUiNamespace": true,
+      "canBlockDesktopSwitching": true,
+      "canBlockLogoffOrShutdown": true,
+      "canBlockSystemParameterChanges": true,
+      "canBlockDisplaySettingsChanges": true
+     }
+    }
+   },
+   "probe_output_contains_a_psec_field": false,
+   "sha256_identical_in_condition_2": true,
+   "probe_verbatim_identical_in_condition_2": true
+  },
+  "B": {
+   "path": "C:\\blarai-spike-mxc\\build-main-20261015\\target\\x86_64-pc-windows-msvc\\release\\wxc-exec.exe",
+   "sha256": "e951922beec5ad5f0ba967e398763640c3b24c96cbf97f2d198174a949e5f8cc",
+   "size_bytes": 5791744,
+   "authenticode": "NotSigned|",
+   "source": {
+    "commit": "525d0f25763b2edaab56e29651fb7c12c4cbbd93",
+    "basis": "given on the command line (matches the known-build table)"
+   },
+   "probe_verbatim": {
+    "tier": "base-container",
+    "needsDaclAugmentation": false,
+    "warnings": [],
+    "probes": {
+     "baseContainerApiPresent": true,
+     "nativeCaptureAvailable": true,
+     "guardedCaptureAvailable": false,
+     "bfscfgPresent": false,
+     "bfsCompiledIn": false,
+     "baseContainerSupportsDenyPaths": true,
+     "baseContainerSupportsEnumeratePaths": true,
+     "baseContainerSupportsIngressHostLoopbackAllow": true,
+     "baseContainerSupportsIdentitylessLoopbackProxy": true,
+     "isolationSessionAvailable": false,
+     "hyperlightAvailable": false,
+     "uiCapabilities": {
+      "canBlockClipboardRead": true,
+      "canBlockClipboardWrite": true,
+      "canBlockInputInjection": true,
+      "canBlockInputMethodChanges": true,
+      "canBlockExternalUiObjects": true,
+      "canBlockGlobalUiNamespace": true,
+      "canBlockDesktopSwitching": true,
+      "canBlockLogoffOrShutdown": true,
+      "canBlockSystemParameterChanges": true,
+      "canBlockDisplaySettingsChanges": true
+     }
+    }
+   },
+   "probe_output_contains_a_psec_field": false,
+   "sha256_identical_in_condition_2": true,
+   "probe_verbatim_identical_in_condition_2": true
+  }
+ },
+ "harness": {
+  "commit_that_ran": "25210ef3",
+  "branch": "feat/mxc-proxy-egress",
+  "same_in_both_conditions": true,
+  "approved_hash_file_run_probe_py_sha256": "979c21d546af264702ea9df8ca1f2b9f25ad038d9f1425019c85a1e4aa945879",
+  "run_probe_py_sha256_condition_1": "979c21d546af264702ea9df8ca1f2b9f25ad038d9f1425019c85a1e4aa945879",
+  "run_probe_py_sha256_condition_2": "979c21d546af264702ea9df8ca1f2b9f25ad038d9f1425019c85a1e4aa945879",
+  "host_python": "3.14.3 (tags/v3.14.3:323c59a, Feb  3 2026, 16:04:56) [MSC v.1944 64 bit (AMD64)]",
+  "interpreters": {
+   "host": {
+    "path": "C:\\Python314\\python.exe",
+    "sha256": "cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b"
+   },
+   "container": {
+    "path": "C:\\blarai-spike\\toolchain\\Python314\\python.exe",
+    "sha256": "cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b"
+   }
+  },
+  "host_prep": {
+   "run_by_harness": false,
+   "note": "wxc-host-prep is not invoked by this harness"
+  },
+  "ports": {
+   "proxy": 18110,
+   "target": 18111
+  },
+  "note": "Later review fixes (round 3, a port pre-flight) are in later commits and were not part of either batch."
+ },
+ "policy": {
+  "fx-a_and_fx-b_identical_measured_state": true,
+  "policy_as_submitted_arm_A_run_1_condition_1": {
+   "version": "1.0.0",
+   "containment": "processcontainer",
+   "lifecycle": {
+    "destroyOnExit": true
+   },
+   "fallback": {
+    "allowDaclMutation": false
+   },
+   "process": {
+    "commandLine": "\"C:\\blarai-spike\\toolchain\\Python314\\python.exe\" -I \"%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\payload\\net_payload.py\" --tag A-A1-r1-160723 --out \"%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\work\\result-A-A1-r1-160723.json\" --gateway-ip <default-gateway> --gateway-port 80 --proxy-port 18110 --target-port 18111",
+    "cwd": "%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\work",
+    "inheritDefaultEnv": true,
+    "timeout": 150000
+   },
+   "filesystem": {
+    "readwritePaths": [
+     "%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\work"
+    ],
+    "readonlyPaths": [
+     "C:\\blarai-spike\\toolchain",
+     "%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\payload"
+    ]
+   },
+   "network": {
+    "egress": {
+     "default": "deny"
+    },
+    "ingress": {
+     "default": "allow",
+     "hostLoopback": "allow"
+    }
+   },
+   "runtimeConfig": {
+    "networkProxy": "http://127.0.0.1:18110"
+   },
+   "ui": {
+    "disable": false,
+    "clipboard": "none",
+    "injection": false
+   }
+  },
+  "policy_as_submitted_arm_B_run_1_condition_1": {
+   "version": "1.0.0",
+   "containment": "processcontainer",
+   "lifecycle": {
+    "destroyOnExit": true
+   },
+   "fallback": {
+    "allowDaclMutation": false
+   },
+   "process": {
+    "commandLine": "\"C:\\blarai-spike\\toolchain\\Python314\\python.exe\" -I \"%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\payload\\net_payload.py\" --tag B-B1-r1-160738 --out \"%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\work\\result-B-B1-r1-160738.json\" --gateway-ip <default-gateway> --gateway-port 80 --proxy-port 18110 --target-port 18111",
+    "cwd": "%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\work",
+    "inheritDefaultEnv": true,
+    "timeout": 150000
+   },
+   "filesystem": {
+    "readwritePaths": [
+     "%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\work"
+    ],
+    "readonlyPaths": [
+     "C:\\blarai-spike\\toolchain",
+     "%USERPROFILE%\\blarai-research-data\\mxc-proxy-egress\\run-20261015-1\\staging\\payload"
+    ]
+   },
+   "network": {
+    "egress": {
+     "default": "deny"
+    },
+    "ingress": {
+     "default": "allow",
+     "hostLoopback": "allow"
+    }
+   },
+   "runtimeConfig": {
+    "networkProxy": "http://127.0.0.1:18110"
+   },
+   "ui": {
+    "disable": false,
+    "clipboard": "none",
+    "injection": false
+   }
+  }
+ },
+ "conditions": {
+  "condition_1": {
+   "label": "condition_1_no_third_party_suite",
+   "run": {
+    "raw_folder_name": "run-20261015-1",
+    "started": "2026-10-15T16:07:21.893-04:00",
+    "finished": "2026-10-15T16:07:53.809-04:00",
+    "first_launch_started": "2026-10-15T16:07:25.414-04:00",
+    "last_launch_ended": "2026-10-15T16:07:51.783-04:00",
+    "elevated": true,
+    "priority": "BelowNormal",
+    "n_per_state_per_arm": 3,
+    "ac_power": true,
+    "battery_percent": 80,
+    "windows_build_with_ubr": "26200.9711"
+   },
+   "security_conditions": {
+    "firewall_product_per_security_center_raw": [
+     "McAfee|266240"
+    ],
+    "bitdefender_named_process_count_raw_during_batch": 1,
+    "bitdefender_named_processes_raw": [
+     "bdredline.exe"
+    ],
+    "windows_firewall_profiles_raw": [
+     "Domain|True|NotConfigured|NotConfigured|True",
+     "Private|True|NotConfigured|NotConfigured|True",
+     "Public|True|NotConfigured|NotConfigured|True"
+    ],
+    "columns_of_profile_strings": "Name|Enabled|DefaultInboundAction|DefaultOutboundAction|NotifyOnListen",
+    "note_from_operator": "PER THE OPERATOR (not in the raw records): Bitdefender was uninstalled on 2026-10-14, Windows Defender real-time protection was on, and the remnant service was bdredline_agent. FROM THE RAW RECORDS: the Windows firewall profiles were all enabled, Security Center listed a stale McAfee entry as the firewall product, and the process scan found bdredline.exe. Not under a third-party firewall; Bitdefender was not present as a product."
+   },
+   "harness_files_sha256_as_run": {
+    "run_probe.py": "979c21d546af264702ea9df8ca1f2b9f25ad038d9f1425019c85a1e4aa945879",
+    "net_payload.py": "372b812c4f770305a5495c650af3a4ad58297278b64c69a201b8d8bfdeaf6b21",
+    "proxy.py": "9057ef74f8d877ec2ccf15990c75ada7e27b9cf84369ce3d1a712f85fbf8e814",
+    "summarise.py": "78ee0b4090fe060f6ab065f8bd3a3076ef678aabc51809e932b633de798ec706"
+   },
+   "launch_ps1_sha256": "d94e93d8bb53065c11bc54423802dd10dd311748d80e0a944c02e11c7e635a03",
+   "launch_ps1_sha256_as_passed_by_launcher": "d94e93d8bb53065c11bc54423802dd10dd311748d80e0a944c02e11c7e635a03",
+   "launcher_sha256": {
+    "A": "aa444c0fc4b7f155fd8631068ffafb453d71d8b47fc47d417a74c9545a344031",
+    "B": "e951922beec5ad5f0ba967e398763640c3b24c96cbf97f2d198174a949e5f8cc"
+   },
+   "arm_commits": {
+    "B": {
+     "commit": "525d0f25763b2edaab56e29651fb7c12c4cbbd93",
+     "basis": "given on the command line (matches the known-build table)"
+    }
+   },
+   "gateway_port_selected": 80,
+   "launcher_log_facts_observed": {
+    "psec": {
+     "A": [
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes"
+     ],
+     "B": [
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes"
+     ]
+    },
+    "network_policy_applied": {
+     "A": [
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      }
+     ],
+     "B": [
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      }
+     ]
+    }
+   },
+   "results": {
+    "A": {
+     "state": "A1",
+     "fixture": "fx-a",
+     "runs": 3,
+     "run_tags": [
+      "A-A1-r1-160723",
+      "A-A1-r2-160728",
+      "A-A1-r3-160733"
+     ],
+     "dry_run_accepted": "3 of 3",
+     "dry_run_text_first_run": "Dry run completed. Result: validation passed",
+     "dry_run_stderr_empty": true,
+     "launch_exit_codes": [
+      0,
+      0,
+      0
+     ],
+     "launch_wall_secs": [
+      0.698,
+      0.453,
+      0.404
+     ],
+     "B2_requests_through_proxy_200_in_container": "9 of 9 requests; runs with 3 of 3: 3 of 3",
+     "B2_proxy_log_forwarded_200": "9 of 9",
+     "B2_second_listener_logged_with_run_tag": "9 of 9",
+     "B3_direct_connect_to_second_loopback_listener": {
+      "refused_with_winerror_10013": "3 of 3",
+      "listener_hits": 0
+     },
+     "B4i_connect_to_default_gateway_port_80": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "B4ii_connect_to_1.1.1.1_443": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "unfenced_control_around_launch": {
+      "cloudflare_443_connected_before_and_after": "3 of 3",
+      "gateway_80_connected_before_and_after": "3 of 3"
+     },
+     "container_env_proxy": {
+      "HTTPS_PROXY": "http://127.0.0.1:18110",
+      "HTTP_PROXY": "http://127.0.0.1:18110"
+     },
+     "state_changed_by_run": [
+      {},
+      {},
+      {}
+     ],
+     "snapshot_wfp_mxc_named_filter_count_before_after": [
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ],
+     "snapshot_interpreter_firewall_rules_enabled_any": false,
+     "run_verdicts": [
+      "HOLD",
+      "HOLD",
+      "HOLD"
+     ],
+     "batch_verdict": "HOLD"
+    },
+    "B": {
+     "state": "B1",
+     "fixture": "fx-b",
+     "runs": 3,
+     "run_tags": [
+      "B-B1-r1-160738",
+      "B-B1-r2-160743",
+      "B-B1-r3-160748"
+     ],
+     "dry_run_accepted": "3 of 3",
+     "dry_run_text_first_run": "Dry run completed. Result: validation passed",
+     "dry_run_stderr_empty": true,
+     "launch_exit_codes": [
+      0,
+      0,
+      0
+     ],
+     "launch_wall_secs": [
+      0.387,
+      0.454,
+      0.425
+     ],
+     "B2_requests_through_proxy_200_in_container": "9 of 9 requests; runs with 3 of 3: 3 of 3",
+     "B2_proxy_log_forwarded_200": "9 of 9",
+     "B2_second_listener_logged_with_run_tag": "9 of 9",
+     "B3_direct_connect_to_second_loopback_listener": {
+      "refused_with_winerror_10013": "3 of 3",
+      "listener_hits": 0
+     },
+     "B4i_connect_to_default_gateway_port_80": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "B4ii_connect_to_1.1.1.1_443": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "unfenced_control_around_launch": {
+      "cloudflare_443_connected_before_and_after": "3 of 3",
+      "gateway_80_connected_before_and_after": "3 of 3"
+     },
+     "container_env_proxy": {
+      "HTTPS_PROXY": "http://127.0.0.1:18110",
+      "HTTP_PROXY": "http://127.0.0.1:18110"
+     },
+     "state_changed_by_run": [
+      {},
+      {},
+      {}
+     ],
+     "snapshot_wfp_mxc_named_filter_count_before_after": [
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ],
+     "snapshot_interpreter_firewall_rules_enabled_any": false,
+     "run_verdicts": [
+      "HOLD",
+      "HOLD",
+      "HOLD"
+     ],
+     "batch_verdict": "HOLD"
+    }
+   },
+   "unfenced_control_B5_once_per_batch": {
+    "loopback_second_listener_reached": true,
+    "default_gateway_80_connected": true,
+    "cloudflare_443_connected": true,
+    "ok": true
+   },
+   "batch_summary_verbatim": {
+    "controls": {
+     "ok": true,
+     "reasons": [],
+     "b5a": true,
+     "b5b": true,
+     "b5c": true
+    },
+    "groups": {
+     "A/A1": {
+      "verdict": "HOLD",
+      "runs": 3,
+      "run_verdicts": [
+       "HOLD",
+       "HOLD",
+       "HOLD"
+      ],
+      "b4i_not_measurable": false,
+      "state_changed_runs": [],
+      "launcher_nonzero_exit_runs": []
+     },
+     "B/B1": {
+      "verdict": "HOLD",
+      "runs": 3,
+      "run_verdicts": [
+       "HOLD",
+       "HOLD",
+       "HOLD"
+      ],
+      "b4i_not_measurable": false,
+      "state_changed_runs": [],
+      "launcher_nonzero_exit_runs": []
+     }
+    },
+    "arm_refusals": []
+   }
+  },
+  "condition_2": {
+   "label": "condition_2_bitdefender_present",
+   "run": {
+    "raw_folder_name": "run-20261015-3",
+    "started": "2026-10-15T16:43:14.669-04:00",
+    "finished": "2026-10-15T16:44:41.135-04:00",
+    "first_launch_started": "2026-10-15T16:43:21.757-04:00",
+    "last_launch_ended": "2026-10-15T16:44:36.890-04:00",
+    "elevated": true,
+    "priority": "BelowNormal",
+    "n_per_state_per_arm": 3,
+    "ac_power": true,
+    "battery_percent": 80,
+    "windows_build_with_ubr": "26200.9711"
+   },
+   "security_conditions": {
+    "firewall_product_per_security_center_raw": [
+     "Bitdefender Firewall|266240",
+     "McAfee|266240"
+    ],
+    "bitdefender_named_process_count_raw_during_batch": 14,
+    "bitdefender_named_processes_raw": [
+     "bdagent.exe",
+     "bdntwrk.exe",
+     "bdredline.exe",
+     "bdredline.exe",
+     "bdservicehost.exe",
+     "bdservicehost.exe",
+     "bdservicehost.exe",
+     "bdservicehost.exe",
+     "bdservicehost.exe",
+     "bduserhost.exe",
+     "bduserhost.exe",
+     "bduserhost.exe",
+     "bduserhost.exe",
+     "updatesrv.exe"
+    ],
+    "windows_firewall_profiles_raw": [
+     "Domain|True|NotConfigured|NotConfigured|True",
+     "Private|True|NotConfigured|NotConfigured|True",
+     "Public|True|NotConfigured|NotConfigured|True"
+    ],
+    "columns_of_profile_strings": "Name|Enabled|DefaultInboundAction|DefaultOutboundAction|NotifyOnListen",
+    "note_from_operator": "Bitdefender reinstalled and present; Security Center listed Bitdefender Firewall (default automatic mode) and the stale McAfee entry. Shortly before the batch the Bitdefender firewall logged \"Application allowed to access network\" for the host Python to 1.1.1.1:443 TCP and granted it automatically (the unfenced control of the aborted attempt run-20261015-2); that auto-allow is part of this condition. The product was still changing state: the header of the aborted attempt (16:30) lists 17 Bitdefender-named processes and the header of the batch (16:43) lists 14. The harness was started from a clean detached worktree of the same commit and its hash check passed."
+   },
+   "harness_files_sha256_as_run": {
+    "run_probe.py": "979c21d546af264702ea9df8ca1f2b9f25ad038d9f1425019c85a1e4aa945879",
+    "net_payload.py": "372b812c4f770305a5495c650af3a4ad58297278b64c69a201b8d8bfdeaf6b21",
+    "proxy.py": "9057ef74f8d877ec2ccf15990c75ada7e27b9cf84369ce3d1a712f85fbf8e814",
+    "summarise.py": "78ee0b4090fe060f6ab065f8bd3a3076ef678aabc51809e932b633de798ec706"
+   },
+   "launch_ps1_sha256": "d94e93d8bb53065c11bc54423802dd10dd311748d80e0a944c02e11c7e635a03",
+   "launch_ps1_sha256_as_passed_by_launcher": "d94e93d8bb53065c11bc54423802dd10dd311748d80e0a944c02e11c7e635a03",
+   "launcher_sha256": {
+    "A": "aa444c0fc4b7f155fd8631068ffafb453d71d8b47fc47d417a74c9545a344031",
+    "B": "e951922beec5ad5f0ba967e398763640c3b24c96cbf97f2d198174a949e5f8cc"
+   },
+   "arm_commits": {
+    "B": {
+     "commit": "525d0f25763b2edaab56e29651fb7c12c4cbbd93",
+     "basis": "given on the command line (matches the known-build table)"
+    }
+   },
+   "gateway_port_selected": 80,
+   "launcher_log_facts_observed": {
+    "psec": {
+     "A": [
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes"
+     ],
+     "B": [
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes",
+      "PSEC 1.1, 432 bytes"
+     ]
+    },
+    "network_policy_applied": {
+     "A": [
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      }
+     ],
+     "B": [
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      },
+      {
+       "enforcement_mode": "capabilities",
+       "default_policy": "block",
+       "firewall_rules_created": 0,
+       "firewall_applied": false,
+       "status": "success"
+      }
+     ]
+    }
+   },
+   "results": {
+    "A": {
+     "state": "A1",
+     "fixture": "fx-a",
+     "runs": 3,
+     "run_tags": [
+      "A-A1-r1-164317",
+      "A-A1-r2-164328",
+      "A-A1-r3-164348"
+     ],
+     "dry_run_accepted": "3 of 3",
+     "dry_run_text_first_run": "Dry run completed. Result: validation passed",
+     "dry_run_stderr_empty": true,
+     "launch_exit_codes": [
+      0,
+      0,
+      0
+     ],
+     "launch_wall_secs": [
+      1.801,
+      1.308,
+      0.566
+     ],
+     "B2_requests_through_proxy_200_in_container": "9 of 9 requests; runs with 3 of 3: 3 of 3",
+     "B2_proxy_log_forwarded_200": "9 of 9",
+     "B2_second_listener_logged_with_run_tag": "9 of 9",
+     "B3_direct_connect_to_second_loopback_listener": {
+      "refused_with_winerror_10013": "3 of 3",
+      "listener_hits": 0
+     },
+     "B4i_connect_to_default_gateway_port_80": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "B4ii_connect_to_1.1.1.1_443": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "unfenced_control_around_launch": {
+      "cloudflare_443_connected_before_and_after": "3 of 3",
+      "gateway_80_connected_before_and_after": "3 of 3"
+     },
+     "container_env_proxy": {
+      "HTTPS_PROXY": "http://127.0.0.1:18110",
+      "HTTP_PROXY": "http://127.0.0.1:18110"
+     },
+     "state_changed_by_run": [
+      {},
+      {},
+      {}
+     ],
+     "snapshot_wfp_mxc_named_filter_count_before_after": [
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ],
+     "snapshot_interpreter_firewall_rules_enabled_any": false,
+     "run_verdicts": [
+      "HOLD",
+      "HOLD",
+      "HOLD"
+     ],
+     "batch_verdict": "HOLD"
+    },
+    "B": {
+     "state": "B1",
+     "fixture": "fx-b",
+     "runs": 3,
+     "run_tags": [
+      "B-B1-r1-164357",
+      "B-B1-r2-164411",
+      "B-B1-r3-164426"
+     ],
+     "dry_run_accepted": "3 of 3",
+     "dry_run_text_first_run": "Dry run completed. Result: validation passed",
+     "dry_run_stderr_empty": true,
+     "launch_exit_codes": [
+      0,
+      0,
+      0
+     ],
+     "launch_wall_secs": [
+      1.864,
+      1.26,
+      0.813
+     ],
+     "B2_requests_through_proxy_200_in_container": "9 of 9 requests; runs with 3 of 3: 3 of 3",
+     "B2_proxy_log_forwarded_200": "9 of 9",
+     "B2_second_listener_logged_with_run_tag": "9 of 9",
+     "B3_direct_connect_to_second_loopback_listener": {
+      "refused_with_winerror_10013": "3 of 3",
+      "listener_hits": 0
+     },
+     "B4i_connect_to_default_gateway_port_80": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "B4ii_connect_to_1.1.1.1_443": {
+      "refused_with_winerror_10013": "3 of 3"
+     },
+     "unfenced_control_around_launch": {
+      "cloudflare_443_connected_before_and_after": "3 of 3",
+      "gateway_80_connected_before_and_after": "3 of 3"
+     },
+     "container_env_proxy": {
+      "HTTPS_PROXY": "http://127.0.0.1:18110",
+      "HTTP_PROXY": "http://127.0.0.1:18110"
+     },
+     "state_changed_by_run": [
+      {},
+      {},
+      {}
+     ],
+     "snapshot_wfp_mxc_named_filter_count_before_after": [
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ],
+     "snapshot_interpreter_firewall_rules_enabled_any": false,
+     "run_verdicts": [
+      "HOLD",
+      "HOLD",
+      "HOLD"
+     ],
+     "batch_verdict": "HOLD"
+    }
+   },
+   "unfenced_control_B5_once_per_batch": {
+    "loopback_second_listener_reached": true,
+    "default_gateway_80_connected": true,
+    "cloudflare_443_connected": true,
+    "ok": true
+   },
+   "batch_summary_verbatim": {
+    "controls": {
+     "ok": true,
+     "reasons": [],
+     "b5a": true,
+     "b5b": true,
+     "b5c": true
+    },
+    "groups": {
+     "A/A1": {
+      "verdict": "HOLD",
+      "runs": 3,
+      "run_verdicts": [
+       "HOLD",
+       "HOLD",
+       "HOLD"
+      ],
+      "b4i_not_measurable": false,
+      "state_changed_runs": [],
+      "launcher_nonzero_exit_runs": []
+     },
+     "B/B1": {
+      "verdict": "HOLD",
+      "runs": 3,
+      "run_verdicts": [
+       "HOLD",
+       "HOLD",
+       "HOLD"
+      ],
+      "b4i_not_measurable": false,
+      "state_changed_runs": [],
+      "launcher_nonzero_exit_runs": []
+     }
+    },
+    "arm_refusals": []
+   }
+  }
+ },
+ "non_results": [
+  {
+   "raw_folder_name": "run-20261015-2",
+   "status": "ABORTED, not evidence",
+   "started": "2026-10-15T16:30:27.702-04:00",
+   "what_happened": "An attempt at condition 2 passed its hash check and its unfenced control (B5 judgement ok: True), then stopped on binding 127.0.0.1:18111 (WinError 10048, from the console output the operator pasted; no raw file records it) because an unrelated self-test of the harness on the same machine held the harness loopback ports. No container was launched and no run record exists.",
+   "bitdefender_named_process_count_in_its_raw_header": 17,
+   "also": "An earlier start from the wrong folder was refused by the hash check before anything ran. The aborted attempt's unfenced control (host Python to 1.1.1.1:443) is what the Bitdefender firewall auto-allowed."
+  }
+ ],
+ "comparison_with_earlier_record": {
+  "earlier": "docs/research/windows-containment-comparison-2026-10/mxc-1406-probe (2026-10-11, Windows 26200.9457, elevated, Bitdefender present)",
+  "earlier_v1.0.0_result": "REJECTED at dry-run 3 of 3 with the same network and proxy settings as here (proxy port 18099 then): network.ingress.hostLoopback='allow' is not supported by this version of Windows; host-loopback ingress requires native ProcessContainer support. The v1.0.0 launcher did not launch then.",
+  "earlier_launches": "the older main build 70fc7d52 (9 launches), whose own log recorded PSEC 1.0 in every launch",
+  "earlier_record_launcher_log_facts": [
+   {
+    "condition": "L-off-c",
+    "psec": [
+     "PSEC 1.0, 232 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "L-off-c",
+    "psec": [
+     "PSEC 1.0, 232 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "L-off-c",
+    "psec": [
+     "PSEC 1.0, 232 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "T-on",
+    "psec": [
+     "PSEC 1.0, 344 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "T-on",
+    "psec": [
+     "PSEC 1.0, 344 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "T-on",
+    "psec": [
+     "PSEC 1.0, 344 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "P-18100",
+    "psec": [
+     "PSEC 1.0, 344 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "P-18100",
+    "psec": [
+     "PSEC 1.0, 344 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   },
+   {
+    "condition": "P-18100",
+    "psec": [
+     "PSEC 1.0, 344 bytes"
+    ],
+    "network_policy_applied": {
+     "enforcement_mode": "capabilities",
+     "firewall_rules_created": 0,
+     "firewall_applied": false,
+     "status": "success"
+    }
+   }
+  ],
+  "this_record_v1.0.0_result": "ACCEPTED at dry-run 3 of 3 and launched 3 of 3 on 26200.9711 in both conditions; --probe on 26200.9711 reports host-loopback ingress support (baseContainerSupportsIngressHostLoopbackAllow true) for v1.0.0. The proxy policy launched under PSEC 1.1 in all 12 launches (both arms, both conditions; MXC's launch log: PSEC 1.1, 432 bytes); the six 2026-10-11 proxy-policy launches on 26200.9457 logged PSEC 1.0 (nine launches in all, three of them the no-proxy baseline); the logged version follows the policy launched, not only the host.",
+  "vendor_doc_statement": "The vendor networking document says hostLoopback allow is rejected when the PSEC 1.1 ingress contract is unavailable, which matches the 2026-10-11 rejection text.",
+  "cause_of_the_change_in_acceptance": "NOT ISOLATED. The Windows build (9457 to 9711), the harness and the proxy port (18099 to 18110) all changed too. The security software is ruled out: acceptance was the same with Bitdefender absent (condition 1) and present (condition 2).",
+  "consequence_for_arm_B": "The proxy policy launched under PSEC 1.1 in all 12 launches, so arm B (main 525d0f25, written to support an identity-less loopback proxy on PSEC 1.0-only hosts) did not exercise that path here; its HOLD is not evidence about it."
+ },
+ "not_measured": [
+  "any build other than the ones run",
+  "the PSEC 1.0-only path (the identity-less proxy workaround from microsoft/mxc#1406): the host supports PSEC 1.1 and the proxy policy launched under it, so the workaround path was not taken and arm B did not exercise it, and its HOLD is not evidence about that path",
+  "a non-elevated live run (both batches were elevated)",
+  "behaviour on a host whose --probe reports host-loopback ingress unsupported (the earlier 26200.9457 condition)",
+  "an identity-scoped proxy (allowedProxyPeer)",
+  "the session-isolation backend",
+  "UDP, ICMP or DNS egress under the proxy policy",
+  "host-to-container ingress (the vendor doc's own open limitation)",
+  "nono under MXC",
+  "anything about any other sandbox",
+  "IPv6; HTTPS or CONNECT through the proxy; destination ports other than 80 (gateway), 443 (1.1.1.1) and the two loopback ports",
+  "the container's WFP filters (they were not read; only an MXC-named filter count and MXC's own NetworkPolicyApplied log line were taken, the latter recording enforcement_mode capabilities and firewall_rules_created 0 in every launch)",
+  "Bitdefender's own firewall rules and logs (the state snapshot does not include them; one auto-allow event is recorded from the operator's statement only); any Bitdefender mode other than the default automatic one",
+  "variance beyond 3 runs per state per arm: each batch is a repeat on one machine within about one minute, not a distribution"
+ ]
+}

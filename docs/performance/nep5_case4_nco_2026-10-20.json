@@ -1,0 +1,64 @@
+{
+  "question": "NEP-0005 Q2 for a delegated non-administrator (ticket 1764, case 4 of nolabs-ai/nono#2125): can a member of the local group Network Configuration Operators (S-1-5-32-556) add and delete a Windows Filtering Platform (WFP) filter in a test sublayer, and under which token state (filtered or elevated)?",
+  "date": "2026-10-20",
+  "clock": "-04:00 local; -Prepare 00:48:45 to 00:48:52; F runs 01:05:15 to 01:14:40; S runs 01:21:45 to 01:21:48; A runs 01:22:40 to 01:22:43; -Collect 01:22:58; -Finish 01:23:12; -PartD 01:42:16; standard-token control (matrix phase n1) 2026-10-19 16:49:53 to 16:51:17",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V",
+    "ram_gb": 31.3,
+    "gpu": "not relevant to this measurement (no GPU or model work)",
+    "os": "Windows 11 Pro 10.0.26200, update build revision 9711 (read from the operator's console banner in his screenshot of the E attempt; the run records carry no build number)"
+  },
+  "software": {
+    "probe": "ncoprobe.exe (C#, .NET Framework 4.x csc, x64) sha256 4fde1ad6db744fa289b65eb6f639628cd1f04ead6f3b5e6db247fcdc3a0e14d4, source NcoProbe.cs sha256 (LF) 28bc05d583135c446ae5dff073907b42c855e522123ba7106c76ff185a42f794, commit 21cb384d",
+    "driver": "spike-nep5-c4-driver.ps1 sha256 (LF) 47fcd179b28f15b6deb9d9bfeb41ee501f7e43ee8824364c2bc757707f6c031a, lock corpus case4-lock-corpus.json f98304092c2e4ac06feba76cbcc5f9c0bb86fea4f8d0aed7c9a8c4b70b3f97bc, commit 1ed25f50",
+    "reviews": "probe: three independent rounds (FAIL, PASS, PASS); driver: three (FAIL, PASS with corrections, PASS); dispositions docs/reviews/1764-case4-review-disposition-2026-10-20.md (45 rows, verifier 45/45)",
+    "standard_token_control": "the half-set matrix's phase n1 (live bytes: spike-nep5-matrix.ps1 8dcede1912f6..., spike-nep5-lib.ps1 7bf14bde7432..., spike-nep5-run-lib.ps1 eca7246e4cff..., spike-nep5-connect-probe.ps1 fa87534ce867..., halfset.exe ebe029802387...; fresh -SelfTest -WriteProof 310 checks at 16:48:31 on 2026-10-19)"
+  },
+  "antivirus": "Bitdefender present throughout (two file-level scan exceptions for the driver script only; the probe exe and every run were under full protection)",
+  "method": "The driver (elevated) created the test sublayer S2 and its provider with no filter, a Users-readable folder holding the probe and its arming proof (bound to the exe's own hash, 24 h), and a drop folder the account and the operator could write. The Lead Architect then launched the probe himself: condition F three-plus times as the account through Windows' secondary logon (a filtered token), condition E through an elevation request made from inside the account's own console, condition S from his own non-elevated console, condition A from his elevated console. Each run read its own token (user SID, every group with attributes, integrity, elevation type, linked token), checked the stale SID resolves to no account, then made ONE FwpmFilterAdd0 (persistent block in S2 keyed to the stale SID, fixed key), a read-back, ONE FwpmFilterDeleteByKey0, a read-back, and wrote a record. -Collect validated every record (schema, hashes, condition, account, token state per condition, clock window) and -Finish removed everything by key and verified by direct reads and a netsh export. The account was created, enabled, removed from the group, deleted and its profile deleted by the Lead Architect in Windows' own tools; no script touched any account.",
+  "run_counts": { "F": 4, "E_attempts": 4, "E_reached_engine": 0, "S": 3, "A": 3, "N1_control": 3 },
+  "results": {
+    "F_filtered_token_as_the_account": {
+      "token": "elevation type 3 (limited), integrity medium, linked token present, S-1-5-32-556 present with attributes 0x00000010 (USE_FOR_DENY_ONLY), Administrators absent",
+      "FwpmFilterAdd0": "0x00000005 access denied, 4 of 4",
+      "FwpmFilterDeleteByKey0": "0x80320003 filter not found, 4 of 4 (nothing had been added)",
+      "left_behind": false
+    },
+    "E_elevated_as_the_account": {
+      "result": "NOT REACHABLE: the elevation request from inside the account's console showed Windows' credential prompt listing only the machine's administrator accounts, with no field to name the account; cancelled 4 of 4 times; no record reached the engine",
+      "recorded_as": "elevation_refused (the driver's explicit class, with the operator's note)"
+    },
+    "S_operator_non_elevated": {
+      "token": "elevation type 3 (limited), integrity medium, linked token present, Administrators 0x00000010 (USE_FOR_DENY_ONLY), S-1-5-32-556 absent",
+      "FwpmFilterAdd0": "0x00000005 access denied, 3 of 3",
+      "FwpmFilterDeleteByKey0": "0x80320003 not found, 3 of 3"
+    },
+    "A_operator_elevated": {
+      "token": "elevation type 2 (full), integrity high, Administrators 0x0000000F enabled",
+      "FwpmFilterAdd0": "0x00000000, 3 of 3",
+      "FwpmFilterDeleteByKey0": "0x00000000, 3 of 3",
+      "left_behind": false
+    },
+    "N1_standard_token_control": {
+      "token": "blarai-spike's own standard non-administrator token (interactive logon by the matrix's approved password-reset design)",
+      "FwpmFilterAdd0": "0x00000005, 3 of 3",
+      "FwpmFilterDeleteByKey0": "0x00000005, 3 of 3 (against a test filter the matrix added elevated)"
+    },
+    "engine_access_list": "read by netsh wfp show security type=engine at -Prepare and -Finish, identical; the group's ACE (A;;0x307ff;;;NO) present as on 2026-10-13",
+    "reading": "On this build, membership of Network Configuration Operators does not change what a normally launched process can do to the engine: its token carries the group marked deny-only, exactly like a filtered administrator token, and the engine refuses the add. The account's full token, the only one in which the group's ACE would apply, is not reachable through the over-the-shoulder elevation prompt. This is the behaviour Microsoft documents for the four split-token groups; it is not a finding."
+  },
+  "cleanup": "-Finish: the probe's key, the library's fixed keys, S1/S2/S3 and the provider removed by key; sweep clean (enumeration 0, sublayers and provider absent, netsh export 0 hits for the marker, srt-win, the three sublayers and the provider); drop ACEs removed and read back; the public folder removed at 01:43 after the operator closed the consoles that sat in it; matrix -Check 20; -PartD 20 after the operator's part C (account absent, group empty, ProfileList entry absent, no profile folder)",
+  "not_measured": [
+    "a process holding the group ENABLED: the account's full token under any route other than the over-the-shoulder elevation prompt (an interactive logon at the lock screen, a Scheduled Task with RunLevel Highest, LogonUser from code) was not attempted, by the Lead Architect's ruling that every logon is his and his sheet's rule against a lock-screen logon",
+    "other Windows builds, a domain-joined machine, the group's other documented rights (network configuration)",
+    "what the elevation prompt would do in the account's own interactive session (not opened)",
+    "timing (each run completed in well under a second; not a measurement of speed)",
+    "the n=4 for F is four back-to-back runs on one boot: a repeat, not independent replication"
+  ],
+  "replication_note": "F ran four times (one more than the sheet asked; the driver counts every valid record), S and A three times each, the standard-token control three times; every condition gave identical results in every run.",
+  "raw_data": {
+    "sanitised_records": "docs/research/containment-evidence-2026-10-05/nep0005-open-questions/nco/runs/ (per-run records, prepare, collect, final and part D records, the control's matrix records under controls/, results-summary.json, AS_RUN.md with sizes and hashes)",
+    "originals": "admin-only C:/ProgramData/BlarAI/trackb-live/nep5-out/case4/ (not tracked)",
+    "claims": "C27 in docs/research/account-level-containment-evidence-2026-10-05.md"
+  }
+}

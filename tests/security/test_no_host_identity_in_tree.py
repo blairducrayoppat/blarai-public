@@ -1,4 +1,4 @@
-"""Gate lock: no tracked file carries this machine's host name in any reading of its bytes; no file in the containment
+"""Gate lock: no tracked file carries this machine's host name, a volume serial number or a Microsoft-account or Entra ID account SID in any reading of its bytes; no file in the containment
 studies' and performance records' scope carries the operator's account name; no credential-store row keeps the name in its
 path; no tracked file NAME carries either name; and outside the scope the account name's footprint never grows (the ratchet).
 
@@ -15,6 +15,8 @@ Recognition lives in ``scripts/identity_lock.py`` and is shared with the scrub, 
 scrub tools. The tree test, the scrub's ``check()`` and its ``ratchet_violations()`` are each driven here on scratch trees with
 planted findings beside clean twins, so a control that stops seeing fails here before it fails in public. Names are never written
 here; the digests and the live machine both must hold, and the test fails, never skips, when the machine's names cannot be read.
+Volume serials follow the same rule (#1786): the live fixed volumes' serials are read at run time and held as digests, a header
+``Volume Serial Number is`` plus any serial is a finding from any machine, and no serial of this machine appears in this file.
 """
 
 from __future__ import annotations
@@ -39,11 +41,13 @@ BS = chr(92)
 
 # ---- the scan both the tree test and the toggles use ----------------------------------------------------------------------------
 
-def scan(root: Path, files: list[Path], host_digests: frozenset[str], user_digests: frozenset[str], scope: tuple[str, ...]) -> dict[str, list[str]]:
-    hits: dict[str, list[str]] = {"host": [], "user": [], "credential": [], "name": []}
+def scan(root: Path, files: list[Path], host_digests: frozenset[str], user_digests: frozenset[str], scope: tuple[str, ...],
+         serial_digests: frozenset[str] = frozenset()) -> dict[str, list[str]]:
+    hits: dict[str, list[str]] = {"host": [], "user": [], "credential": [], "name": [], "serial": [], "account_sid": []}
     for p in files:
         r = p.relative_to(root).as_posix()
-        if il.name_in_path(r, host_digests, user_digests):
+        if (il.name_in_path(r, host_digests, user_digests) or il.find_serial_hits(r.encode("utf-8"), serial_digests)
+                or il.find_account_sid_hits(r.encode("utf-8"))):
             hits["name"].append(r)
         data = p.read_bytes()
         hosts, users = il.find_hits(data, host_digests, user_digests)
@@ -53,6 +57,10 @@ def scan(root: Path, files: list[Path], host_digests: frozenset[str], user_diges
             hits["user"].append(r)
         if p.suffix.lower() in (".json", ".gz") and scrub.secret_rows_carrying_the_name(data, user_digests):
             hits["credential"].append(r)
+        if il.find_serial_hits(data, serial_digests):
+            hits["serial"].append(r)
+        if il.account_sid_container_problems(data, r):
+            hits["account_sid"].append(r)
     return hits
 
 
@@ -61,6 +69,16 @@ def _live() -> tuple[str, str]:
     assert host, "the host name is not readable on this machine; the lock cannot see its subject"
     assert user, "the user name is not readable on this machine; the lock cannot see its subject"
     return host, user
+
+
+def _serials() -> frozenset[int]:
+    serials = il.live_volume_serials()
+    assert serials, "no local fixed volume serial is readable on this machine; the lock cannot see its subject"
+    return serials
+
+
+def _serial_digests() -> frozenset[str]:
+    return il.serial_digests(_serials())
 
 
 def _tracked() -> list[Path]:
@@ -74,7 +92,7 @@ def _tree_scan() -> dict[str, list[str]]:
     """One pass over the tree per test session; the tests below read their own key."""
     host, user = _live()
     hd, ud = il.digests_with_live(host, user)
-    return scan(REPO_ROOT, _tracked(), hd, ud, scrub.USER_SCOPE)
+    return scan(REPO_ROOT, _tracked(), hd, ud, scrub.USER_SCOPE, _serial_digests())
 
 
 # ---- the tree -------------------------------------------------------------------------------------------------------------------
@@ -99,10 +117,14 @@ def test_scope_exists_and_is_scanned() -> None:
 def test_tree_is_clean() -> None:
     hits = _tree_scan()
     msg = "run scripts/scrub_public_identifiers.py (a file NAME needs a rename by hand)"
+    sd = _serial_digests()  # a file name can carry a serial: no listed path is printed unredacted
+    hits = {k: [il.redact_serials(r, sd) for r in v] for k, v in hits.items()}
     assert not hits["host"], f"tracked files name the host; {msg}:\n  " + "\n  ".join(hits["host"])
     assert not hits["user"], f"files in USER_SCOPE name the operator; {msg}:\n  " + "\n  ".join(hits["user"])
     assert not hits["credential"], f"records carry credential-store rows naming the operator; {msg}:\n  " + "\n  ".join(hits["credential"])
     assert not hits["name"], f"tracked file names carry an identifier; {msg}:\n  " + "\n  ".join(hits["name"])
+    assert not hits["serial"], f"tracked files carry a volume serial number; {msg}:\n  " + "\n  ".join(hits["serial"])
+    assert not hits["account_sid"], f"tracked files carry a Microsoft-account or Entra ID account SID; {msg}:\n  " + "\n  ".join(hits["account_sid"])
 
 
 def test_ratchet_holds_on_the_tree() -> None:
@@ -136,7 +158,7 @@ def _plant(root: Path, rel: str, data: bytes) -> Path:
 
 def _scan_one(root: Path, p: Path, host: str, user: str) -> dict[str, list[str]]:
     hd, ud = il.digests_with_live(host, user)
-    return scan(root, [p], hd, ud, scrub.USER_SCOPE)
+    return scan(root, [p], hd, ud, scrub.USER_SCOPE, _serial_digests())
 
 
 HOST_SHAPES = {

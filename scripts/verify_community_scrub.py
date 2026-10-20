@@ -87,6 +87,8 @@ def apply_subs(s: str) -> str:
     for pat, repl in SUBSTITUTIONS:
         out = re.sub(pat, repl, out)
     # The known scrub also replaces any token identity_lock recognises by digest (its own, independent read of the names).
+    raw, _ = _il.rewrite_serials(out.encode("utf-8", "surrogatepass"), _il.live_volume_serials())
+    out = raw.decode("utf-8", "surrogatepass")
     hosts, users = _il.find_hits(out.encode("utf-8", "surrogatepass"))
     for tok in sorted(hosts, key=len, reverse=True):
         out = re.sub(re.escape(tok.decode()), "<host>", out, flags=re.IGNORECASE)
@@ -141,6 +143,14 @@ def residual_scan(text: str) -> tuple[list[str], list[str]]:
         fails.append('hostname (digest match)')
     for _ in users:
         fails.append('username (digest match)')
+    digests = _il.serial_digests()
+    if not digests:
+        fails.append('volume serials not readable on this machine (the scan cannot rule out a serial)')
+    kinds = _il.find_serial_hits(text.encode('utf-8', 'surrogatepass'), digests)
+    if 'live' in kinds:
+        fails.append("volume serial of this machine (digest match)")
+    if 'header' in kinds:
+        fails.append("'Volume Serial Number is' header")
     for pat, label in SENSITIVE_FAIL:
         for m in re.finditer(pat, text):
             snippet = text[max(0, m.start() - 20):m.start() + 40].replace("\n", " ")

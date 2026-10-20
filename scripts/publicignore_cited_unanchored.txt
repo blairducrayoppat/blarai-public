@@ -1,0 +1,3 @@
+# Cited paths that need not be anchored. One line per path, "path | reason"; the lock rejects a line for a path that is
+# untracked, already anchored, or cited by no scanned document (scripts/publicignore_anchors.txt, above its #:cited-only line).
+.github/copilot-instructions.md | named only in vendored text inside the evidence folders (a coincidental match); no post links it

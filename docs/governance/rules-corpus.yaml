@@ -808,8 +808,8 @@
 - id: "identity_hygiene.land-any-branch-touching"
   anchor: "identity_hygiene#5"
   source: ".claude/rules/identity.md"
-  text: "Land any branch touching the ratchet's files (`scripts/identity_user_baseline.json`, `scripts/scrub_public_identifiers.py`, `scripts/identity_lock.py`) with `git merge --no-ff`: a fast-forward puts every intermediate baseline version on main's reference line; the reference reads the last 20 baseline versions, so a growth that merged ungated stops being seen after 20 more (#1781)."
-  text_sha256: "3dd6e394125e17d8a517a447fc371ae1176303441a3402f3a0f6a2141b24828b"
+  text: "Land any branch touching the ratchet's files (`scripts/identity_user_baseline.json`, `scripts/scrub_public_identifiers.py`, `scripts/identity_lock.py`) or the research-tracker lock's (`scripts/research_tracker_baseline.json`, `scripts/research_tracker_lock.py`) with `git merge --no-ff`: a fast-forward puts every intermediate baseline version on main's reference line; the reference reads the last 20 baseline versions, so a growth that merged ungated stops being seen after 20 more (#1781)."
+  text_sha256: "7cfba26a8b9a65067c4e6eceae7895308dadc747b3e5f71be3f08fab06deeea7"
   why_pointer: ""
   scope: ["git", "security"]
   enforcement:

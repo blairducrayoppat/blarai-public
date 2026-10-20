@@ -1,0 +1,299 @@
+{
+ "record": "mxc_proxy_egress_standard_token",
+ "date": "2026-10-16",
+ "status": "FINAL",
+ "raw_folder_name": "run-20261016-1",
+ "question": "Q3 (the fork's variant 1): with the case-1 loopback-proxy policy launched from a STANDARD non-elevated token (Medium integrity, Administrators deny-only), are both launchers accepted, and is non-proxy egress from inside the container blocked?",
+ "answer": "ANSWERED-HOLD, both arms, 3 of 3 runs each, within the stated scope",
+ "hardware": {
+  "cpu": "Intel Core Ultra 7 258V",
+  "ram_gb": 31.3,
+  "note": "hardware description from the host record; the raw batch headers do not carry it. No GPU or model work. AC power, battery 80 percent."
+ },
+ "windows": {
+  "build_with_ubr": "26200.9711",
+  "product_name_registry": "Windows 10 Pro",
+  "note": "ProductName is read from the registry as written by Windows; the build number is 26200 (Windows 11 family)."
+ },
+ "run": {
+  "started": "2026-10-16T05:48:34.620-04:00",
+  "finished": "2026-10-16T05:49:11.934-04:00",
+  "priority": "BelowNormal",
+  "n_per_state_per_arm": 3,
+  "harness_commit": "1c6638aa",
+  "harness_sha256_as_run": {
+   "run_probe.py": "2da4097bcfe8c97ab6ef4c787b8b49f445851c9ca85d41d83fd7d4cce87041c1",
+   "net_payload.py": "13b730365d691825633f2fb819cc60f03346a91e1a539a1bf2984458773ea784",
+   "proxy.py": "8ed0f6fc347909ca65fd83e3f0a4e8310ce801615fc62ffc95a1d81932671ccf",
+   "summarise.py": "56bc14f74b28953c8a38f408ffdbabac48bf7a6c3523dcbafb94f3840f1465ad"
+  },
+  "launch_ps1_sha256": "b243519be5578b82aa550220dd7b3091ea1f8461c8d6885304d332d5a368b59e"
+ },
+ "token": {
+  "mode": "standard",
+  "is_user_an_admin": false,
+  "elevated": false,
+  "elevation_type": "limited",
+  "integrity": "Medium (S-1-16-8192)",
+  "administrators_group": "deny-only",
+  "same_token_recorded_in_header_control_and_all_six_runs": true,
+  "note": "started through a scheduled-task runner that yields a filtered Medium-integrity token"
+ },
+ "security_conditions": {
+  "firewall_product_per_security_center_raw": [
+   "Bitdefender Firewall|266240",
+   "McAfee|266240"
+  ],
+  "bitdefender_named_process_count_start": 16,
+  "bitdefender_named_process_count_end": 16,
+  "windows_firewall_profiles_raw": [
+   "Domain|True|NotConfigured|NotConfigured|True",
+   "Private|True|NotConfigured|NotConfigured|True",
+   "Public|True|NotConfigured|NotConfigured|True"
+  ],
+  "columns_of_profile_strings": "Name|Enabled|DefaultInboundAction|DefaultOutboundAction|NotifyOnListen",
+  "note": "Bitdefender present (16 processes); the Security Center McAfee entry is a stale registration. Bitdefender's own firewall rules were not read."
+ },
+ "launchers": {
+  "A": {
+   "sha256": "aa444c0fc4b7f155fd8631068ffafb453d71d8b47fc47d417a74c9545a344031",
+   "size_bytes": 12003128,
+   "authenticode": "Valid|CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+   "source": "v1.0.0 (operator-designated signed release; the launcher reports no version)"
+  },
+  "B": {
+   "sha256": "e951922beec5ad5f0ba967e398763640c3b24c96cbf97f2d198174a949e5f8cc",
+   "authenticode": "NotSigned|",
+   "source": "built from microsoft/mxc commit 525d0f25763b2edaab56e29651fb7c12c4cbbd93 (known-build table); --probe reports baseContainerSupportsIdentitylessLoopbackProxy true"
+  },
+  "same_hashes_as_run-20261015-1_and_-3": true
+ },
+ "interpreters": {
+  "host_sha256": "cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b",
+  "container_sha256": "cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b",
+  "note": "same file hash, different path (host Python314 install, container a throwaway toolchain copy)"
+ },
+ "policy": {
+  "networkProxy": "http://127.0.0.1:18110",
+  "allowedProxyPeer": null,
+  "ingress.default": "allow",
+  "ingress.hostLoopback": "allow",
+  "egress.default": "deny",
+  "egress_rules": [],
+  "note": "the case-1 policy, byte-identical to run-20261015-1 and -3 (checked by the standard-token post-run review)"
+ },
+ "gateway_port_selected": 80,
+ "results": {
+  "dry_run_validation_passed": "6 of 6",
+  "launch_exit_code_0": "6 of 6",
+  "container_confined": "6 of 6 (AppContainer, Low integrity S-1-16-4096, in-container token elevated false; the variant 4 batch reads true in 6 of 6)",
+  "b2_requests_through_proxy": "18 of 18 (container 200 = proxy log forwarded 200 = second-listener marker), 9 per arm",
+  "b3_direct_connect_to_second_loopback_listener": "refused, WinError 10013, 6 of 6; listener hits 0",
+  "b4i_gateway_port_80": "refused, WinError 10013, 6 of 6",
+  "b4ii_1.1.1.1_443": "refused, WinError 10013, 6 of 6",
+  "unfenced_controls_around_each_launch": "24 of 24 connected (1.1.1.1:443 and gateway port 80, before and after each of 6 launches)",
+  "b5_once_per_batch": "second loopback listener, gateway port 80 and 1.1.1.1:443 each reached from an unconfined process",
+  "mxc_log_every_launch": "PSEC 1.1, 432 bytes (6 of 6); mxc.NetworkPolicyApplied with firewall_rules_created 0 (6 of 6)",
+  "state_changed_by_run": "{} in 6 of 6 for every field the standard token could read; the WFP filter count was unreadable under this token and is NOT MEASURED",
+  "launch_wall_secs": [
+   0.88,
+   0.617,
+   0.475,
+   0.561,
+   0.572,
+   0.481
+  ],
+  "harness_verdict": "HOLD for A/A1 and B/B1, controls ok"
+ },
+ "runs": [
+  {
+   "arm": "A",
+   "state": "A1",
+   "run": 1,
+   "launch_wall_secs": 0.88,
+   "launch_exit_code": 0,
+   "dry_run_rc": 0,
+   "b2_container_status": [
+    200,
+    200,
+    200
+   ],
+   "b3_winerror": 10013,
+   "b4i_winerror": 10013,
+   "b4ii_winerror": 10013,
+   "container_is_appcontainer": true,
+   "container_integrity": "S-1-16-4096",
+   "verdict": "HOLD",
+   "b3_listener_hits": 0,
+   "state_changed_by_run": {}
+  },
+  {
+   "arm": "A",
+   "state": "A1",
+   "run": 2,
+   "launch_wall_secs": 0.617,
+   "launch_exit_code": 0,
+   "dry_run_rc": 0,
+   "b2_container_status": [
+    200,
+    200,
+    200
+   ],
+   "b3_winerror": 10013,
+   "b4i_winerror": 10013,
+   "b4ii_winerror": 10013,
+   "container_is_appcontainer": true,
+   "container_integrity": "S-1-16-4096",
+   "verdict": "HOLD",
+   "b3_listener_hits": 0,
+   "state_changed_by_run": {}
+  },
+  {
+   "arm": "A",
+   "state": "A1",
+   "run": 3,
+   "launch_wall_secs": 0.475,
+   "launch_exit_code": 0,
+   "dry_run_rc": 0,
+   "b2_container_status": [
+    200,
+    200,
+    200
+   ],
+   "b3_winerror": 10013,
+   "b4i_winerror": 10013,
+   "b4ii_winerror": 10013,
+   "container_is_appcontainer": true,
+   "container_integrity": "S-1-16-4096",
+   "verdict": "HOLD",
+   "b3_listener_hits": 0,
+   "state_changed_by_run": {}
+  },
+  {
+   "arm": "B",
+   "state": "B1",
+   "run": 1,
+   "launch_wall_secs": 0.561,
+   "launch_exit_code": 0,
+   "dry_run_rc": 0,
+   "b2_container_status": [
+    200,
+    200,
+    200
+   ],
+   "b3_winerror": 10013,
+   "b4i_winerror": 10013,
+   "b4ii_winerror": 10013,
+   "container_is_appcontainer": true,
+   "container_integrity": "S-1-16-4096",
+   "verdict": "HOLD",
+   "b3_listener_hits": 0,
+   "state_changed_by_run": {}
+  },
+  {
+   "arm": "B",
+   "state": "B1",
+   "run": 2,
+   "launch_wall_secs": 0.572,
+   "launch_exit_code": 0,
+   "dry_run_rc": 0,
+   "b2_container_status": [
+    200,
+    200,
+    200
+   ],
+   "b3_winerror": 10013,
+   "b4i_winerror": 10013,
+   "b4ii_winerror": 10013,
+   "container_is_appcontainer": true,
+   "container_integrity": "S-1-16-4096",
+   "verdict": "HOLD",
+   "b3_listener_hits": 0,
+   "state_changed_by_run": {}
+  },
+  {
+   "arm": "B",
+   "state": "B1",
+   "run": 3,
+   "launch_wall_secs": 0.481,
+   "launch_exit_code": 0,
+   "dry_run_rc": 0,
+   "b2_container_status": [
+    200,
+    200,
+    200
+   ],
+   "b3_winerror": 10013,
+   "b4i_winerror": 10013,
+   "b4ii_winerror": 10013,
+   "container_is_appcontainer": true,
+   "container_integrity": "S-1-16-4096",
+   "verdict": "HOLD",
+   "b3_listener_hits": 0,
+   "state_changed_by_run": {}
+  }
+ ],
+ "batch_summary_verbatim": {
+  "controls": {
+   "ok": true,
+   "reasons": [],
+   "b5a": true,
+   "b5b": true,
+   "b5c": true
+  },
+  "groups": {
+   "A/A1": {
+    "verdict": "HOLD",
+    "runs": 3,
+    "run_verdicts": [
+     "HOLD",
+     "HOLD",
+     "HOLD"
+    ],
+    "b4i_not_measurable": false,
+    "state_changed_runs": [],
+    "token_modes": [
+     "standard"
+    ],
+    "launcher_nonzero_exit_runs": []
+   },
+   "B/B1": {
+    "verdict": "HOLD",
+    "runs": 3,
+    "run_verdicts": [
+     "HOLD",
+     "HOLD",
+     "HOLD"
+    ],
+    "b4i_not_measurable": false,
+    "state_changed_runs": [],
+    "token_modes": [
+     "standard"
+    ],
+    "launcher_nonzero_exit_runs": []
+   }
+  },
+  "n_expected": 3,
+  "below_spec_n": false,
+  "arm_refusals": []
+ },
+ "header_unreadable_under_this_token": [
+  "wfp_mxc_filters"
+ ],
+ "differences_from_the_elevated_case1_batches": "token, all four harness files, launch.ps1 (sha256 d94e93d8... in the earlier batches, b243519b... here), a new launch-standard.cmd, and the Bitdefender process set (1 and 14 processes in run-20261015-1 and -3, 16 here) changed together; launcher hashes and Windows build did not. The same verdicts and error codes are not an isolated token effect.",
+ "post_run_review": "docs/reviews/mxc-proxy-egress-standard-token-postrun-review-2026-10-16.md (596f155d)",
+ "known_record_defects": [
+  "the console capture of the batch is incomplete (the runner returned early); this record cites the raw run files, not the console"
+ ],
+ "not_measured": [
+  "the WFP filter state under this token (unreadable: not elevated), including whether any filter appeared or changed during a launch",
+  "which layer produced WinError 10013 (see the variant 4 record: two layers are present and this batch cannot separate them)",
+  "an isolated token effect: token, harness and Bitdefender process set all changed against the elevated batches",
+  "whether a per-program Bitdefender firewall rule on the container interpreter path contributed: the unconfined controls ran a different interpreter path (same hash); run-20261015-1 (Bitdefender uninstalled) gave the same 10013 pattern, so this batch alone does not attribute the refusal to MXC",
+  "UDP, ICMP or DNS egress; IPv6; HTTPS or CONNECT through the proxy; destination ports other than 80 (gateway), 443 (1.1.1.1) and the two loopback ports",
+  "an identity-scoped proxy (allowedProxyPeer); the session-isolation backend; host-to-container ingress; nono under MXC",
+  "any build other than the two run; Windows builds other than 26200.9711; a host whose --probe reports host-loopback ingress unsupported",
+  "Bitdefender's own firewall rules and logs",
+  "variance beyond 3 runs per arm: one machine, 37 seconds, a repeat and not a distribution"
+ ]
+}

@@ -1,0 +1,1542 @@
+{
+ "schema": "nep5-case4-lock-corpus-v2",
+ "about": "The case-4 driver's two parser locks: each pattern as a template and its alternatives, every alternative with the one plant it alone catches, and the fixtures its self-test proves the locks with. Data only: the case-4 admin driver beside it reads this file with ConvertFrom-Json for -SelfTest, never executes it, and the driver proof binds its sha256.",
+ "switch_allowlist": [],
+ "patterns": {
+  "machine_commands": {
+   "scope": "seams",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "New\\-Nep5RealBackend",
+     "plant": "New-Nep5RealBackend",
+     "finding": "^line \\d+: New\\-Nep5RealBackend outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "New\\-HalfsetRunner",
+     "plant": "New-HalfsetRunner",
+     "finding": "^line \\d+: New\\-HalfsetRunner outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Invoke\\-Nep5Export",
+     "plant": "Invoke-Nep5Export",
+     "finding": "^line \\d+: Invoke\\-Nep5Export outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Invoke\\-ManualN5Rollback",
+     "plant": "Invoke-ManualN5Rollback",
+     "finding": "^line \\d+: Invoke\\-ManualN5Rollback outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "New\\-Nep5SidResolver",
+     "plant": "New-Nep5SidResolver",
+     "finding": "^line \\d+: New\\-Nep5SidResolver outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-OperatorTokenSids",
+     "plant": "Get-OperatorTokenSids",
+     "finding": "^line \\d+: Get\\-OperatorTokenSids outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Test\\-AdminOnlyFolder",
+     "plant": "Test-AdminOnlyFolder",
+     "finding": "^line \\d+: Test\\-AdminOnlyFolder outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Test\\-IsElevated",
+     "plant": "Test-IsElevated",
+     "finding": "^line \\d+: Test\\-IsElevated outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-PathSecurityObject",
+     "plant": "Get-PathSecurityObject",
+     "finding": "^line \\d+: Get\\-PathSecurityObject outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-DirSecurity",
+     "plant": "Get-DirSecurity",
+     "finding": "^line \\d+: Get\\-DirSecurity outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Set\\-DirSecurity",
+     "plant": "Set-DirSecurity",
+     "finding": "^line \\d+: Set\\-DirSecurity outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Remove\\-TreeNoFollow",
+     "plant": "Remove-TreeNoFollow",
+     "finding": "^line \\d+: Remove\\-TreeNoFollow outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Read\\-UntrustedJson",
+     "plant": "Read-UntrustedJson",
+     "finding": "^line \\d+: Read\\-UntrustedJson outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-LocalUser",
+     "plant": "Get-LocalUser",
+     "finding": "^line \\d+: Get\\-LocalUser outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-LocalGroup",
+     "plant": "Get-LocalGroup",
+     "finding": "^line \\d+: Get\\-LocalGroup outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-LocalGroupMember",
+     "plant": "Get-LocalGroupMember",
+     "finding": "^line \\d+: Get\\-LocalGroupMember outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-Acl",
+     "plant": "Get-Acl",
+     "finding": "^line \\d+: Get\\-Acl outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Set\\-Acl",
+     "plant": "Set-Acl",
+     "finding": "^line \\d+: Set\\-Acl outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Start\\-Process",
+     "plant": "Start-Process",
+     "finding": "^line \\d+: Start\\-Process outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-ItemProperty",
+     "plant": "Get-ItemProperty",
+     "finding": "^line \\d+: Get\\-ItemProperty outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Get\\-Process",
+     "plant": "Get-Process",
+     "finding": "^line \\d+: Get\\-Process outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Add\\-Type",
+     "plant": "Add-Type",
+     "finding": "^line \\d+: Add\\-Type outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Invoke\\-Expression",
+     "plant": "Invoke-Expression",
+     "finding": "^line \\d+: Invoke\\-Expression outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "iex",
+     "plant": "iex",
+     "finding": "^line \\d+: iex outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "Invoke\\-Command",
+     "plant": "Invoke-Command",
+     "finding": "^line \\d+: Invoke\\-Command outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "netsh",
+     "plant": "netsh",
+     "finding": "^line \\d+: netsh outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "net",
+     "plant": "net",
+     "finding": "^line \\d+: net outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "net1",
+     "plant": "net1",
+     "finding": "^line \\d+: net1 outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "icacls",
+     "plant": "icacls",
+     "finding": "^line \\d+: icacls outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "cacls",
+     "plant": "cacls",
+     "finding": "^line \\d+: cacls outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "takeown",
+     "plant": "takeown",
+     "finding": "^line \\d+: takeown outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "attrib",
+     "plant": "attrib",
+     "finding": "^line \\d+: attrib outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "fsutil",
+     "plant": "fsutil",
+     "finding": "^line \\d+: fsutil outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "reg",
+     "plant": "reg",
+     "finding": "^line \\d+: reg outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "sc",
+     "plant": "sc",
+     "finding": "^line \\d+: sc outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "whoami",
+     "plant": "whoami",
+     "finding": "^line \\d+: whoami outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "explorer",
+     "plant": "explorer",
+     "finding": "^line \\d+: explorer outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "halfset",
+     "plant": "halfset",
+     "finding": "^line \\d+: halfset outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "ncoprobe",
+     "plant": "ncoprobe",
+     "finding": "^line \\d+: ncoprobe outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "pwsh",
+     "plant": "pwsh",
+     "finding": "^line \\d+: pwsh outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "powershell",
+     "plant": "powershell",
+     "finding": "^line \\d+: powershell outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "cmd",
+     "plant": "cmd",
+     "finding": "^line \\d+: cmd outside a seam \\(in Get-C4PlantHost\\)$"
+    },
+    {
+     "alt": "wevtutil",
+     "plant": "wevtutil",
+     "finding": "^line \\d+: wevtutil outside a seam \\(in Get-C4PlantHost\\)$"
+    }
+   ]
+  },
+  "machine_members": {
+   "scope": "seams",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "SetAccessControl",
+     "plant": "$x.SetAccessControl($y)",
+     "finding": "^line \\d+: \\.SetAccessControl\\(\\) outside a seam$"
+    },
+    {
+     "alt": "GetAccessControl",
+     "plant": "$x.GetAccessControl($y)",
+     "finding": "^line \\d+: \\.GetAccessControl\\(\\) outside a seam$"
+    },
+    {
+     "alt": "Translate",
+     "plant": "$x.Translate($y)",
+     "finding": "^line \\d+: \\.Translate\\(\\) outside a seam$"
+    }
+   ]
+  },
+  "machine_types": {
+   "scope": "seams",
+   "template": "(?i)({0})$",
+   "alternatives": [
+    {
+     "alt": "FileSystemAclExtensions",
+     "plant": "$t = [IO.FileSystemAclExtensions]",
+     "finding": "^line \\d+: \\[IO\\.FileSystemAclExtensions\\] outside a seam$"
+    },
+    {
+     "alt": "N5Engine",
+     "plant": "$t = [BlarAI.Nep5.N5Engine]",
+     "finding": "^line \\d+: \\[BlarAI\\.Nep5\\.N5Engine\\] outside a seam$"
+    },
+    {
+     "alt": "Diagnostics\\.Process",
+     "plant": "$t = [Diagnostics.Process]",
+     "finding": "^line \\d+: \\[Diagnostics\\.Process\\] outside a seam$"
+    },
+    {
+     "alt": "Diagnostics\\.ProcessStartInfo",
+     "plant": "$t = [Diagnostics.ProcessStartInfo]",
+     "finding": "^line \\d+: \\[Diagnostics\\.ProcessStartInfo\\] outside a seam$"
+    },
+    {
+     "alt": "Win32\\.Registry",
+     "plant": "$t = [Microsoft.Win32.Registry]",
+     "finding": "^line \\d+: \\[Microsoft\\.Win32\\.Registry\\] outside a seam$"
+    },
+    {
+     "alt": "Win32\\.RegistryKey",
+     "plant": "$t = [Microsoft.Win32.RegistryKey]",
+     "finding": "^line \\d+: \\[Microsoft\\.Win32\\.RegistryKey\\] outside a seam$"
+    }
+   ]
+  },
+  "fs_commands": {
+   "scope": "seams",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "New\\-Item",
+     "plant": "New-Item x",
+     "finding": "^line \\d+: New\\-Item writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Remove\\-Item",
+     "plant": "Remove-Item x",
+     "finding": "^line \\d+: Remove\\-Item writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Copy\\-Item",
+     "plant": "Copy-Item x",
+     "finding": "^line \\d+: Copy\\-Item writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Move\\-Item",
+     "plant": "Move-Item x",
+     "finding": "^line \\d+: Move\\-Item writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Rename\\-Item",
+     "plant": "Rename-Item x",
+     "finding": "^line \\d+: Rename\\-Item writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Set\\-Content",
+     "plant": "Set-Content x",
+     "finding": "^line \\d+: Set\\-Content writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Add\\-Content",
+     "plant": "Add-Content x",
+     "finding": "^line \\d+: Add\\-Content writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Out\\-File",
+     "plant": "Out-File x",
+     "finding": "^line \\d+: Out\\-File writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Clear\\-Content",
+     "plant": "Clear-Content x",
+     "finding": "^line \\d+: Clear\\-Content writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Clear\\-Item",
+     "plant": "Clear-Item x",
+     "finding": "^line \\d+: Clear\\-Item writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Set\\-Item",
+     "plant": "Set-Item x",
+     "finding": "^line \\d+: Set\\-Item writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Set\\-ItemProperty",
+     "plant": "Set-ItemProperty x",
+     "finding": "^line \\d+: Set\\-ItemProperty writes or deletes files outside a seam"
+    },
+    {
+     "alt": "New\\-ItemProperty",
+     "plant": "New-ItemProperty x",
+     "finding": "^line \\d+: New\\-ItemProperty writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Remove\\-ItemProperty",
+     "plant": "Remove-ItemProperty x",
+     "finding": "^line \\d+: Remove\\-ItemProperty writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Export\\-Csv",
+     "plant": "Export-Csv x",
+     "finding": "^line \\d+: Export\\-Csv writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Export\\-Clixml",
+     "plant": "Export-Clixml x",
+     "finding": "^line \\d+: Export\\-Clixml writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Tee\\-Object",
+     "plant": "Tee-Object x",
+     "finding": "^line \\d+: Tee\\-Object writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Write\\-JsonGuarded",
+     "plant": "Write-JsonGuarded x",
+     "finding": "^line \\d+: Write\\-JsonGuarded writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Write\\-JsonAtomic",
+     "plant": "Write-JsonAtomic x",
+     "finding": "^line \\d+: Write\\-JsonAtomic writes or deletes files outside a seam"
+    },
+    {
+     "alt": "ConvertTo\\-Utf8NoBom",
+     "plant": "ConvertTo-Utf8NoBom x",
+     "finding": "^line \\d+: ConvertTo\\-Utf8NoBom writes or deletes files outside a seam"
+    },
+    {
+     "alt": "New\\-PrivateTempDir",
+     "plant": "New-PrivateTempDir x",
+     "finding": "^line \\d+: New\\-PrivateTempDir writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Remove\\-PrivateTempDir",
+     "plant": "Remove-PrivateTempDir x",
+     "finding": "^line \\d+: Remove\\-PrivateTempDir writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Remove\\-DirNoFollow",
+     "plant": "Remove-DirNoFollow x",
+     "finding": "^line \\d+: Remove\\-DirNoFollow writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Remove\\-LinkItself",
+     "plant": "Remove-LinkItself x",
+     "finding": "^line \\d+: Remove\\-LinkItself writes or deletes files outside a seam"
+    },
+    {
+     "alt": "ri",
+     "plant": "ri x",
+     "finding": "^line \\d+: ri writes or deletes files outside a seam"
+    },
+    {
+     "alt": "rni",
+     "plant": "rni x",
+     "finding": "^line \\d+: rni writes or deletes files outside a seam"
+    },
+    {
+     "alt": "ni",
+     "plant": "ni x",
+     "finding": "^line \\d+: ni writes or deletes files outside a seam"
+    },
+    {
+     "alt": "cpi",
+     "plant": "cpi x",
+     "finding": "^line \\d+: cpi writes or deletes files outside a seam"
+    },
+    {
+     "alt": "mi",
+     "plant": "mi x",
+     "finding": "^line \\d+: mi writes or deletes files outside a seam"
+    },
+    {
+     "alt": "rm",
+     "plant": "rm x",
+     "finding": "^line \\d+: rm writes or deletes files outside a seam"
+    },
+    {
+     "alt": "del",
+     "plant": "del x",
+     "finding": "^line \\d+: del writes or deletes files outside a seam"
+    },
+    {
+     "alt": "erase",
+     "plant": "erase x",
+     "finding": "^line \\d+: erase writes or deletes files outside a seam"
+    },
+    {
+     "alt": "rd",
+     "plant": "rd x",
+     "finding": "^line \\d+: rd writes or deletes files outside a seam"
+    },
+    {
+     "alt": "rmdir",
+     "plant": "rmdir x",
+     "finding": "^line \\d+: rmdir writes or deletes files outside a seam"
+    },
+    {
+     "alt": "copy",
+     "plant": "copy x",
+     "finding": "^line \\d+: copy writes or deletes files outside a seam"
+    },
+    {
+     "alt": "cp",
+     "plant": "cp x",
+     "finding": "^line \\d+: cp writes or deletes files outside a seam"
+    },
+    {
+     "alt": "move",
+     "plant": "move x",
+     "finding": "^line \\d+: move writes or deletes files outside a seam"
+    },
+    {
+     "alt": "mv",
+     "plant": "mv x",
+     "finding": "^line \\d+: mv writes or deletes files outside a seam"
+    },
+    {
+     "alt": "ren",
+     "plant": "ren x",
+     "finding": "^line \\d+: ren writes or deletes files outside a seam"
+    },
+    {
+     "alt": "ac",
+     "plant": "ac x",
+     "finding": "^line \\d+: ac writes or deletes files outside a seam"
+    },
+    {
+     "alt": "clc",
+     "plant": "clc x",
+     "finding": "^line \\d+: clc writes or deletes files outside a seam"
+    },
+    {
+     "alt": "cli",
+     "plant": "cli x",
+     "finding": "^line \\d+: cli writes or deletes files outside a seam"
+    },
+    {
+     "alt": "si",
+     "plant": "si x",
+     "finding": "^line \\d+: si writes or deletes files outside a seam"
+    },
+    {
+     "alt": "sp",
+     "plant": "sp x",
+     "finding": "^line \\d+: sp writes or deletes files outside a seam"
+    },
+    {
+     "alt": "rp",
+     "plant": "rp x",
+     "finding": "^line \\d+: rp writes or deletes files outside a seam"
+    },
+    {
+     "alt": "tee",
+     "plant": "tee x",
+     "finding": "^line \\d+: tee writes or deletes files outside a seam"
+    }
+   ]
+  },
+  "fs_static_types": {
+   "scope": "seams",
+   "template": "(?i)^(System\\.)?IO\\.({0})$",
+   "alternatives": [
+    {
+     "alt": "File",
+     "plant": "[IO.File]::Delete($a)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::Delete writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Directory",
+     "plant": "[IO.Directory]::Delete($a)",
+     "finding": "^line \\d+: \\[IO\\.Directory\\]::Delete writes or deletes files outside a seam"
+    },
+    {
+     "alt": "FileSystemAclExtensions",
+     "plant": "[IO.FileSystemAclExtensions]::SetAccessControl($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.FileSystemAclExtensions\\]::SetAccessControl writes or deletes files outside a seam"
+    }
+   ]
+  },
+  "fs_members": {
+   "scope": "seams",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "WriteAll\\w*",
+     "plant": "[IO.File]::WriteAllBytes($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::WriteAllBytes writes or deletes files outside a seam"
+    },
+    {
+     "alt": "AppendAll\\w*",
+     "plant": "[IO.File]::AppendAllText($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::AppendAllText writes or deletes files outside a seam"
+    },
+    {
+     "alt": "AppendText",
+     "plant": "[IO.File]::AppendText($a)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::AppendText writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Delete",
+     "plant": "[IO.File]::Delete($a)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::Delete writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Move",
+     "plant": "[IO.File]::Move($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::Move writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Copy",
+     "plant": "[IO.File]::Copy($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::Copy writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Create\\w*",
+     "plant": "[IO.Directory]::CreateDirectory($a)",
+     "finding": "^line \\d+: \\[IO\\.Directory\\]::CreateDirectory writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Replace",
+     "plant": "[IO.File]::Replace($a, $b, $c)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::Replace writes or deletes files outside a seam"
+    },
+    {
+     "alt": "SetAttributes",
+     "plant": "[IO.File]::SetAttributes($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::SetAttributes writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Encrypt",
+     "plant": "[IO.File]::Encrypt($a)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::Encrypt writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Decrypt",
+     "plant": "[IO.File]::Decrypt($a)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::Decrypt writes or deletes files outside a seam"
+    },
+    {
+     "alt": "SetAccessControl",
+     "plant": "[IO.FileSystemAclExtensions]::SetAccessControl($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.FileSystemAclExtensions\\]::SetAccessControl writes or deletes files outside a seam"
+    },
+    {
+     "alt": "Set\\w*Time\\w*",
+     "plant": "[IO.File]::SetLastWriteTime($a, $b)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::SetLastWriteTime writes or deletes files outside a seam"
+    },
+    {
+     "alt": "OpenWrite",
+     "plant": "[IO.File]::OpenWrite($a)",
+     "finding": "^line \\d+: \\[IO\\.File\\]::OpenWrite writes or deletes files outside a seam"
+    }
+   ]
+  },
+  "lifecycle_commands": {
+   "scope": "lifecycle",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "New\\-LocalUser",
+     "plant": "New-LocalUser x",
+     "finding": "^line \\d+: New\\-LocalUser$"
+    },
+    {
+     "alt": "Remove\\-LocalUser",
+     "plant": "Remove-LocalUser x",
+     "finding": "^line \\d+: Remove\\-LocalUser$"
+    },
+    {
+     "alt": "Enable\\-LocalUser",
+     "plant": "Enable-LocalUser x",
+     "finding": "^line \\d+: Enable\\-LocalUser$"
+    },
+    {
+     "alt": "Disable\\-LocalUser",
+     "plant": "Disable-LocalUser x",
+     "finding": "^line \\d+: Disable\\-LocalUser$"
+    },
+    {
+     "alt": "Set\\-LocalUser",
+     "plant": "Set-LocalUser x",
+     "finding": "^line \\d+: Set\\-LocalUser$"
+    },
+    {
+     "alt": "Rename\\-LocalUser",
+     "plant": "Rename-LocalUser x",
+     "finding": "^line \\d+: Rename\\-LocalUser$"
+    },
+    {
+     "alt": "Add\\-LocalGroupMember",
+     "plant": "Add-LocalGroupMember x",
+     "finding": "^line \\d+: Add\\-LocalGroupMember$"
+    },
+    {
+     "alt": "Remove\\-LocalGroupMember",
+     "plant": "Remove-LocalGroupMember x",
+     "finding": "^line \\d+: Remove\\-LocalGroupMember$"
+    },
+    {
+     "alt": "New\\-LocalGroup",
+     "plant": "New-LocalGroup x",
+     "finding": "^line \\d+: New\\-LocalGroup$"
+    },
+    {
+     "alt": "Remove\\-LocalGroup",
+     "plant": "Remove-LocalGroup x",
+     "finding": "^line \\d+: Remove\\-LocalGroup$"
+    },
+    {
+     "alt": "Set\\-LocalGroup",
+     "plant": "Set-LocalGroup x",
+     "finding": "^line \\d+: Set\\-LocalGroup$"
+    },
+    {
+     "alt": "Rename\\-LocalGroup",
+     "plant": "Rename-LocalGroup x",
+     "finding": "^line \\d+: Rename\\-LocalGroup$"
+    },
+    {
+     "alt": "Register\\-ScheduledTask",
+     "plant": "Register-ScheduledTask x",
+     "finding": "^line \\d+: Register\\-ScheduledTask$"
+    },
+    {
+     "alt": "Unregister\\-ScheduledTask",
+     "plant": "Unregister-ScheduledTask x",
+     "finding": "^line \\d+: Unregister\\-ScheduledTask$"
+    },
+    {
+     "alt": "Set\\-ScheduledTask",
+     "plant": "Set-ScheduledTask x",
+     "finding": "^line \\d+: Set\\-ScheduledTask$"
+    },
+    {
+     "alt": "Start\\-ScheduledTask",
+     "plant": "Start-ScheduledTask x",
+     "finding": "^line \\d+: Start\\-ScheduledTask$"
+    },
+    {
+     "alt": "Stop\\-ScheduledTask",
+     "plant": "Stop-ScheduledTask x",
+     "finding": "^line \\d+: Stop\\-ScheduledTask$"
+    },
+    {
+     "alt": "Enable\\-ScheduledTask",
+     "plant": "Enable-ScheduledTask x",
+     "finding": "^line \\d+: Enable\\-ScheduledTask$"
+    },
+    {
+     "alt": "Disable\\-ScheduledTask",
+     "plant": "Disable-ScheduledTask x",
+     "finding": "^line \\d+: Disable\\-ScheduledTask$"
+    },
+    {
+     "alt": "New-ScheduledTask\\w*",
+     "plant": "New-ScheduledTaskAction x",
+     "finding": "^line \\d+: New\\-ScheduledTaskAction$"
+    },
+    {
+     "alt": "schtasks",
+     "plant": "schtasks x",
+     "finding": "^line \\d+: schtasks$"
+    },
+    {
+     "alt": "Get\\-Credential",
+     "plant": "Get-Credential x",
+     "finding": "^line \\d+: Get\\-Credential$"
+    },
+    {
+     "alt": "ConvertTo\\-SecureString",
+     "plant": "ConvertTo-SecureString x",
+     "finding": "^line \\d+: ConvertTo\\-SecureString$"
+    },
+    {
+     "alt": "Set\\-LocalUserPassword",
+     "plant": "Set-LocalUserPassword x",
+     "finding": "^line \\d+: Set\\-LocalUserPassword$"
+    },
+    {
+     "alt": "Set\\-ADAccountPassword",
+     "plant": "Set-ADAccountPassword x",
+     "finding": "^line \\d+: Set\\-ADAccountPassword$"
+    },
+    {
+     "alt": "wmic",
+     "plant": "wmic x",
+     "finding": "^line \\d+: wmic$"
+    },
+    {
+     "alt": "Invoke\\-CimMethod",
+     "plant": "Invoke-CimMethod x",
+     "finding": "^line \\d+: Invoke\\-CimMethod$"
+    },
+    {
+     "alt": "Invoke\\-WmiMethod",
+     "plant": "Invoke-WmiMethod x",
+     "finding": "^line \\d+: Invoke\\-WmiMethod$"
+    },
+    {
+     "alt": "Set\\-CimInstance",
+     "plant": "Set-CimInstance x",
+     "finding": "^line \\d+: Set\\-CimInstance$"
+    },
+    {
+     "alt": "New\\-CimInstance",
+     "plant": "New-CimInstance x",
+     "finding": "^line \\d+: New\\-CimInstance$"
+    },
+    {
+     "alt": "Remove\\-CimInstance",
+     "plant": "Remove-CimInstance x",
+     "finding": "^line \\d+: Remove\\-CimInstance$"
+    },
+    {
+     "alt": "Set\\-WmiInstance",
+     "plant": "Set-WmiInstance x",
+     "finding": "^line \\d+: Set\\-WmiInstance$"
+    },
+    {
+     "alt": "Remove\\-WmiObject",
+     "plant": "Remove-WmiObject x",
+     "finding": "^line \\d+: Remove\\-WmiObject$"
+    },
+    {
+     "alt": "Invoke\\-Expression",
+     "plant": "Invoke-Expression x",
+     "finding": "^line \\d+: Invoke\\-Expression$"
+    },
+    {
+     "alt": "iex",
+     "plant": "iex x",
+     "finding": "^line \\d+: iex$"
+    },
+    {
+     "alt": "cmdkey",
+     "plant": "cmdkey x",
+     "finding": "^line \\d+: cmdkey$"
+    },
+    {
+     "alt": "ntrights",
+     "plant": "ntrights x",
+     "finding": "^line \\d+: ntrights$"
+    },
+    {
+     "alt": "New\\-StrongPassword",
+     "plant": "New-StrongPassword x",
+     "finding": "^line \\d+: New\\-StrongPassword$"
+    },
+    {
+     "alt": "Unregister\\-TaskIfPresent",
+     "plant": "Unregister-TaskIfPresent x",
+     "finding": "^line \\d+: Unregister\\-TaskIfPresent$"
+    },
+    {
+     "alt": "Start\\-SpikeTaskProved",
+     "plant": "Start-SpikeTaskProved x",
+     "finding": "^line \\d+: Start\\-SpikeTaskProved$"
+    },
+    {
+     "alt": "Invoke\\-ProbeTaskRun",
+     "plant": "Invoke-ProbeTaskRun x",
+     "finding": "^line \\d+: Invoke\\-ProbeTaskRun$"
+    },
+    {
+     "alt": "Get\\-ProbeOutcome",
+     "plant": "Get-ProbeOutcome x",
+     "finding": "^line \\d+: Get\\-ProbeOutcome$"
+    },
+    {
+     "alt": "Invoke\\-GuardedProbe",
+     "plant": "Invoke-GuardedProbe x",
+     "finding": "^line \\d+: Invoke\\-GuardedProbe$"
+    }
+   ]
+  },
+  "lifecycle_types": {
+   "scope": "lifecycle",
+   "template": "(?i)(^|\\.)({0})$",
+   "alternatives": [
+    {
+     "alt": "pscredential",
+     "plant": "$t = [pscredential]",
+     "finding": "^line \\d+: \\[pscredential\\]$"
+    },
+    {
+     "alt": "NetworkCredential",
+     "plant": "$t = [System.Net.NetworkCredential]",
+     "finding": "^line \\d+: \\[System\\.Net\\.NetworkCredential\\]$"
+    },
+    {
+     "alt": "SecureString",
+     "plant": "$t = [securestring]",
+     "finding": "^line \\d+: \\[securestring\\]$"
+    },
+    {
+     "alt": "ADSI",
+     "plant": "$t = [adsi]",
+     "finding": "^line \\d+: \\[adsi\\]$"
+    },
+    {
+     "alt": "DirectoryEntry",
+     "plant": "$t = [System.DirectoryServices.DirectoryEntry]",
+     "finding": "^line \\d+: \\[System\\.DirectoryServices\\.DirectoryEntry\\]$"
+    },
+    {
+     "alt": "UserPrincipal",
+     "plant": "$t = [UserPrincipal]",
+     "finding": "^line \\d+: \\[UserPrincipal\\]$"
+    },
+    {
+     "alt": "GroupPrincipal",
+     "plant": "$t = [GroupPrincipal]",
+     "finding": "^line \\d+: \\[GroupPrincipal\\]$"
+    },
+    {
+     "alt": "PrincipalContext",
+     "plant": "$t = [PrincipalContext]",
+     "finding": "^line \\d+: \\[PrincipalContext\\]$"
+    },
+    {
+     "alt": "AuthenticablePrincipal",
+     "plant": "$t = [AuthenticablePrincipal]",
+     "finding": "^line \\d+: \\[AuthenticablePrincipal\\]$"
+    },
+    {
+     "alt": "ComputerPrincipal",
+     "plant": "$t = [ComputerPrincipal]",
+     "finding": "^line \\d+: \\[ComputerPrincipal\\]$"
+    },
+    {
+     "alt": "DirectoryServices\\.AccountManagement\\.\\w+",
+     "plant": "$t = [System.DirectoryServices.AccountManagement.Principal]",
+     "finding": "^line \\d+: \\[System\\.DirectoryServices\\.AccountManagement\\.Principal\\]$"
+    }
+   ]
+  },
+  "lifecycle_apis": {
+   "scope": "lifecycle-cs",
+   "template": "(?i)({0})",
+   "alternatives": [
+    {
+     "alt": "\\bLogonUser\\w*\\b",
+     "plant": "class P { void M() { LogonUserW(); } }",
+     "finding": "^C#: LogonUserW"
+    },
+    {
+     "alt": "\\bCreateProcessWithLogonW\\b",
+     "plant": "class P { void M() { CreateProcessWithLogonW(); } }",
+     "finding": "^C#: CreateProcessWithLogonW"
+    },
+    {
+     "alt": "\\bCreateProcessWithTokenW\\b",
+     "plant": "class P { void M() { CreateProcessWithTokenW(); } }",
+     "finding": "^C#: CreateProcessWithTokenW"
+    },
+    {
+     "alt": "\\bCreateProcessAsUser\\w*\\b",
+     "plant": "class P { void M() { CreateProcessAsUserW(); } }",
+     "finding": "^C#: CreateProcessAsUserW"
+    },
+    {
+     "alt": "\\bNetUserAdd\\b",
+     "plant": "class P { void M() { NetUserAdd(); } }",
+     "finding": "^C#: NetUserAdd"
+    },
+    {
+     "alt": "\\bNetUserDel\\b",
+     "plant": "class P { void M() { NetUserDel(); } }",
+     "finding": "^C#: NetUserDel"
+    },
+    {
+     "alt": "\\bNetUserSetInfo\\b",
+     "plant": "class P { void M() { NetUserSetInfo(); } }",
+     "finding": "^C#: NetUserSetInfo"
+    },
+    {
+     "alt": "\\bNetUserChangePassword\\b",
+     "plant": "class P { void M() { NetUserChangePassword(); } }",
+     "finding": "^C#: NetUserChangePassword"
+    },
+    {
+     "alt": "\\bNetLocalGroupAdd\\w*\\b",
+     "plant": "class P { void M() { NetLocalGroupAddMembers(); } }",
+     "finding": "^C#: NetLocalGroupAddMembers"
+    },
+    {
+     "alt": "\\bNetLocalGroupDel\\w*\\b",
+     "plant": "class P { void M() { NetLocalGroupDelMembers(); } }",
+     "finding": "^C#: NetLocalGroupDelMembers"
+    },
+    {
+     "alt": "\\bNetLocalGroupSetMembers\\b",
+     "plant": "class P { void M() { NetLocalGroupSetMembers(); } }",
+     "finding": "^C#: NetLocalGroupSetMembers"
+    },
+    {
+     "alt": "\\bITaskService\\b",
+     "plant": "class P { ITaskService s; }",
+     "finding": "^C#: ITaskService"
+    },
+    {
+     "alt": "\\bTaskScheduler\\b",
+     "plant": "class P { TaskScheduler s; }",
+     "finding": "^C#: TaskScheduler"
+    },
+    {
+     "alt": "\\bUserPrincipal\\b",
+     "plant": "class P { UserPrincipal u; }",
+     "finding": "^C#: UserPrincipal"
+    },
+    {
+     "alt": "\\bDirectoryEntry\\b",
+     "plant": "class P { DirectoryEntry d; }",
+     "finding": "^C#: DirectoryEntry"
+    },
+    {
+     "alt": "\\bSecureString\\b",
+     "plant": "class P { SecureString s; }",
+     "finding": "^C#: SecureString"
+    },
+    {
+     "alt": "WinNT://",
+     "plant": "class P { string s = \"WinNT://x\"; }",
+     "finding": "^C#: WinNT://"
+    },
+    {
+     "alt": "\\.Password\\s*=(?!=)",
+     "plant": "class P { void M() { x.Password = y; } }",
+     "finding": "^C#: \\.Password\\s*="
+    },
+    {
+     "alt": "\\.UserName\\s*=(?!=)",
+     "plant": "class P { void M() { x.UserName = y; } }",
+     "finding": "^C#: \\.UserName\\s*="
+    },
+    {
+     "alt": "\\.PasswordInClearText\\s*=(?!=)",
+     "plant": "class P { void M() { x.PasswordInClearText = y; } }",
+     "finding": "^C#: \\.PasswordInClearText\\s*="
+    },
+    {
+     "alt": "\\.LoadUserProfile\\s*=(?!=)",
+     "plant": "class P { void M() { x.LoadUserProfile = y; } }",
+     "finding": "^C#: \\.LoadUserProfile\\s*="
+    },
+    {
+     "alt": "EntryPoint\\s*=\\s*\"[^\"]*\"\\s*\\+",
+     "plant": "class P { [DllImport(\"x.dll\", EntryPoint = \"A\" + \"B\")] static extern bool M(); }",
+     "finding": "^C#: EntryPoint\\s*=\\s*\"A\"\\s*\\+"
+    },
+    {
+     "alt": "EntryPoint\\s*=\\s*[A-Za-z_]",
+     "plant": "class P { [DllImport(\"x.dll\", EntryPoint = Names.Second)] static extern bool M(); }",
+     "finding": "^C#: EntryPoint\\s*=\\s*N"
+    }
+   ]
+  },
+  "lifecycle_interpreters": {
+   "scope": "lifecycle",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "cmd",
+     "plant": "cmd x net",
+     "finding": "^line \\d+: cmd carries 'net' in its arguments$"
+    },
+    {
+     "alt": "powershell",
+     "plant": "powershell x net",
+     "finding": "^line \\d+: powershell carries 'net' in its arguments$"
+    },
+    {
+     "alt": "pwsh",
+     "plant": "pwsh x net",
+     "finding": "^line \\d+: pwsh carries 'net' in its arguments$"
+    },
+    {
+     "alt": "Start\\-Process",
+     "plant": "Start-Process x net",
+     "finding": "^line \\d+: Start\\-Process carries 'net' in its arguments$"
+    },
+    {
+     "alt": "saps",
+     "plant": "saps x net",
+     "finding": "^line \\d+: saps carries 'net' in its arguments$"
+    },
+    {
+     "alt": "start",
+     "plant": "start x net",
+     "finding": "^line \\d+: start carries 'net' in its arguments$"
+    },
+    {
+     "alt": "Invoke\\-Command",
+     "plant": "Invoke-Command x net",
+     "finding": "^line \\d+: Invoke\\-Command carries 'net' in its arguments$"
+    },
+    {
+     "alt": "icm",
+     "plant": "icm x net",
+     "finding": "^line \\d+: icm carries 'net' in its arguments$"
+    }
+   ]
+  },
+  "lifecycle_arg_text": {
+   "scope": "lifecycle",
+   "template": "(?i)({0})",
+   "alternatives": [
+    {
+     "alt": "\\bnet1?(\\.exe)?\\b",
+     "plant": "pwsh -c 'net'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bschtasks\\b",
+     "plant": "pwsh -c 'schtasks'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bwmic\\b",
+     "plant": "pwsh -c 'wmic'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "(?<![\\w:/.\\\\-])/[A-Za-z?]",
+     "plant": "pwsh -c 'x /zz'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bNew-LocalUser\\b",
+     "plant": "pwsh -c 'New-LocalUser'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bRemove-LocalUser\\b",
+     "plant": "pwsh -c 'Remove-LocalUser'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bEnable-LocalUser\\b",
+     "plant": "pwsh -c 'Enable-LocalUser'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bDisable-LocalUser\\b",
+     "plant": "pwsh -c 'Disable-LocalUser'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bSet-LocalUser\\b",
+     "plant": "pwsh -c 'Set-LocalUser'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bRename-LocalUser\\b",
+     "plant": "pwsh -c 'Rename-LocalUser'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bAdd-LocalGroupMember\\b",
+     "plant": "pwsh -c 'Add-LocalGroupMember'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bRemove-LocalGroupMember\\b",
+     "plant": "pwsh -c 'Remove-LocalGroupMember'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bRegister-ScheduledTask\\b",
+     "plant": "pwsh -c 'Register-ScheduledTask'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bUnregister-ScheduledTask\\b",
+     "plant": "pwsh -c 'Unregister-ScheduledTask'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bStart-ScheduledTask\\b",
+     "plant": "pwsh -c 'Start-ScheduledTask'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bStop-ScheduledTask\\b",
+     "plant": "pwsh -c 'Stop-ScheduledTask'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bSet-ScheduledTask\\b",
+     "plant": "pwsh -c 'Set-ScheduledTask'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "ConvertTo-SecureString",
+     "plant": "pwsh -c 'ConvertTo-SecureString'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "-ComObject\\b",
+     "plant": "pwsh -c 'New-Object -ComObject x'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "GetTypeFrom",
+     "plant": "pwsh -c '[type]::GetTypeFromProgID(1)'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bSet-CimInstance\\b",
+     "plant": "pwsh -c 'Set-CimInstance'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bNew-CimInstance\\b",
+     "plant": "pwsh -c 'New-CimInstance'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bRemove-CimInstance\\b",
+     "plant": "pwsh -c 'Remove-CimInstance'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bInvoke-CimMethod\\b",
+     "plant": "pwsh -c 'Invoke-CimMethod'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bInvoke-WmiMethod\\b",
+     "plant": "pwsh -c 'Invoke-WmiMethod'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bSet-WmiInstance\\b",
+     "plant": "pwsh -c 'Set-WmiInstance'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "\\bRemove-WmiObject\\b",
+     "plant": "pwsh -c 'Remove-WmiObject'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "-Credential\\b",
+     "plant": "pwsh -c 'x -Credential y'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    },
+    {
+     "alt": "-LoadUserProfile\\b",
+     "plant": "pwsh -c 'x -LoadUserProfile'",
+     "finding": "^line \\d+: pwsh carries '.+' in its arguments$"
+    }
+   ]
+  },
+  "net_names": {
+   "scope": "lifecycle",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "net",
+     "plant": "net x y z",
+     "finding": "^line \\d+: net x y z \\(only the two reads"
+    },
+    {
+     "alt": "net1",
+     "plant": "net1 x y z",
+     "finding": "^line \\d+: net1 x y z \\(only the two reads"
+    }
+   ]
+  },
+  "com_switch": {
+   "scope": "lifecycle",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "-ComObject",
+     "plant": "New-Object -ComObject x",
+     "finding": "New-Object of a credential, directory or COM type$"
+    }
+   ]
+  },
+  "com_members": {
+   "scope": "lifecycle",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "GetTypeFromProgID",
+     "plant": "[type]::GetTypeFromProgID($x)",
+     "finding": "a COM class by its registry name$"
+    },
+    {
+     "alt": "GetTypeFromCLSID",
+     "plant": "[type]::GetTypeFromCLSID($x)",
+     "finding": "a COM class by its registry name$"
+    }
+   ]
+  },
+  "lifecycle_new_object_types": {
+   "scope": "lifecycle",
+   "template": "(?i)({0})",
+   "alternatives": [
+    {
+     "alt": "PSCredential",
+     "plant": "New-Object PSCredential",
+     "finding": "New-Object of a credential, directory or COM type$"
+    },
+    {
+     "alt": "NetworkCredential",
+     "plant": "New-Object NetworkCredential",
+     "finding": "New-Object of a credential, directory or COM type$"
+    },
+    {
+     "alt": "DirectoryEntry",
+     "plant": "New-Object DirectoryEntry",
+     "finding": "New-Object of a credential, directory or COM type$"
+    },
+    {
+     "alt": "UserPrincipal",
+     "plant": "New-Object UserPrincipal",
+     "finding": "New-Object of a credential, directory or COM type$"
+    },
+    {
+     "alt": "GroupPrincipal",
+     "plant": "New-Object GroupPrincipal",
+     "finding": "New-Object of a credential, directory or COM type$"
+    },
+    {
+     "alt": "PrincipalContext",
+     "plant": "New-Object PrincipalContext",
+     "finding": "New-Object of a credential, directory or COM type$"
+    }
+   ]
+  },
+  "lifecycle_assign_members": {
+   "scope": "lifecycle",
+   "template": "(?i)^({0})$",
+   "alternatives": [
+    {
+     "alt": "UserName",
+     "plant": "$o.UserName = $x",
+     "finding": "assignment to \\.UserName$"
+    },
+    {
+     "alt": "Password",
+     "plant": "$o.Password = $x",
+     "finding": "assignment to \\.Password$"
+    },
+    {
+     "alt": "PasswordInClearText",
+     "plant": "$o.PasswordInClearText = $x",
+     "finding": "assignment to \\.PasswordInClearText$"
+    },
+    {
+     "alt": "LoadUserProfile",
+     "plant": "$o.LoadUserProfile = $x",
+     "finding": "assignment to \\.LoadUserProfile$"
+    },
+    {
+     "alt": "Domain",
+     "plant": "$o.Domain = $x",
+     "finding": "assignment to \\.Domain$"
+    }
+   ]
+  },
+  "cs_marker": {
+   "scope": "lifecycle",
+   "template": "{0}",
+   "alternatives": [
+    {
+     "alt": "DllImport",
+     "plant": "$t = \"[DllImport(x)] static extern bool LogonUserW();\"",
+     "finding": "C# in a string: LogonUserW$"
+    }
+   ]
+  },
+  "process_types": {
+   "scope": "lifecycle",
+   "template": "(?i)(^|\\.)({0})$",
+   "alternatives": [
+    {
+     "alt": "Diagnostics\\.Process",
+     "plant": "[Diagnostics.Process]::Start('net.exe', 'user x')",
+     "finding": "^line \\d+: a \\.NET process start carrying '.+'$"
+    },
+    {
+     "alt": "Diagnostics\\.ProcessStartInfo",
+     "plant": "[Diagnostics.ProcessStartInfo]::new('net.exe', 'user x')",
+     "finding": "^line \\d+: a \\.NET process start carrying '.+'$"
+    }
+   ]
+  }
+ },
+ "fixtures": {
+  "cs_sample": "static class C4Sample { static int Read() { return 0; } }",
+  "cs_comment_only": "// LogonUser is never called\nstatic class C4Sample { static int Read() { return 0; } }",
+  "seam_named": [
+   {
+    "name": "an engine open in a pure function",
+    "function": "Get-C4PrepPlan",
+    "code": "$null = New-Nep5RealBackend",
+    "finding": "New-Nep5RealBackend outside a seam"
+   },
+   {
+    "name": "a real context built inside the self-test",
+    "function": "Invoke-C4SelfTest",
+    "code": "$null = New-C4RealCtx -ScriptDir $PSScriptRoot",
+    "finding": "New-C4RealCtx called from Invoke-C4SelfTest"
+   },
+   {
+    "name": "a netsh call",
+    "function": "Get-C4PrepPlan",
+    "code": "& (Join-C4Path ([Environment]::GetFolderPath('System')) 'netsh.exe') wfp show security type=engine",
+    "finding": "netsh outside a seam"
+   },
+   {
+    "name": "a proof-time seam outside if ($WriteProof)",
+    "function": "Invoke-C4SelfTest",
+    "code": "$null = Invoke-C4RealProbeVersion -Folder x",
+    "finding": "Invoke-C4RealProbeVersion in the self-test outside"
+   }
+  ],
+  "seam_plants": [
+   {
+    "name": "halfset by path",
+    "code": "& (Join-C4Path $PSScriptRoot 'halfset.exe') prepare",
+    "finding": "halfset outside a seam"
+   },
+   {
+    "name": "Remove-Item of the folder",
+    "code": "Remove-Item -LiteralPath $pub -Recurse",
+    "finding": "Remove-Item writes or deletes files outside a seam"
+   },
+   {
+    "name": "Directory.CreateDirectory",
+    "code": "[void][IO.Directory]::CreateDirectory($pub)",
+    "finding": "::CreateDirectory writes or deletes files outside a seam"
+   },
+   {
+    "name": "File.WriteAllText",
+    "code": "[IO.File]::WriteAllText($f, $t)",
+    "finding": "::WriteAllText writes or deletes files outside a seam"
+   },
+   {
+    "name": "New-Item",
+    "code": "New-Item -ItemType Directory -Path $pub",
+    "finding": "New-Item writes or deletes files outside a seam"
+   },
+   {
+    "name": "takeown",
+    "code": "takeown",
+    "finding": "takeown outside a seam"
+   },
+   {
+    "name": "icacls",
+    "code": "icacls",
+    "finding": "icacls outside a seam"
+   },
+   {
+    "name": "ncoprobe by path",
+    "code": "& (Join-C4Path $b 'ncoprobe.exe') run --cond F",
+    "finding": "ncoprobe outside a seam"
+   },
+   {
+    "name": "pwsh",
+    "code": "pwsh -NoProfile -File x.ps1",
+    "finding": "pwsh outside a seam"
+   },
+   {
+    "name": "powershell",
+    "code": "powershell -NoProfile -File x.ps1",
+    "finding": "powershell outside a seam"
+   },
+   {
+    "name": "cmd",
+    "code": "cmd /c dir",
+    "finding": "cmd outside a seam"
+   },
+   {
+    "name": "net",
+    "code": "net localgroup x",
+    "finding": "net outside a seam"
+   },
+   {
+    "name": "netsh",
+    "code": "netsh wfp show filters",
+    "finding": "netsh outside a seam"
+   },
+   {
+    "name": "registry",
+    "code": "[void][Microsoft.Win32.Registry]::GetValue($k, $v, 0)",
+    "finding": "Registry\\] outside a seam"
+   }
+  ],
+  "fs_off": "[void][IO.Directory]::CreateDirectory($pub)",
+  "impure_plants": [
+   {
+    "code": "[void][IO.Directory]::CreateDirectory($pub)",
+    "finding": "CreateDirectory"
+   },
+   {
+    "code": "Remove-Item -LiteralPath $pub",
+    "finding": "Remove-Item"
+   },
+   {
+    "code": "[void][Microsoft.Win32.Registry]::GetValue($k, $v, 0)",
+    "finding": "Registry"
+   },
+   {
+    "code": "([IO.DirectoryInfo]$pub).Create()",
+    "finding": "\\.Create\\(\\)"
+   }
+  ],
+  "lifecycle_ps": [
+   "New-LocalUser -Name x -NoPassword",
+   "Add-LocalGroupMember -SID 'S-1-5-32-556' -Member x",
+   "net user x /add",
+   "net user x Pa55-w0rd",
+   "net localgroup g x /add",
+   "& (Join-C4Path $s 'net.exe') user x /delete",
+   "Set-LocalUser -Name x -Description y",
+   "Register-ScheduledTask -TaskName t -Action $a",
+   "$c = Get-Credential",
+   "$s = ConvertTo-SecureString x -AsPlainText -Force",
+   "$psi.Password = $s",
+   "Start-Process cmd -Credential $c",
+   "[pscredential]$c = $null",
+   "schtasks /create /tn t",
+   "net1 localgroup g x",
+   "cmd /c net user x",
+   "cmd.exe /c 'net1 user x'",
+   "Start-Process net -ArgumentList 'user'",
+   "Start-Process -FilePath 'net.exe' -ArgumentList 'user'",
+   "function Y { param($Name) net user $Name }",
+   "function Y { param([string[]]$Name) net user $Name }",
+   "$a = @('user'); net @a",
+   "function Y { param([string]$Name) net user $Name x }",
+   "Invoke-Expression $s",
+   "iex $s",
+   "pwsh -c 'net user x'",
+   "Invoke-Command -ScriptBlock { net @a }",
+   "x /zz",
+   "pwsh -c 'x /zz'",
+   "Start-Process x -ArgumentList '/zz'",
+   "New-Object -ComObject $progId",
+   "[type]::GetTypeFromProgID($progId)",
+   "[type]::GetTypeFromCLSID($g)",
+   "Set-CimInstance -InputObject $u",
+   "$u | Remove-CimInstance",
+   "Unregister-TaskIfPresent -Name x",
+   "Start-SpikeTaskProved -Name x",
+   "$p = New-StrongPassword",
+   "[Diagnostics.Process]::Start('net.exe', 'user nco-probe')",
+   "$psi = [System.Diagnostics.ProcessStartInfo]::new('net.exe', 'user nco-probe')",
+   "$t = [System.DirectoryServices.AccountManagement.UserPrincipal]",
+   "[System.DirectoryServices.AccountManagement.GroupPrincipal]::FindByIdentity($c, $n)"
+  ],
+  "lifecycle_cs": [
+   "static class C4Sample { static int LogonUserW() { return 0; } }",
+   "static class C4Sample { static int CreateProcessWithLogonW() { return 0; } }",
+   "static class C4Sample { static int NetUserAdd() { return 0; } }",
+   "static class C4Sample { static int NetLocalGroupAddMembers() { return 0; } }",
+   "static class C4Sample { [DllImport(\"x.dll\", EntryPoint = \"A\" + \"B\")] static extern bool Read() { return 0; } }",
+   "static class C4Sample { [DllImport(\"x.dll\", EntryPoint = Names.Second)] static extern bool Read() { return 0; } }"
+  ],
+  "ps_carrying_cs": "$t = \"[DllImport(x)] static extern bool LogonUserW();\"",
+  "lifecycle_reads": [
+   "function Y { param([string]$Name) net user $Name }",
+   "net user nco-probe",
+   "net localgroup 'Network Configuration Operators'",
+   "function Y { param([string]$Name) & (Join-C4Path $s 'net.exe') user $Name 2>&1 | Out-String }"
+  ],
+  "lifecycle_off": "New-LocalUser -Name x -NoPassword",
+  "switch_plant": "x /zz",
+  "library_helpers": [
+   "New-StrongPassword",
+   "Unregister-TaskIfPresent",
+   "Start-SpikeTaskProved"
+  ]
+ }
+}

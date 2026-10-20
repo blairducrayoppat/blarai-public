@@ -4,4 +4,7 @@
 # a one-line reason; optional ticket. Remove an entry when the study is cited
 # in a map (the checker fails on an entry that is both listed and cited).
 # Never fake coverage by adding a citation without a real card.
-unmapped: []
+unmapped:
+  - path: PREFLIGHT_RESEARCH_COMMIT.md
+    reason: a pre-commit checklist for research records, not a study; it has no finding to map
+

@@ -1,0 +1,371 @@
+{
+  "counts": {
+    "docs/performance/acp_ab_driver_2026-07-11.json": {
+      "tracker-ref": 7
+    },
+    "docs/performance/answer-quality-ceremony-2026-07-21.json": {
+      "tracker-ref": 13
+    },
+    "docs/performance/audit_chain_verify_cost_2026-09-17_22-50-00.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/b5_coder_fleet_budget_2026-08-06_17-09-57.json": {
+      "tracker-ref": 4
+    },
+    "docs/performance/benchmark_ovms_coder-30b_2026-08-31_11-21-31.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/benchmark_vlm_text_qwen3.6-27b-int4-ov_2026-07-08_16-21-18.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/benchmark_vlm_text_qwen36-35b-a3b-int4-ov-OFFICIAL_2026-07-16_18-22-59.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/benchmark_vlm_text_qwen36-35b-a3b-int4-ov-OFFICIAL_2026-07-16_18-28-09.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/benchmark_vlm_text_qwen36-35b-a3b-int4-ov-OFFICIAL_2026-09-22_00-15-28.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/benchmark_vlm_text_qwen36-35b-a3b-int4-ov-OFFICIAL_2026-09-22_00-34-57.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/benchmark_vlm_text_qwen36-35b-a3b-int4-ov_2026-07-10_22-11-10.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/coder_in_vm_memory_2026-07-10.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/coder_offload_ab_2026-09-01.json": {
+      "tracker-ref": 5
+    },
+    "docs/performance/coder_offload_ab_restored_ceiling_2026-09-01.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/coder_prompt_floor_2026-09-01.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/coder_sustained_cs4-offload30-bootfresh_2026-08-31_19-45-26.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/coder_web_task_cost_2026-08-08.json": {
+      "tracker-ref": 8
+    },
+    "docs/performance/coordinator_shadow_precision_2026-07-22.json": {
+      "tracker-ref": 4
+    },
+    "docs/performance/coverage_gate_cold_plan_timing_2026-07-29.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/dispatch_concurrency_arc140v_2026-06-27.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/eval_14b_answer_quality_corrected_2026-09-22_01-16-41.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/eval_14b_aq_postfix_2026-09-22.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/eval_14b_aq_postgate_2026-09-22.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/eval_14b_aq_r1_2026-09-22_04-15-54.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/eval_14b_aq_r2_2026-09-22_04-21-45.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/eval_14b_aq_r3_2026-09-22_04-28-55.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/eval_35b_answer_quality_corrected_2026-09-22_01-16-41.json": {
+      "tracker-ref": 6
+    },
+    "docs/performance/eval_35b_aq_r1_2026-09-22_04-18-51.json": {
+      "tracker-ref": 6
+    },
+    "docs/performance/eval_35b_aq_r2_2026-09-22_04-26-00.json": {
+      "tracker-ref": 6
+    },
+    "docs/performance/eval_35b_aq_r3_2026-09-22_04-32-29.json": {
+      "tracker-ref": 6
+    },
+    "docs/performance/eval_conversation_agentic_2026-09-22_14-45-36.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/eval_conversation_multiturn_2026-09-22_14-26-56.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/eval_rebuilt_suites_2026-09-22_16-21-13.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/eval_rebuilt_suites_2026-09-22_16-32-58.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/gemma4-instrument-probe-2026-07-22.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/gemma4-vision-instrument-probe-2026-07-22.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/gemma4-vs-qwen3-14b-grading-2026-07-22.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/gemma4-vs-qwen3vl-headtohead-2026-07-22.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/gpu_plugin_from_source_capability_proof_2026-07-06.json": {
+      "tracker-ref": 6
+    },
+    "docs/performance/guest_parser_memory_2026-06-13.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/harness_chat_2026-06-04T17-21-56-906527-00-00.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/harness_chat_2026-06-07T05-32-39-582912-00-00.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/harness_router_2026-06-04T17-20-28-995057-00-00.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/harness_substrate_use_case_002_2026-06-04T21-20-23-589381-00-00.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/harness_vlm_2026-06-04T17-21-11-880242-00-00.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/hybrid_vs_vector_795_2026-07-10_17-13-30.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/hybrid_vs_vector_795_2026-07-21_01-58-08.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/image_gen_phase0_2026-06-16.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/knowledge_retrieve_scaling_2026-09-21.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/kv_cache_sweep_ov2026_2_1_0_2026-07-01_19-10-33.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/kv_cache_sweep_ov2026_2_1_0_2026-07-23_12-47-59.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/kv_cache_sweep_ov2026_2_1_0_2026-07-23_13-03-04.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/live_verify_ingest_2026-06-11.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/llamacpp_production_models_769_2026-07-16_19-35-37.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/llamacpp_production_models_fa_addendum_2026-07-16_20-31-19.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/llamacpp_specdecode_14b_2026-07-16_20-09-36.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/llamacpp_specdecode_14b_2026-07-16_20-30-22.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/llamacpp_vs_openvino_769_2026-07-10.json": {
+      "tracker-ref": 4
+    },
+    "docs/performance/m2_plan_graph_live_verify_2026-07-05.json": {
+      "tracker-ref": 7
+    },
+    "docs/performance/mem_reclaim_900_inapp_2026-07-16_17-57-41.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/mem_reclaim_900_shared14b_2026-07-16_17-03-31.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/milestone1_14b_release_2026-06-21.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/musicgen_medium_cpu_2026-07-11.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/musicgen_xpu_arc140v_2026-07-16.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/nep0005_halfset_matrix_2026-10-13.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/nep0005_srtcli_halfset_2026-10-13.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/oracle_mutation_attribution_cost_2026-07-31.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/ovms_cache_size_decode_cliff_2026-08-31.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/ovms_compile_cache_coder30b_2026-07-06.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/ovms_template_engine_swap_2026-09-01_00-44.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/pgov_stage5_reembed_807_after_2026-07-11_08-32-56.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/pgov_stage5_reembed_807_before_2026-07-11_08-23-26.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/preference_contradiction_796_2026-07-10_17-08-57.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/prefix_caching_ab_ov2026_2_1_0_2026-07-09_16-02-52.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/prefix_caching_ab_ov2026_2_1_0_2026-07-09_18-02-15.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/probe_35b_greedy_determinism_2026-09-22_04-13-38.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/probe_35b_multimodal_quality_2026-07-16_21-54-51.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/probe_35b_thinking_control_2026.2.1_2026-09-22_00-55-51.json": {
+      "tracker-ref": 5
+    },
+    "docs/performance/probe_livecheck_2026-07-10.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/probe_pr4139_enable_thinking_35b_2026-07-16_21-10-31.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/probe_pr4139_enable_thinking_35b_2026-07-16_21-13-41.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/probe_pr4139_enable_thinking_35b_2026-07-16_21-25-23.json": {
+      "tracker-ref": 3
+    },
+    "docs/performance/probe_pr4139_v2_2026.4.0.0-49-5166cd3e4c7_2026-07-22_20-33-54.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/probe_pr4139_v2_2026.4.0.0-50-8cf5e4502f3-feat-thinking-suppression_2026-07-22_20-24-08.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/probe_pr4139_v2_2026.4.0.0-52-cea6c5f2690-feat-thinking-suppression_2026-07-23_07-22-56.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/probe_pr4139_wrapup_2phase_2026-07-22_22-21-33.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/probe_thinking_toggle_llamaserver_2026-07-16_19-39-33.json": {
+      "tracker-ref": 4
+    },
+    "docs/performance/qwen35_9b_summary_2026-10-04.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/qwen35_phase1_summary_2026-10-04.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/ram_census_2026-07-15.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/spec_decode_ab_ov2026_2_1_0_2026-07-10_14-22-08.json": {
+      "tracker-ref": 5
+    },
+    "docs/performance/sprint18_model_loaded_roundtrip_2026-06-08.json": {
+      "tracker-ref": 4
+    },
+    "docs/performance/tool_call_native_round_trip_2026-07-02.json": {
+      "tracker-ref": 2
+    },
+    "docs/performance/uc010_dispatch_asset_gen_2026-06-30.json": {
+      "tracker-ref": 5
+    },
+    "docs/performance/uc010_image_styles_arc140v_2026-06-27.json": {
+      "tracker-ref": 4
+    },
+    "docs/performance/verdict_receipt_cost_shipped_path_2026-09-18_14-29-00.json": {
+      "tracker-ref": 7
+    },
+    "docs/performance/verdict_receipt_cost_vs_chain_length_2026-09-18_15-10-00.json": {
+      "tracker-ref": 6
+    },
+    "docs/performance/voice_ram_2026-06-14_15-53-06.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/voice_ram_2026-06-14_15-55-36.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/voice_ram_2026-06-14_16-00-28.json": {
+      "tracker-ref": 1
+    },
+    "docs/performance/xgrammar_stop_token_fix_verify_2026-07-05_15-34-27.json": {
+      "tracker-ref": 1
+    },
+    "tools/probes/containment_arms/analyse.py": {
+      "tracker-ref": 3
+    },
+    "tools/probes/containment_arms/arm_a_operator.cmd": {
+      "tracker-ref": 3
+    },
+    "tools/probes/containment_arms/arm_a_operator.ps1": {
+      "tracker-ref": 3
+    },
+    "tools/probes/containment_arms/arm_payload.py": {
+      "tracker-ref": 2
+    },
+    "tools/probes/containment_arms/deny_ace_check.py": {
+      "tracker-ref": 1
+    },
+    "tools/probes/containment_arms/effective_access.py": {
+      "tracker-ref": 2
+    },
+    "tools/probes/containment_arms/fixtures.py": {
+      "tracker-ref": 2
+    },
+    "tools/probes/containment_arms/run_arm.py": {
+      "tracker-ref": 6
+    },
+    "tools/probes/containment_arms/run_arm_e.py": {
+      "tracker-ref": 1
+    },
+    "tools/probes/containment_arms/run_phase2.py": {
+      "tracker-ref": 1
+    },
+    "tools/probes/containment_arms/summarise_phase2.py": {
+      "tracker-ref": 2
+    },
+    "tools/probes/containment_arms/wfp_fence.ps1": {
+      "tracker-ref": 10
+    },
+    "tools/probes/containment_arms/winsec.py": {
+      "tracker-ref": 1
+    },
+    "tools/probes/mxc_1406/net_payload.py": {
+      "tracker-ref": 2
+    },
+    "tools/probes/mxc_1406/run_probe.py": {
+      "tracker-ref": 2
+    },
+    "tools/probes/mxc_1406/summarise.py": {
+      "tracker-ref": 3
+    }
+  },
+  "names": [
+    "docs/performance/capture_4035_usm_coder30b_2026-07-23.json",
+    "docs/performance/capture_4035_usm_coder30b_2026.4dev_2026-07-23.json",
+    "docs/performance/nep0005_halfset_matrix_2026-10-13.json",
+    "docs/performance/nep0005_srtcli_halfset_2026-10-13.json",
+    "docs/performance/probe_pr4139_enable_thinking_35b_2026-07-16_21-10-31.json",
+    "docs/performance/probe_pr4139_enable_thinking_35b_2026-07-16_21-13-41.json",
+    "docs/performance/probe_pr4139_enable_thinking_35b_2026-07-16_21-25-23.json",
+    "docs/performance/probe_pr4139_v2_2026.4.0.0-49-5166cd3e4c7_2026-07-22_20-33-54.json",
+    "docs/performance/probe_pr4139_v2_2026.4.0.0-50-8cf5e4502f3-feat-thinking-suppression_2026-07-22_20-24-08.json",
+    "docs/performance/probe_pr4139_v2_2026.4.0.0-52-cea6c5f2690-feat-thinking-suppression_2026-07-23_07-22-56.json",
+    "docs/performance/probe_pr4139_wrapup_2phase_2026-07-22_22-21-33.json",
+    "tools/probes/mxc_1406/net_payload.py",
+    "tools/probes/mxc_1406/run_probe.py",
+    "tools/probes/mxc_1406/summarise.py"
+  ]
+}

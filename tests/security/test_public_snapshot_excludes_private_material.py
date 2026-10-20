@@ -20,6 +20,14 @@ WHAT IS LOCKED HERE
 4b. The filtered tree keeps the anchor paths (``README.md``, ``LICENSE.md``): a list that matches everything would publish an empty tree.
 4c. ``scripts/publicignore_anchors.txt`` (read from the index) names the public evidence the posts cite; the list may not exclude
    any path it names (a trailing ``/`` names everything beneath), and an anchor that names no tracked path fails too.
+4d. Every tracked path an anchored document cites is itself anchored, or is listed in ``scripts/publicignore_cited_unanchored.txt``
+   with a one-line reason (``path | reason``). The documents scanned are every text file the anchors above the
+   ``#:cited-only`` line of ``scripts/publicignore_anchors.txt`` name (any extension; a blob that starts with the gzip magic or holds
+   a NUL byte in its first 8 KB is binary and not read); the anchors below that line keep the cited paths public and
+   are not scanned in turn (one hop, not the closure of the repository). A citation is a path-shaped token that equals a tracked
+   file, or a tracked directory of three or more segments; a relative link (``../x.md``) and a directory of one or two segments
+   (an area, not a citation) are not read. An allowlist entry that is not tracked, is anchored, is cited by no scanned document or
+   has no reason fails too.
 5. The matching rules in ``scripts/publicignore.py`` give the answers in ``scripts/publicignore_cases.json`` and refuse what
    they should refuse.
 6. Toggles: a planted phrase in an unexcluded scratch file fails the scan and passes once the file is excluded; every spelling of
@@ -128,6 +136,8 @@ def phrase_set_digest(phrases: Iterable[str]) -> str:
 # Paths that must survive the filter: a list that matches everything would publish an empty tree.
 ANCHOR_PATHS: tuple[str, ...] = ("README.md", "LICENSE.md")
 ANCHORS_FILE = "scripts/publicignore_anchors.txt"
+CITED_ONLY_MARK = "#:cited-only"
+CITED_ALLOWLIST_FILE = "scripts/publicignore_cited_unanchored.txt"
 
 # Name classes, matched anywhere in a tracked path, ignoring case. 1741 is held to digit boundaries so a timestamp or a hash that
 # happens to contain it is not mistaken for the ticket.
@@ -200,6 +210,76 @@ def load_anchors(root: Path) -> list[str]:
     if not entries:
         pytest.fail(f"{ANCHORS_FILE} (index copy) names no anchor")
     return entries
+
+
+def load_anchor_sections(root: Path) -> tuple[list[str], list[str]]:
+    """``(documents' anchors, cited-only anchors)``: the entries above and below the ``#:cited-only`` line; other ``#`` lines are comments."""
+    text = _git(root, "show", f":{ANCHORS_FILE}").decode("utf-8")
+    primary: list[str] = []
+    cited_only: list[str] = []
+    bucket = primary
+    for ln in text.splitlines():
+        ln = ln.strip()
+        if ln == CITED_ONLY_MARK:
+            bucket = cited_only
+        elif ln and not ln.startswith("#"):
+            bucket.append(ln)
+    return primary, cited_only
+
+
+def load_cited_allowlist(root: Path) -> dict[str, str]:
+    """``{path: reason}`` from the INDEX copy of the allowlist; a line without a ``path | reason`` shape fails (an empty list is valid)."""
+    text = _git(root, "show", f":{CITED_ALLOWLIST_FILE}").decode("utf-8")
+    entries: dict[str, str] = {}
+    for ln in text.splitlines():
+        ln = ln.strip()
+        if not ln or ln.startswith("#"):
+            continue
+        path, sep, reason = (part.strip() for part in ln.partition("|"))
+        if not sep or not path or not reason:
+            pytest.fail(f"{CITED_ALLOWLIST_FILE}: '{ln}' is not 'path | reason'")
+        entries[path] = reason
+    return entries
+
+
+_CITE_TOKEN = re.compile(r"[A-Za-z0-9_.\-/]+")
+
+
+def _anchor_covers(anchors: list[str], path: str) -> bool:
+    return any(path.startswith(a) if a.endswith("/") else path == a for a in anchors)
+
+
+def citations(text: str, tracked: set[str], dirs: set[str]) -> set[str]:
+    """Tracked paths a document names: a token that equals a tracked file, or a tracked directory of three or more segments."""
+    found: set[str] = set()
+    for tok in _CITE_TOKEN.findall(text):
+        while tok.startswith("./"):
+            tok = tok[2:]
+        tok = tok.rstrip(".,;:").rstrip("/")
+        if tok in tracked or (tok in dirs and tok.count("/") >= 2):
+            found.add(tok)
+    return found
+
+
+def cited_findings(root: Path, paths: list[str]) -> tuple[list[str], list[str]]:
+    """``(paths a scanned document cites that no anchor covers and the allowlist does not hold, allowlist problems)``."""
+    primary, cited_only = load_anchor_sections(root)
+    anchors = primary + cited_only
+    allow = load_cited_allowlist(root)
+    tracked = set(paths)
+    dirs = {"/".join(p.split("/")[:i]) for p in paths for i in range(1, p.count("/") + 1)}
+    cited: set[str] = set()
+    for doc in (p for p in paths if _anchor_covers(primary, p)):
+        data = _git(root, "show", f":{doc}")
+        if data.startswith(_GZIP_MAGIC) or b"\x00" in data[:8192]:
+            continue
+        cited |= citations(data.decode("utf-8", "replace"), tracked, dirs)
+    # a cited directory is covered by an anchor that names it or a folder above it
+    unanchored = sorted(c for c in cited if not _anchor_covers(anchors, c + ("/" if c in dirs else "")) and c not in allow)
+    problems = [f"{a}: not tracked" for a in allow if a not in tracked and a not in dirs]
+    problems += [f"{a}: anchored, so it needs no allowlist line" for a in allow if _anchor_covers(anchors, a + ("/" if a in dirs else ""))]
+    problems += [f"{a}: cited by no scanned document" for a in allow if (a in tracked or a in dirs) and a not in cited]
+    return unanchored, sorted(problems)
 
 
 def anchor_findings(paths: list[str], excluded: set[str], anchors: list[str]) -> tuple[list[str], list[str]]:
@@ -323,6 +403,7 @@ def check_tree(root: Path) -> dict[str, object]:
     phrase_hits = {p: rest for p, found in scanned.items() if (rest := [f for f in found if f != _MARKER_CORE])}
     present = {e.path for e in published}
     anchored_removed, anchors_empty = anchor_findings(paths, excluded, load_anchors(root))
+    cited_unanchored, cited_allowlist_problems = cited_findings(root, paths)
     return {
         "list_is_tracked": pi.IGNORE_FILE in paths,
         "list_excludes_itself": rules.matches(pi.IGNORE_FILE),
@@ -335,6 +416,8 @@ def check_tree(root: Path) -> dict[str, object]:
         "tree_is_empty": not present,
         "anchored_but_excluded": anchored_removed,
         "anchors_naming_nothing": anchors_empty,
+        "cited_unanchored": cited_unanchored,
+        "cited_allowlist_problems": cited_allowlist_problems,
     }
 
 
@@ -387,6 +470,14 @@ def test_the_filtered_tree_keeps_its_anchor_paths(real_tree: dict[str, object]) 
 def test_the_list_excludes_no_anchored_path(real_tree: dict[str, object]) -> None:
     assert real_tree["anchored_but_excluded"] == [], "the list holds back evidence the posts cite: " + ", ".join(real_tree["anchored_but_excluded"])  # type: ignore[arg-type]
     assert real_tree["anchors_naming_nothing"] == [], "anchors that name no tracked path: " + ", ".join(real_tree["anchors_naming_nothing"])  # type: ignore[arg-type]
+
+
+def test_every_path_an_anchored_document_cites_is_anchored_or_allowlisted(real_tree: dict[str, object]) -> None:
+    assert real_tree["cited_unanchored"] == [], (
+        "anchored documents cite paths no anchor covers (add each to scripts/publicignore_anchors.txt below the cited-only line, or to "
+        "scripts/publicignore_cited_unanchored.txt with a reason): " + ", ".join(real_tree["cited_unanchored"])  # type: ignore[arg-type]
+    )
+    assert real_tree["cited_allowlist_problems"] == [], "; ".join(real_tree["cited_allowlist_problems"])  # type: ignore[arg-type]
 
 
 def test_the_anchor_file_names_the_public_evidence() -> None:
@@ -489,7 +580,7 @@ def test_the_rules_are_not_the_library_glob() -> None:
 def _scratch(base: Path, files: dict[str, bytes], ignore: str) -> Path:
     base.mkdir(parents=True)
     _git(base, "init", "-q")
-    files = {ANCHORS_FILE: b"# none\nREADME.md\n", **files, pi.IGNORE_FILE: ignore.encode("utf-8")}
+    files = {ANCHORS_FILE: b"# none\nREADME.md\n", CITED_ALLOWLIST_FILE: b"# none\n", **files, pi.IGNORE_FILE: ignore.encode("utf-8")}
     for rel, data in files.items():
         target = base / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -698,6 +789,63 @@ def test_toggle_a_list_line_that_reaches_an_anchored_path_is_caught_and_a_clean_
 def test_toggle_an_anchor_that_names_no_tracked_path_is_reported(tmp_path: Path) -> None:
     files = {ANCHORS_FILE: b"README.md\ndocs/gone/\n", "README.md": b"r\n"}
     assert check_tree(_scratch(tmp_path / "stale", files, SELF_EXCLUDING))["anchors_naming_nothing"] == ["docs/gone/"]
+
+
+def test_toggle_a_path_an_anchored_document_cites_must_be_anchored_or_allowlisted(tmp_path: Path) -> None:
+    files = {ANCHORS_FILE: b"README.md\n#:cited-only\ndocs/design/cited.md\n",
+             "README.md": b"see docs/design/cited.md and docs/design/other.md and tools/probes/p1/run.py\n",
+             "docs/design/cited.md": b"see docs/design/deeper.md\n", "docs/design/other.md": b"o\n", "docs/design/deeper.md": b"d\n",
+             "tools/probes/p1/run.py": b"x\n"}
+    open_ = check_tree(_scratch(tmp_path / "open", files, SELF_EXCLUDING))
+    # cited-only anchors are not scanned in turn, so docs/design/deeper.md is not required
+    assert open_["cited_unanchored"] == ["docs/design/other.md", "tools/probes/p1/run.py"]
+    held = {**files, CITED_ALLOWLIST_FILE: b"docs/design/other.md | a draft the post does not link\ntools/probes/p1/run.py | the probe is not published\n"}
+    ok = check_tree(_scratch(tmp_path / "held", held, SELF_EXCLUDING))
+    assert ok["cited_unanchored"] == [] and ok["cited_allowlist_problems"] == []
+    anchored = {**files, ANCHORS_FILE: b"README.md\n#:cited-only\ndocs/design/\ntools/probes/p1/\n"}
+    assert check_tree(_scratch(tmp_path / "anchored", anchored, SELF_EXCLUDING))["cited_unanchored"] == []
+
+
+def test_toggle_citations_are_read_from_every_text_file_under_the_anchors_and_not_from_binaries(tmp_path: Path) -> None:
+    files = {ANCHORS_FILE: b"README.md\ndocs/ev/\n", "README.md": b"r\n",
+             "docs/ev/run.json": b'{"instrument": "tools/probes/arms/effective_access.py"}\n',
+             "docs/ev/gate.ps1": b"# see tools/probes/arms/countdown_gate.ps1\n",
+             "docs/ev/blob.bin": b"\x00\x01 tools/probes/arms/binary_only.py\n",
+             "docs/ev/packed.gz": b"\x1f\x8b tools/probes/arms/packed_only.py\n",
+             "tools/probes/arms/effective_access.py": b"x\n", "tools/probes/arms/countdown_gate.ps1": b"x\n",
+             "tools/probes/arms/binary_only.py": b"x\n", "tools/probes/arms/packed_only.py": b"x\n"}
+    found = check_tree(_scratch(tmp_path / "text", files, SELF_EXCLUDING + "tools/probes/arms/\n"))["cited_unanchored"]
+    assert found == ["tools/probes/arms/countdown_gate.ps1", "tools/probes/arms/effective_access.py"]
+
+
+def test_toggle_a_list_line_that_excludes_a_cited_unanchored_path_is_reported_and_anchoring_it_fails_the_list(tmp_path: Path) -> None:
+    files = {ANCHORS_FILE: b"README.md\n", "README.md": b"see docs/adrs/ADR-1.md\n", "docs/adrs/ADR-1.md": b"a\n"}
+    cited = check_tree(_scratch(tmp_path / "cited", files, SELF_EXCLUDING + "docs/adrs/*\n"))
+    assert cited["cited_unanchored"] == ["docs/adrs/ADR-1.md"]
+    with_anchor = {**files, ANCHORS_FILE: b"README.md\n#:cited-only\ndocs/adrs/ADR-1.md\n"}
+    covered = check_tree(_scratch(tmp_path / "covered", with_anchor, SELF_EXCLUDING + "docs/adrs/*\n"))
+    assert covered["cited_unanchored"] == [] and covered["anchored_but_excluded"] == ["docs/adrs/ADR-1.md"]
+
+
+def test_toggle_the_citation_reader_takes_files_and_deep_directories_and_leaves_areas_and_prose() -> None:
+    tracked = {"a/b/c.md", "x.md", "tools/probes/p1/run.py"}
+    dirs = {"a", "a/b", "tools", "tools/probes", "tools/probes/p1"}
+    text = "See `a/b/c.md`, (./x.md), tools/probes/p1. Area a/b and a, plus nothing/here.md, docs/gone.md."
+    assert citations(text, tracked, dirs) == {"a/b/c.md", "x.md", "tools/probes/p1"}
+
+
+def test_toggle_the_allowlist_rejects_stale_anchored_unreasoned_and_missing_files(tmp_path: Path) -> None:
+    base = {ANCHORS_FILE: b"README.md\n#:cited-only\ndocs/a.md\n", "README.md": b"see docs/a.md and docs/b.md\n",
+            "docs/a.md": b"a\n", "docs/b.md": b"b\n", "docs/c.md": b"c\n"}
+    bad = {**base, CITED_ALLOWLIST_FILE: b"docs/a.md | anchored already\ndocs/c.md | cited by nobody\ndocs/gone.md | not tracked\ndocs/b.md | cited, fine\n"}
+    problems = check_tree(_scratch(tmp_path / "bad", bad, SELF_EXCLUDING))["cited_allowlist_problems"]
+    assert problems == ["docs/a.md: anchored, so it needs no allowlist line", "docs/c.md: cited by no scanned document", "docs/gone.md: not tracked"]
+    with pytest.raises(pytest.fail.Exception):
+        check_tree(_scratch(tmp_path / "noreason", {**base, CITED_ALLOWLIST_FILE: b"docs/b.md\n"}, SELF_EXCLUDING))
+    missing = _scratch(tmp_path / "missing", base, SELF_EXCLUDING)
+    _git(missing, "rm", "-q", "--cached", "--", CITED_ALLOWLIST_FILE)
+    with pytest.raises(pytest.fail.Exception):
+        check_tree(missing)
 
 
 def test_toggle_the_anchor_file_is_read_from_the_index(tmp_path: Path) -> None:

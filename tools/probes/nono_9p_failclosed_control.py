@@ -1941,7 +1941,7 @@ def self_test() -> int:
     else:
         t.skipped.append("windows fixture steps (need Windows python)")
     t.chk("windows", "dir listing filter keeps entries only",
-          dir_entry_lines(" Volume in drive C is OS\n Volume Serial Number is 0000-0000\n\n Directory of C:/x\n\n"
+          dir_entry_lines(" Volume in drive C is OS\n Volume Serial Number is XXXX-XXXX\n\n Directory of C:/x\n\n"
                           "10/14/2026  11:09 PM    <DIR>          UNGRAN~1     ungranted_long_dir\n"
                           "               1 File(s)             49 bytes\n               5 Dir(s)  1 bytes free")
           == "10/14/2026  11:09 PM    <DIR>          UNGRAN~1     ungranted_long_dir")

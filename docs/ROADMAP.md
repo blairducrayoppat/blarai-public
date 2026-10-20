@@ -1,8 +1,8 @@
 # THE ROADMAP
-**Last refresh (2026-10-04)**. Every number below was checked on disk, not taken
+**Last refresh (2026-10-20)**. Every number below was checked on disk, not taken
 from a ticket.
 
-> **A date bump is a claim, so this one says exactly what it re-measured.** The 2026-10-04
+> **A date bump is a claim, so this one says exactly what it re-measured.** The 2026-10-20
 > refresh ran `scripts/verify_roadmap.py` against the live board: **21 rows checked, 0 stale,
 > 0 missing, 1 needs-the-operator, 0 deliberately unticketed.** Every cited ticket exists and
 > is still OPEN.
@@ -11,11 +11,12 @@ from a ticket.
 > did not re-rank anything. The order below is the one the 2026-09-16 refresh left; ranking is a
 > judgement and it stays the operator's.
 >
-> **Why the date moved at all.** The 2026-10-04 merge of the Qwen3.5 Phase 1 measurement arc
-> (#1663) advanced `main` eighteen days past the 2026-09-16 stamp, and the post-merge run of
-> the security tier failed on exactly this test while the branch had passed it. Same
-> mechanism as the 2026-09-16 refresh: re-read, then stamp; never stamp alone. This block
-> REPLACES the previous one; the 2026-09-16 narrative is in git history.
+> **Why the date moved at all.** The 2026-10-20 merge of the case-4 measurement (#1764, the
+> delegated non-administrator row of NEP-0005 Q2) advanced `main` sixteen days past the
+> 2026-10-04 stamp, and the post-merge standing gate failed on exactly this test while the
+> branch had passed it. Same mechanism as the 2026-10-04 and 2026-09-16 refreshes: re-read,
+> then stamp; never stamp alone. This block REPLACES the previous one; the 2026-10-04 narrative
+> is in git history.
 
 > **This file is THE ORDER.** `CLAUDE.md`'s `<live_state_pointers>` names it, so a session
 > reads the ranking here instead of re-deriving one from whatever it happens to open first.

@@ -48,3 +48,7 @@ scripts/githooks/** text eol=lf
 # The containment evidence bundle is evidence of bytes: checkouts must be LF on every machine (its manifest and tests also
 # hash LF-normalised bytes, so they do not depend on this, but the files must read the same everywhere).
 docs/research/containment-evidence-2026-10-05/** text eol=lf
+
+# The loopback-proxy egress probe is hash-bound at launch: its files must read the same bytes on every checkout.
+tools/probes/mxc_proxy_egress/** text eol=lf
+tools/probes/mxc_proxy_egress/*.cmd text eol=crlf

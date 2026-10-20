@@ -1,0 +1,33 @@
+{
+  "kind": "nep5-case4-partd",
+  "at": "2026-10-20T01:42:16.2774687-04:00",
+  "code": 20,
+  "net_user": {
+    "exit": 2,
+    "state": "absent",
+    "netsh_text": "The user name could not be found.\r\n\r\nMore help is available by typing NET HELPMSG 2221.\r\n\r\n"
+  },
+  "lookup": {
+    "Ok": false,
+    "Sid": null,
+    "Domain": null,
+    "Use": 0,
+    "Error": 1332,
+    "Detail": "Some or all identity references could not be translated."
+  },
+  "group": "BUILTIN\\Network Configuration Operators",
+  "net_localgroup": {
+    "exit": 0,
+    "netsh_text": "Alias name     Network Configuration Operators\r\nComment        Members in this group can have some administrative privileges to manage configuration of networking features\r\n\r\nMembers\r\n\r\n-------------------------------------------------------------------------------\r\nThe command completed successfully.\r\n\r\n"
+  },
+  "members": [],
+  "profile_dir": "C:\\Users\\nco-probe",
+  "profile_present": false,
+  "account_sid": "S-1-5-21-1000000001-1000000002-1000000003-2250",
+  "profile_list_entry": {
+    "Present": false,
+    "ImagePath": null,
+    "Error": null
+  },
+  "profile_folders": []
+}

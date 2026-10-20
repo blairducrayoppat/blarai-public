@@ -361,6 +361,8 @@ whose section 6 states what its measurements do not establish. The switch is off
 the measurement is evidence rather than a control, and nothing here claims the coder
 is contained.
 
+The measurements are also published, sanitised and under CC BY 4.0 (data) and Apache-2.0 (code), in [windows-containment-evidence](https://github.com/blairducrayoppat/windows-containment-evidence); new results are published there, and this repository keeps the comparison study and its decision records.
+
 ---
 
 ## License
