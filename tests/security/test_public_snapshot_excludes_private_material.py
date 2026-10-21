@@ -507,7 +507,7 @@ def test_the_phrase_set_covers_every_spelling_of_the_numbering() -> None:
 
 
 # Built from parts: this file is published and must not carry the wording it keeps out of the reviews.
-_UNPOSTED_DRAFT = re.compile(("un" "posted[ -]dra" "ft|dra" "ft v[0-9]").encode(), re.IGNORECASE)
+_UNPOSTED_DRAFT = re.compile(("un" "posted[ -]dra" "ft|dra" "ft v[0-9]|pa" "ste_v[0-9]").encode(), re.IGNORECASE)
 
 
 def test_published_reviews_do_not_name_a_numbered_unposted_draft() -> None:
@@ -521,7 +521,7 @@ def test_published_reviews_do_not_name_a_numbered_unposted_draft() -> None:
 
 
 def test_toggle_the_unposted_draft_wording_is_recognised() -> None:
-    for text in ("R2-un" "posted-dra" "ft-v5-still", "dra" "ft v5:237", "Un" "posted dra" "ft"):
+    for text in ("R2-un" "posted-dra" "ft-v5-still", "dra" "ft v5:237", "Un" "posted dra" "ft", "x_case3_PA" "STE_v2.md"):
         assert _UNPOSTED_DRAFT.search(text.encode())
     assert not _UNPOSTED_DRAFT.search(b"the NEP-0005 evidence write-up (unposted)")
 

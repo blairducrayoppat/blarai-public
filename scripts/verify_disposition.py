@@ -127,9 +127,11 @@ QUALIFIED_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9._-]*)@([0-9a-f]{7,40})(?![0-9A
 HOME_REPO = "blarai"
 
 #: The repositories a row may cite, lowercased, per CLAUDE.md
-#: <repo_constellation>. An allowlist: a name that is not here is refused
-#: rather than searched for, so a typo cannot become a directory probe.
-KNOWN_REPOS: tuple[str, ...] = (HOME_REPO, "agentic-setup", "devplatform")
+#: <repo_constellation>, plus windows-containment-evidence, the public
+#: repository the containment measurements are published to (a review of a
+#: folder there is dispositioned here). An allowlist: a name that is not here
+#: is refused rather than searched for, so a typo cannot become a directory probe.
+KNOWN_REPOS: tuple[str, ...] = (HOME_REPO, "agentic-setup", "devplatform", "windows-containment-evidence")
 
 #: A named repository followed by something that is not a resolvable SHA -
 #: the branch-name substitution arriving through the sibling door. Scanned

@@ -373,6 +373,26 @@ def test_a_hex_looking_domain_does_not_name_a_repository() -> None:
     assert all(repo == "blarai" for repo, _ in found), found
 
 
+EVIDENCE_REPO = "windows-containment-evidence"
+
+
+def test_evidence_repo_citation_resolves_there_and_nowhere_else(tmp_path: Path) -> None:
+    """A review of a published evidence folder cites the commit in the evidence repository.
+
+    The positive row resolves there; the same name on a BlarAI SHA is refused, so the
+    lookup follows the name and not wherever the SHA happens to exist. The evidence HEAD
+    must not also resolve in BlarAI, or the positive row would say nothing about where
+    the lookup happened.
+    """
+    assert resolve_citation("blarai", _head_of(EVIDENCE_REPO)) is not None
+    md = f"```disposition\nx | FIXED | {EVIDENCE_REPO}@{_head_of(EVIDENCE_REPO)} - the fix landed there\n```"
+    code, report = _run(md, tmp_path)
+    assert code == 0, report
+    md = f"```disposition\nx | FIXED | {EVIDENCE_REPO}@{_head_of('blarai')} - landed there\n```"
+    code, report = _run(md, tmp_path)
+    assert code != 0 and f"does not resolve to a commit in {EVIDENCE_REPO}" in report, report
+
+
 def test_the_home_repo_is_in_the_allowlist() -> None:
     """``blarai@<sha>`` is the explicit spelling of the default, not a second door."""
     assert "blarai" in KNOWN_REPOS

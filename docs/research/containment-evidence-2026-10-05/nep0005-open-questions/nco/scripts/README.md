@@ -151,14 +151,20 @@ A record must be the probe's own `run` output (schema `nep5-case4-record-v1`) fr
 
   | Cond | `elevation_type.value` | Group |
   |---|---|---|
-  | F | 3 (limited) or 1 (no split token) | `nco_group.present` true |
-  | E | 2 (full) | `nco_group.present` true |
+  | F | 3 (limited) or 1 (no split token) | `nco_group.present` true; `administrators` absent or deny-only |
+  | E | 2 (full) or 1 (no split token) | `nco_group.present` true, `enabled` true, `use_for_deny_only` false; `administrators` absent or deny-only |
   | S | 3 (limited) | `administrators.present` true and deny-only |
   | A | 2 (full) | `administrators.present` true and enabled, not deny-only |
 
   A line typed into the wrong console, such as A's line in the non-elevated one, is therefore listed and never counted. F accepts type 1 as well as 3,
   because "Network Configuration Operators membership gives no split token on this build" would be a measurement, not an invalid record. The row and
   the collect record carry the elevation type, so the table shows which one each F run had. Only type 2 invalidates an F record.
+  E accepts type 1 as well as 2, and under either the group must be ENABLED: a batch logon (the Task Scheduler route, RUN_SHEET step 4b) is never
+  split, so its token is type 1 with the group enabled, which is the token condition E is about; a deny-only group under either type is the F token
+  mislabelled and is invalid by token state (2026-10-20 amendment; the first live run measured elevation type 1, integrity medium-plus, session 0).
+  F and E also require Administrators absent or deny-only: a token with Administrators enabled could add the filter as an administrator, which is
+  condition A's question, not the group's (review round 4). An F line run through the task route is the batch token (type 1, group enabled): it is a
+  valid F record whose row says so, and it is never counted as E (the count keys on `cond`).
 - The probe refuses a run made by the wrong principal: F or E not as `nco-probe`, or S or A as `nco-probe`. A record of a run it should have refused,
   but that reached the engine, is invalid.
 
@@ -193,10 +199,10 @@ When Windows refuses to elevate `nco-probe` at condition E, that refusal is itse
 `-Collect -ElevationRefused '<note>'`, or the same on `-Finish`, writing the note itself from what the Lead Architect reports. RUN_SHEET step 6
 shows the plain `-Collect`, so the session adds this form when E was refused.
 
-The note is judged on the token. It is counted as the E result only when no E file in `drop\`, valid or not, shows the account's elevated token
-(elevation type 2). What happened after the elevation does not matter: an engine open that failed or threw under the elevated token still proves
-Windows elevated the account. An E line run in the account's unelevated console (type 3, invalid by token state) does not contradict the note, and
-neither does another principal's record. When an E record under the account's elevated token exists, the note is listed as contradicted, not counted,
+The note is judged on the token. It is counted as the E result only when no E file in `drop\`, valid or not, shows the token E is about: the
+account's elevated token (elevation type 2), or an unsplit token (type 1) with `S-1-5-32-556` enabled (`Test-C4ETokenShown`). What happened after
+does not matter: an engine open that failed or threw under that token still proves the token. An E line run in the account's unelevated console (type 3, invalid by token state) does not contradict the note, and
+neither does another principal's record. When an E record showing either token exists, the note is listed as contradicted, not counted,
 and `-Collect` exits 4. The note, whether it was counted and why are in the collect record.
 
 ### Known limit: the record-tamper window
@@ -346,6 +352,17 @@ Exit codes:
 
    A user-SID owner can rewrite the DACL from a non-elevated process, and so could replace the exe that condition A runs elevated. The explicit owner
    makes the result the same whichever default applies. The DACLs themselves are exactly the SPEC's.
+
+   The same default applies to everything the driver writes into the out dir: the records, and the copies `-Collect` makes in `case4-runs\`.
+   `Save-C4Record` therefore gives every record (prepare, collect, final, part D) to Administrators as owner through the file seam, and reports a record
+   whose owner could not be set as not written; `-Collect` gives the `case4-runs\` folder and every copy in it to Administrators the same way, lists a
+   copy whose owner could not be set as not copied (its record is then invalid, exit 4), and its record names the folder's owner. Before this (the
+   2026-10-20 live runs), a file owned by the writing token's user SID made the out dir read non-admin-only. In that state `-Prepare` refuses, `-Collect`
+   runs with the engine enumeration skipped (exit 21), `-Finish` runs with the harness untrusted and falls back to its own engine, and `-PartD` has no
+   admin-only check. The owner was corrected by hand (`icacls /setowner`) between modes that morning; the one instance the records show is the collect
+   of 10:28 (banked, exit 21, enumeration skipped). Which file broke that check is unrecorded (no record carries owners): the 09:28 `-Prepare` had passed
+   with every first-run record in place, so it was a file written after it, the 09:28 prepare record or the copies that collect wrote. The self-test rows
+   tagged `record-owner` and `copy-owner` hold both fixes.
 2. **Account checks first.** `-Prepare` resolves and checks `nco-probe` before the sweep and the add, not when the folder is made, so a refusal or
    STOP over the account adds nothing.
 3. **Probe runner name.** The probe's runner is `run-probe-selftest.ps1`, renamed from the SPEC's `selftest-probe.ps1` (amendment 7 there).
@@ -362,6 +379,14 @@ Exit codes:
    by SID. It is not a compiled `LookupAccountName` call, because the driver compiles nothing. Only a local user (kind 1) may be granted anything.
 6. **ACL read-back.** The ACL read-back uses the .NET security object (`Get-PathSecurityObject`), not the `Get-Acl` cmdlet, as the arm 3 libraries do.
    Its SDDL is the same.
+7. **The Task Scheduler route for E (2026-10-20).** The elevation prompt of step 4 offers only this machine's administrators to a non-administrator,
+   so the account's full token was unreachable by that route (four refusals, 2026-10-19). Step 4b runs the E line without `--wait` as a scheduled
+   task created by the Lead Architect in Task Scheduler (run as `nco-probe`, whether logged on or not, highest privileges; the batch-logon right
+   granted by hand in Local Security Policy). A batch logon is not split, so the record shows elevation type 1 with the group enabled, and the E rule
+   accepts that token. The driver prints the task route beside the E line; the task's action is the printed line without `--wait`. The driver still
+   creates, runs and deletes no task and grants no right: those are the Lead Architect's, by hand, like the account. `-PartD` does not read the
+   task list or the user-rights policy; after part C the session reads both itself (`Get-ScheduledTask` filtered on the principal, and a `secedit`
+   export to a scratch file) and records the result in `runs/AS_RUN.md`.
 
 ## What the self-test does not cover
 

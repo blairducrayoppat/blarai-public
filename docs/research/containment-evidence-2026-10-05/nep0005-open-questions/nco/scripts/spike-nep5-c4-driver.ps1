@@ -129,7 +129,7 @@ $script:C4RawFiles = @($script:C4ProbeExeName, 'halfset.exe', 'halfset.rs', $scr
 $script:C4RequiredTags = @('acl-plan-pure', 'acl-refuses-admin-member', 'acl-refuses-group', 'acl-refuses-operator-sid', 'prepare-refused-without-proof', 'prepare-refused-over-stale-objects',
                            'prepare-stops-on-foreign', 'plan-provider-and-s2-only', 'plan-no-filters', 'probe-proof-fields', 'probe-proof-hash-binding', 'record-validation',
                            'record-wrong-account-stop', 'collect-left-behind', 'finish-removes-by-key', 'finish-sweep-must-be-clean', 'finish-removes-folder', 'finish-ace-removal-read-back',
-                           'partd-reads', 'seams', 'no-account-lifecycle', 'proof-hash-binding', 'harness-live-proof-fresh', 'controls-tested-off')
+                           'partd-reads', 'seams', 'no-account-lifecycle', 'proof-hash-binding', 'harness-live-proof-fresh', 'controls-tested-off', 'record-owner', 'copy-owner')
 $script:C4MinChecks = 60; $script:C4ProofMaxAgeHours = 24; $script:C4ProofNonce = $null
 $script:C4RecordNameRe = '^case4-([FESA])-(\d{8}-\d{6})-(\d+)\.json$'
 $script:C4MaxRecordBytes = 1048576; $script:C4ClockSkewMinutes = 5
@@ -623,15 +623,17 @@ function Test-C4Record {
 
 $script:C4TokenState = [ordered]@{
     F = [ordered]@{ elevation = @(3, 1); group = 'nco'; text = 'filtered token (elevation type 3) or an unsplit one (type 1) holding S-1-5-32-556' }
-    E = [ordered]@{ elevation = 2; group = 'nco'; text = 'full token (elevation type 2) holding S-1-5-32-556' }
+    E = [ordered]@{ elevation = @(2, 1); group = 'nco-enabled'; text = 'full token (elevation type 2) or an unsplit one (type 1) holding S-1-5-32-556 ENABLED (not deny-only)' }
     S = [ordered]@{ elevation = 3; group = 'admins-deny-only'; text = 'filtered token (elevation type 3) with BUILTIN\Administrators present as deny-only' }
     A = [ordered]@{ elevation = 2; group = 'admins-enabled'; text = 'full token (elevation type 2) with BUILTIN\Administrators present and enabled' }
 }
 
 function Get-C4TokenStateProblems {
     # PURE. Whether the record's token is the token its condition is defined by ($script:C4TokenState): F filtered (type 3) or unsplit (type 1; "membership
-    # gives no split token" is a finding, and the row records which) with S-1-5-32-556, E full with S-1-5-32-556,
-    # S filtered with Administrators deny-only, A full with Administrators enabled. Each problem starts "token:"; a record with one is invalid by token state,
+    # gives no split token" is a finding, and the row records which) with S-1-5-32-556, E full (type 2) or unsplit (type 1: a batch logon, the Task
+    # Scheduler route of RUN_SHEET.md step 4b, is never split) with S-1-5-32-556 ENABLED (the question E answers is the group's effect; a deny-only
+    # group under either type is not E), S filtered with Administrators deny-only, A full with Administrators enabled. F and E also require BUILTIN\Administrators absent or deny-only: a
+    # token with Administrators enabled answers "can an administrator add a filter", not the group question (review round 4, R4-2). Each problem starts "token:"; a record with one is invalid by token state,
     # listed and never counted (one line typed into the wrong console must not become a counted answer). Empty for an unknown cond (cond is checked elsewhere).
     param($Record)
     $cond = Get-C4Field $Record 'cond'
@@ -644,6 +646,11 @@ function Get-C4TokenStateProblems {
         'nco' {
             $np = Get-C4Field $Record 'nco_group.present'
             if (-not (& $isTrue $np)) { $p += ("token: {0} needs a {1}; nco_group.present is {2}" -f $cond, $want.text, $np) }
+            if (Test-C4AdminsEnabled -Record $Record) { $p += ("token: {0} needs a {1} and BUILTIN\Administrators absent or deny-only; administrators is present and enabled (an administrator's token answers a different question)" -f $cond, $want.text) }
+        }
+        'nco-enabled' {
+            if (-not (Test-C4NcoEnabled -Record $Record)) { $p += ("token: {0} needs a {1}; nco_group.present is {2}, enabled {3}, use_for_deny_only {4}" -f $cond, $want.text, (Get-C4Field $Record 'nco_group.present'), (Get-C4Field $Record 'nco_group.enabled'), (Get-C4Field $Record 'nco_group.use_for_deny_only')) }
+            if (Test-C4AdminsEnabled -Record $Record) { $p += ("token: {0} needs a {1} and BUILTIN\Administrators absent or deny-only; administrators is present and enabled (an administrator's token answers a different question)" -f $cond, $want.text) }
         }
         'admins-deny-only' {
             $ap = Get-C4Field $Record 'administrators.present'; $dn = Get-C4Field $Record 'administrators.use_for_deny_only'
@@ -666,16 +673,41 @@ function Get-C4InvalidKind {
     return 'invalid'
 }
 
+function Test-C4AdminsEnabled {
+    # PURE. True when the record's token holds S-1-5-32-544 present AND enabled (a token that could add a filter as an administrator, whatever S-1-5-32-556 says).
+    param($Record)
+    $t = { param($v) ($v -is [bool]) -and $v }
+    return ((& $t (Get-C4Field $Record 'administrators.present')) -and (& $t (Get-C4Field $Record 'administrators.enabled')))
+}
+
+function Test-C4NcoEnabled {
+    # PURE. True when the record's token holds S-1-5-32-556 present AND enabled AND not use-for-deny-only (all three read as booleans).
+    param($Record)
+    $t = { param($v) ($v -is [bool]) -and $v }
+    $dn = Get-C4Field $Record 'nco_group.use_for_deny_only'
+    return ((& $t (Get-C4Field $Record 'nco_group.present')) -and (& $t (Get-C4Field $Record 'nco_group.enabled')) -and ($dn -is [bool]) -and -not $dn)
+}
+
+function Test-C4ETokenShown {
+    # PURE. Whether an E record shows the token condition E is about: the account's elevated token (elevation_type 2), or an unsplit token (type 1) with
+    # S-1-5-32-556 enabled (the batch-logon route). Judged on the token alone, whatever happened after.
+    param($Record)
+    $ev = Get-C4Field $Record 'elevation_type.value'
+    if (-not (($ev -is [int]) -or ($ev -is [long]))) { return $false }
+    if ($ev -eq 2) { return $true }
+    return (($ev -eq 1) -and (Test-C4NcoEnabled -Record $Record))
+}
+
 function Get-C4ElevationRefused {
     # PURE. The E result `elevation_refused`: Windows refused to elevate the account at condition E. It rests on the note given with -ElevationRefused and is
-    # judged on the TOKEN: counted ONLY when no E file in drop\, valid or not, shows the account's elevated token (elevation_type 2), whatever happened after (an
-    # engine open that failed or threw still proves the elevation). An E line run under the account's unelevated token (type 3, invalid by token state) does not
-    # contradict it, and neither does another principal's record.
+    # judged on the TOKEN: counted ONLY when no E file in drop\, valid or not, shows the token E is about (Test-C4ETokenShown: elevation_type 2, or type 1 with
+    # S-1-5-32-556 enabled), whatever happened after (an engine open that failed or threw still proves the token). An E line run under the account's unelevated
+    # token (type 3, invalid by token state) does not contradict it, and neither does another principal's record.
     param([string]$Note, [string[]]$EElevated = @())
     if (-not $Note) { return [ordered]@{ given = $false; counted = $false; note = $null; contradicted_by = @(); reason = 'no note given' } }
     $c = @($EElevated | Where-Object { $_ })
     return [ordered]@{ given = $true; counted = ($c.Count -eq 0); note = $Note; contradicted_by = $c
-                       reason = $(if ($c.Count) { "not counted: $($c.Count) E record(s) show the account's elevated token ($($c -join ', '))" } else { "counted as the E result: no E record shows the account's elevated token" }) }
+                       reason = $(if ($c.Count) { "not counted: $($c.Count) E record(s) show the token E is about (elevation type 2, or type 1 with the group enabled) ($($c -join ', '))" } else { "counted as the E result: no E record shows the token E is about (elevation type 2, or type 1 with the group enabled)" }) }
 }
 
 function Test-C4WrongAccountAdd {
@@ -843,7 +875,7 @@ function Get-C4RunSheetLines {
     $line = { param($c, [bool]$wait) "$exe run --cond $c --live $proof --out $DropDir" + $(if ($wait) { ' --wait' } else { '' }) }
     return @(
         [ordered]@{ cond = 'F'; how = "as $($script:C4Account), filtered token: from a console moved to the public folder, Windows' secondary-logon line of RUN_SHEET.md step 3 runs this command, three times"; command = 'cmd /k ' + (& $line 'F' $true) }
-        [ordered]@{ cond = 'E'; how = "as $($script:C4Account), elevated: a console as $($script:C4Account) (RUN_SHEET.md step 4), then INSIDE it the step-4 elevation request wraps this line as /k <line> (the prompt is for $($script:C4Account)); a refusal to elevate is recorded with -Collect -ElevationRefused; three times"; command = (& $line 'E' $true) }
+        [ordered]@{ cond = 'E'; how = "as $($script:C4Account), elevated: a console as $($script:C4Account) (RUN_SHEET.md step 4), then INSIDE it the step-4 elevation request wraps this line as /k <line> (the prompt is for $($script:C4Account)); a refusal to elevate is recorded with -Collect -ElevationRefused; three times. Or the Task Scheduler route (RUN_SHEET.md step 4b): the task's action is this line without --wait, run as $($script:C4Account) with highest privileges (an unsplit token with the group enabled)"; command = (& $line 'E' $true) }
         [ordered]@{ cond = 'S'; how = "typed as is in the operator's normal non-elevated console (RUN_SHEET.md step 5), three times"; command = (& $line 'S' $false) }
         [ordered]@{ cond = 'A'; how = "typed as is in the operator's elevated console (RUN_SHEET.md step 5), three times"; command = (& $line 'A' $false) }
     )
@@ -1341,10 +1373,15 @@ function Add-C4DefaultGates {
 
 # ---- shared mode helpers ------------------------------------------------------------------------------------------------------------------------------------
 function Save-C4Record {
-    # Writes a record into the admin-only out dir through the context's file seam; a failure is printed and returned, never swallowed.
+    # Writes a record into the admin-only out dir through the context's file seam and gives it to Administrators as owner; a failure is printed and
+    # returned, never swallowed. The owner is set explicitly because a new file is otherwise owned by the writing token's default owner, which on some
+    # sessions is the user's own SID (README, departure 1): a file so owned makes the out dir read non-admin-only, after which -Prepare refuses, -Collect
+    # skips the engine enumeration (exit 21) and -Finish falls back to its own engine. The copies -Collect writes get the same owner (Invoke-C4Collect).
     param([Parameter(Mandatory)]$Ctx, [Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)]$Object)
     $p = Join-C4Path $Ctx.OutDir $Name
-    try { $Ctx.Fs.WriteJson($p, $Object); Write-C4 "record written: $p" 'DarkGray'; return $p } catch { Write-C4 "COULD NOT WRITE the record ${p}: $($_.Exception.Message)" 'Red'; return $null }
+    try { $Ctx.Fs.WriteJson($p, $Object) } catch { Write-C4 "COULD NOT WRITE the record ${p}: $($_.Exception.Message)" 'Red'; return $null }
+    try { $Ctx.Fs.SetOwnerAdmins($p) } catch { Write-C4 "the record ${p} was written but its owner could not be set to Administrators: $($_.Exception.Message) (the out dir may no longer read admin-only)" 'Red'; return $null }
+    Write-C4 "record written: $p" 'DarkGray'; return $p
 }
 
 function Write-C4ManualRollback {
@@ -1624,6 +1661,11 @@ function Invoke-C4Collect {
     $end = $now.AddMinutes($script:C4ClockSkewMinutes)
     $seen = @{}
     $invalid = { param($name, $kind, $why) $res.Invalid += , ([ordered]@{ file = $name; kind = $kind; reasons = @($why) }) }
+    # The copies folder is a new folder in the admin-only out dir: created through the seam and given to Administrators as owner, as the records are
+    # (README, departure 1); the record names the owner it got, and a failure is printed, never swallowed.
+    $runsDir = Join-C4Path $Ctx.OutDir 'case4-runs'; $res.CopiesFolderOwner = 'not set'
+    try { $Ctx.Fs.EnsureDir($runsDir); $Ctx.Fs.SetOwnerAdmins($runsDir); $res.CopiesFolderOwner = $script:C4AdminsSid }
+    catch { $res.CopiesFolderOwner = "error: $($_.Exception.Message)"; Write-C4 "the copies folder ${runsDir} could not be given to Administrators as owner: $($_.Exception.Message) (the out dir may no longer read admin-only)" 'Red' }
     $files = @(@($Ctx.Fs.ListFiles($Ctx.DropDir, '*')) | Where-Object { $_ } | Sort-Object Name)
     foreach ($f in $files) {
         $reasons = @(); $sha = $null; $copy = $null; $obj = $null
@@ -1632,7 +1674,12 @@ function Invoke-C4Collect {
         [byte[]]$bytes = $null
         try { $bytes = $Ctx.Fs.ReadBytes($f.FullName, $script:C4MaxRecordBytes) } catch { & $invalid $f.Name 'unreadable' "unreadable: $($_.Exception.Message)"; $res.Uncopied += $f.Name; continue }
         $sha = Get-C4BytesSha $bytes
-        try { $copy = [string]$Ctx.Fs.WriteBytesOnce((Join-C4Path (Join-C4Path $Ctx.OutDir 'case4-runs') $f.Name), $bytes) } catch { $copy = "error: $($_.Exception.Message)" }
+        $copyPath = Join-C4Path $runsDir $f.Name
+        try { $copy = [string]$Ctx.Fs.WriteBytesOnce($copyPath, $bytes) } catch { $copy = "error: $($_.Exception.Message)" }
+        if ($copy -in @('written', 'exists-same')) {
+            # Each copy is a new file in the admin-only out dir: Administrators as owner, as for the records. A copy whose owner cannot be set is not counted as copied.
+            try { $Ctx.Fs.SetOwnerAdmins($copyPath) } catch { $copy = "$copy, owner not set: $($_.Exception.Message)"; Write-C4 "the copy ${copyPath} was written but its owner could not be set to Administrators: $($_.Exception.Message) (the out dir may no longer read admin-only)" 'Red' }
+        }
         $res.Copies += , ([ordered]@{ file = $f.Name; sha256 = $sha.ToLowerInvariant(); status = $copy })
         if ($copy -notin @('written', 'exists-same')) { $reasons += "copy into case4-runs: $copy"; $res.Uncopied += $f.Name }
         try { $obj = ConvertFrom-C4Json -Text ((New-Object Text.UTF8Encoding($false, $true)).GetString($bytes).TrimStart([char]0xFEFF)) } catch { $obj = $null }
@@ -1642,7 +1689,7 @@ function Invoke-C4Collect {
             if (($oaS -ceq $script:C4ProbeStopLine) -or ($oaS -ceq $script:C4ProbeStopLineWrongPrincipal)) { $res.ProbeStops += , ([ordered]@{ file = $f.Name; line = $oaS }) }
             if (@('filter_left_behind', 'filter_possibly_left_behind') -ccontains (Get-C4Field $obj 'overall')) { $res.ProbeLeft += , ([ordered]@{ file = $f.Name; overall = (Get-C4Field $obj 'overall') }) }
             $byAccount = $(if ($prep.Ok -and $pr.nco_sid) { [string](Get-C4Field $obj 'user_sid') -eq [string]$pr.nco_sid } else { (Get-C4Field $obj 'is_expected_account') -eq $true })
-            if (((Get-C4Field $obj 'cond') -ceq 'E') -and ((Get-C4Field $obj 'elevation_type.value') -eq 2) -and $byAccount) { $res.EElevated += $f.Name }
+            if (((Get-C4Field $obj 'cond') -ceq 'E') -and $byAccount -and (Test-C4ETokenShown -Record $obj)) { $res.EElevated += $f.Name }
         }
         if ($f.Name -notmatch $script:C4RecordNameRe) { $reasons += 'file name: not a record (case4-<cond>-<yyyyMMdd-HHmmss>-<pid>.json); listed, never counted'; $res.Invalid += , ([ordered]@{ file = $f.Name; kind = 'misnamed'; reasons = $reasons }); continue }
         if ($null -eq $obj) { $reasons += 'record: not UTF-8 JSON'; $res.Invalid += , ([ordered]@{ file = $f.Name; kind = 'invalid'; reasons = $reasons }); continue }
@@ -1687,7 +1734,7 @@ function Invoke-C4Collect {
     $res.Code = Get-C4CollectExit -Stop ([bool]($res.WrongAccount.Count -or $res.Foreign.Count)) -LeftBehind ($res.LeftBehind.Count + $res.ProbeLeft.Count) -ResidueUnreadable (-not $res.ResidueReadable) -Invalid ($res.Invalid.Count + [int]$noteContradicted)
     $res.RecordPath = Save-C4Record -Ctx $Ctx -Name "case4-collect-$stamp.json" -Object ([ordered]@{ kind = 'nep5-case4-collect'; at = $now.ToString('o'); code = $res.Code; probe_stop_lines = $res.ProbeStops; probe_left_behind = $res.ProbeLeft; prepare = $res.Prepare; valid = $res.Valid; invalid = $res.Invalid
                                                                                                         invalid_by_kind = $kinds; wrong_account = $res.WrongAccount; e_elevated_as_account = $res.EElevated; elevation_refused = $res.ElevationRefused
-                                                                                                        copies = $res.Copies; left_behind = $res.LeftBehind; foreign = $res.Foreign; residue = $res.Residue; rows = $res.Rows })
+                                                                                                        copies = $res.Copies; copies_folder_owner = $res.CopiesFolderOwner; left_behind = $res.LeftBehind; foreign = $res.Foreign; residue = $res.Residue; rows = $res.Rows })
     Write-C4 ("COLLECT exit {0}" -f $res.Code) $(if ($res.Code -eq 0) { 'Green' } else { 'Yellow' })
     return [pscustomobject]$res
 }
@@ -1916,9 +1963,11 @@ function New-C4RealFs {
     $fs | Add-Member -MemberType ScriptMethod -Name SetOwnerAdmins -Value {
         param($p)
         Assert-AclTargetPlain $p
-        $fi = [IO.FileInfo]::new($p); $sec = [IO.FileSystemAclExtensions]::GetAccessControl($fi)
+        # A file or a folder (the copies folder case4-runs\): the info type of its kind, because the ACL extensions are typed per kind.
+        $fi = $(if (Test-Path -LiteralPath $p -PathType Container) { [IO.DirectoryInfo]::new($p) } else { [IO.FileInfo]::new($p) })
+        $sec = [IO.FileSystemAclExtensions]::GetAccessControl($fi)
         $sec.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')); [IO.FileSystemAclExtensions]::SetAccessControl($fi, $sec)
-        $now = ([IO.FileSystemAclExtensions]::GetAccessControl([IO.FileInfo]::new($p))).GetOwner([Security.Principal.SecurityIdentifier]).Value
+        $now = ([IO.FileSystemAclExtensions]::GetAccessControl($fi)).GetOwner([Security.Principal.SecurityIdentifier]).Value
         if ($now -ne 'S-1-5-32-544') { throw "the owner of '$p' reads $now after it was set to Administrators" }
     }
     $fs | Add-Member -MemberType ScriptMethod -Name WriteJson -Value { param($p, $o) Write-JsonGuarded -Path $p -Object $o -Depth 16 }
@@ -2153,11 +2202,11 @@ function New-C4TestCtx {
 function New-C4TestRecord {
     # A record in the probe's own shape (probe/NcoProbe.cs, RunCmd), for the stand-in drop folder. -OpenFailed gives the engine-open failure record. The token
     # state defaults to the one the condition is defined by (F 3 + NCO, E 2 + NCO, S 3 + Administrators deny-only, A 2 + Administrators enabled); -Elevation,
-    # -NcoPresent (true, false or 'unreadable') and -Admins ('absent', 'deny-only', 'enabled') override it.
+    # -NcoPresent (true, false or 'unreadable'), -NcoDenyOnly (present, attributes 0x10) and -Admins ('absent', 'deny-only', 'enabled') override it.
     param([Parameter(Mandatory)][string]$Cond, [Parameter(Mandatory)][string]$UserSid, [bool]$Expected, [Parameter(Mandatory)][string]$ExeSha, [datetimeoffset]$At = [datetimeoffset]::Now, [long]$ProcId = 4242,
           [string]$AddRc = '0x00000000', [string]$DelRc = '0x00000000', $DelPresent = $false, [int]$Elevation = 0, [string]$Integrity = '', [string]$CsSha = ('ab' * 32), [string]$ProofSha = ('ee' * 32),
           [string]$NcoSid = '', $NcoPresent = $null, [string]$Admins = '', [switch]$OpenFailed, [switch]$WrongPrincipal, [switch]$OpenThrew, [switch]$AddThrew, [switch]$DeleteThrew,
-          [switch]$CloseThrew)
+          [switch]$CloseThrew, [switch]$NcoDenyOnly)
     if ($Elevation -eq 0) { $Elevation = $(if ($Cond -in @('E', 'A')) { 2 } else { 3 }) }
     if (-not $Integrity) { $Integrity = $(if ($Elevation -eq 2) { 'high' } else { 'medium' }) }
     if ($null -eq $NcoPresent) { $NcoPresent = ($Cond -in @('F', 'E')) }
@@ -2172,7 +2221,7 @@ function New-C4TestRecord {
         stale_sid = [ordered]@{ sid = $script:N5StaleSid; mapped = $false; lookup_error = 1332; name = $null; accepted = $true }; out_dir = 'Z:\pub\drop'; clock = $clk
         user = [ordered]@{ sid = $UserSid; attributes = '0x00000000'; error = 0 }; user_sid = $UserSid
         groups = [ordered]@{ error = 0; count = 2; items = @() }
-        nco_group = $(if ($NcoPresent -is [string]) { [ordered]@{ sid = 'S-1-5-32-556'; present = $NcoPresent } } elseif ($NcoPresent) { [ordered]@{ sid = 'S-1-5-32-556'; present = $true; attributes = '0x00000007'; enabled = $true; enabled_by_default = $true; use_for_deny_only = $false } } else { [ordered]@{ sid = 'S-1-5-32-556'; present = $false } })
+        nco_group = $(if ($NcoPresent -is [string]) { [ordered]@{ sid = 'S-1-5-32-556'; present = $NcoPresent } } elseif ($NcoDenyOnly) { [ordered]@{ sid = 'S-1-5-32-556'; present = $true; attributes = '0x00000010'; enabled = $false; enabled_by_default = $false; use_for_deny_only = $true } } elseif ($NcoPresent) { [ordered]@{ sid = 'S-1-5-32-556'; present = $true; attributes = '0x00000007'; enabled = $true; enabled_by_default = $true; use_for_deny_only = $false } } else { [ordered]@{ sid = 'S-1-5-32-556'; present = $false } })
         administrators = $(switch ($Admins) {
             'deny-only' { [ordered]@{ sid = 'S-1-5-32-544'; present = $true; attributes = '0x00000010'; enabled = $false; enabled_by_default = $false; use_for_deny_only = $true } }
             'enabled' { [ordered]@{ sid = 'S-1-5-32-544'; present = $true; attributes = '0x0000000F'; enabled = $true; enabled_by_default = $true; use_for_deny_only = $false } }
@@ -2246,7 +2295,7 @@ function Invoke-C4SelfTest {
     Chk 'the WFP C# and the nep5 C# compile together in-process (nothing is opened)' ([bool]('BlarAI.Nep5.N5Engine' -as [type]))
     $libKeys = @($script:N5FilterKeys.Values) + @($script:N5SubLayers.Values) + @($script:N5ProviderKey, $script:N5MissingSubLayer)
     Chk 'constants: the probe''s filter key is a lower-case GUID distinct from every library key, sublayer and the provider; S2, the provider, the layer and the stale SID are the library''s' (((ConvertTo-N5Guid $script:C4ProbeKey) -ceq $script:C4ProbeKey) -and ($libKeys -notcontains $script:C4ProbeKey) -and ($s2 -eq '3e29ae7e-fd9f-413a-8b8d-da9bd3a96359') -and ($script:N5ProviderKey -eq '3e29ae7e-fd9f-413a-8b8d-da9bd3a96360') -and ($script:N5LayerV4 -eq 'c38d57d1-05a7-4c33-904f-7fbceee60e82'))
-    Chk 'constants: the display name starts with the library marker, is at most 120 characters; the public paths carry no space; the stale SID does not resolve here is checked by -Prepare, not assumed' (($script:C4DisplayName.StartsWith($script:N5Marker)) -and ($script:C4DisplayName.Length -le 120) -and ($script:C4PubRoot -notmatch '\s') -and ($script:C4RequiredTags.Count -eq 24))
+    Chk 'constants: the display name starts with the library marker, is at most 120 characters; the public paths carry no space; the stale SID does not resolve here is checked by -Prepare, not assumed' (($script:C4DisplayName.StartsWith($script:N5Marker)) -and ($script:C4DisplayName.Length -le 120) -and ($script:C4PubRoot -notmatch '\s') -and ($script:C4RequiredTags.Count -eq 26))
 
     Write-Host '== pure functions: status classes, names, arguments, plans ==' -ForegroundColor Cyan
     $cls = @([uint32]0, [uint32]5, [uint32]2147942405, [uint32]2150760488, [uint32]2150760451, [uint32]2150760455, [uint32]3735928559 | ForEach-Object { "$(Get-C4RcClass -Rc $_ -Kind add)/$(Get-C4RcClass -Rc $_ -Kind delete)" })
@@ -2320,11 +2369,11 @@ function Invoke-C4SelfTest {
     $win0 = [datetimeoffset]::Now.AddMinutes(-30); $win1 = [datetimeoffset]::Now.AddMinutes(5); $rx = 'C4' * 32; $rcs = 'AB' * 32; $rps = 'EE' * 32
     $va = { param($rec, $name, $seen = @{}) if (-not $name) { $name = [string]$rec.record_file_name }; @(Test-C4Record -Record (ConvertFrom-C4Json -Text (ConvertTo-Json -InputObject $rec -Depth 10)) -FileName $name -ExeSha $rx -CsSha $rcs -ProofSha $rps -NcoSid $ncoSid -OperatorSid $opSid -WindowStart $win0 -WindowEnd $win1 -Seen $seen) }
     $nr = { param($cond, $user, $exp, [int]$elev = 0) New-C4TestRecord -Cond $cond -UserSid $user -Expected $exp -ExeSha $rx -Elevation $elev -NcoSid $ncoSid }
-    $good = @(@(@('F', $ncoSid, $true, 3), @('E', $ncoSid, $true, 2), @('S', $opSid, $false, 3), @('A', $opSid, $false, 2)) | ForEach-Object { @(& $va (& $nr $_[0] $_[1] $_[2] $_[3])).Count })
+    $good = @(@(@('F', $ncoSid, $true, 3), @('E', $ncoSid, $true, 2), @('E', $ncoSid, $true, 1), @('S', $opSid, $false, 3), @('A', $opSid, $false, 2)) | ForEach-Object { @(& $va (& $nr $_[0] $_[1] $_[2] $_[3])).Count })
     $openRec = New-C4TestRecord -Cond 'F' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -OpenFailed
     $leftRec = New-C4TestRecord -Cond 'F' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -DelRc '0x80070005' -DelPresent $true
     $unreadRec = New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -DelPresent 'unreadable'
-    Chk 'records: a good F, E, S and A record, an engine-open failure, a filter left behind (filter_left_behind, exit 8) and an unreadable delete read-back (residue unknown) are valid' ((($good | Measure-Object -Sum).Sum -eq 0) -and ($good.Count -eq 4) -and (@(& $va $openRec).Count -eq 0) -and (@(& $va $leftRec).Count -eq 0) -and (@(& $va $unreadRec).Count -eq 0))
+    Chk 'records: a good F, E (type 2 and type 1 with the group enabled), S and A record, an engine-open failure, a filter left behind (filter_left_behind, exit 8) and an unreadable delete read-back (residue unknown) are valid' ((($good | Measure-Object -Sum).Sum -eq 0) -and ($good.Count -eq 5) -and (@(& $va $openRec).Count -eq 0) -and (@(& $va $leftRec).Count -eq 0) -and (@(& $va $unreadRec).Count -eq 0))
     $muts = [ordered]@{
         'schema'               = { param($r) $r.schema = 'nep5-case4-record-v0' }
         'subcommand'           = { param($r) $r.subcommand = 'identity' }
@@ -2369,6 +2418,12 @@ function Invoke-C4SelfTest {
         'E with a filtered token (the elevation wrapper skipped)'     = { New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 3 }
         'E without S-1-5-32-556'                                      = { New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -NcoPresent $false }
         'E with the group read unreadable'                            = { New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -NcoPresent 'unreadable' }
+        'E with an unsplit token (type 1) and the group deny-only'    = { New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1 -NcoDenyOnly }
+        'E with a full token (type 2) and the group deny-only'        = { New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 2 -NcoDenyOnly }
+        'E with the group enabled AND deny-only (a contradictory read)' = { $r = New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1 -NcoDenyOnly; $r.nco_group.enabled = $true; $r }
+        'E with the group enabled and Administrators enabled'         = { New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1 -Admins 'enabled' }
+        'E (type 2) with Administrators enabled'                      = { New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 2 -Admins 'enabled' }
+        'F with Administrators enabled'                               = { New-C4TestRecord -Cond 'F' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1 -Admins 'enabled' }
         'S with a full token (typed in the elevated console)'         = { New-C4TestRecord -Cond 'S' -UserSid $opSid -Expected $false -ExeSha $rx -NcoSid $ncoSid -Elevation 2 -Admins 'enabled' }
         'S with Administrators enabled, not deny-only'                = { New-C4TestRecord -Cond 'S' -UserSid $opSid -Expected $false -ExeSha $rx -NcoSid $ncoSid -Admins 'enabled' }
         'A with a filtered token (typed in the non-elevated console)'  = { New-C4TestRecord -Cond 'A' -UserSid $opSid -Expected $false -ExeSha $rx -NcoSid $ncoSid -Elevation 3 -Admins 'deny-only' }
@@ -2380,6 +2435,10 @@ function Invoke-C4SelfTest {
     $f1 = New-C4TestRecord -Cond 'F' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1; $f3 = New-C4TestRecord -Cond 'F' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 3
     $f1R = @(& $va $f1); $f3R = @(& $va $f3); $f1Row = Get-C4RecordRow -Record $f1 -FileName 'x'; $f3Row = Get-C4RecordRow -Record $f3 -FileName 'x'
     Chk "records: F is valid under an unsplit token (elevation type 1) as under a filtered one (type 3), and its row records which ($($f1Row.elevation_type); $($f3Row.elevation_type)); only type 2 invalidates an F record $(if ($f1R.Count + $f3R.Count) { '(' + ((@($f1R) + @($f3R)) -join ' / ') + ')' })" (($f1R.Count -eq 0) -and ($f3R.Count -eq 0) -and ($f1Row.elevation_type -match '^1\b') -and ($f3Row.elevation_type -match '^3\b')) 'record-validation'
+    $e1 = New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1; $e2 = New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 2
+    $e1R = @(& $va $e1); $e2R = @(& $va $e2); $e1Row = Get-C4RecordRow -Record $e1 -FileName 'x'; $e2Row = Get-C4RecordRow -Record $e2 -FileName 'x'
+    $eShown = @((Test-C4ETokenShown -Record $e1), (Test-C4ETokenShown -Record $e2), (Test-C4ETokenShown -Record (New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1 -NcoDenyOnly)), (Test-C4ETokenShown -Record (New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 3)), (Test-C4ETokenShown -Record (New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $rx -NcoSid $ncoSid -Elevation 1 -NcoPresent 'unreadable')))
+    Chk "records: E is valid under an unsplit token (type 1) with the group enabled (the batch-logon route) as under a full one (type 2), and its row records which ($($e1Row.elevation_type) $($e1Row.nco_group); $($e2Row.elevation_type) $($e2Row.nco_group)); the token E is about is shown by type 1 enabled and type 2, not by type 1 deny-only, type 3, or an unreadable group ($($eShown -join ','))" (($e1R.Count -eq 0) -and ($e2R.Count -eq 0) -and ($e1Row.elevation_type -match '^1\b') -and ($e1Row.nco_group -ceq '0x00000007 enabled') -and (($eShown -join ',') -ceq 'True,True,False,False,False')) 'record-validation'
     $tokOff = @(Test-C4Record -Record (ConvertFrom-C4Json -Text (ConvertTo-Json -InputObject (& $tokCases['A with a filtered token (typed in the non-elevated console)']) -Depth 10)) -FileName ([string](& $tokCases['A with Administrators deny-only']).record_file_name) -ExeSha $rx -CsSha $rcs -ProofSha $rps -NcoSid $ncoSid -OperatorSid $opSid -WindowStart $win0 -WindowEnd $win1 | Where-Object { $_ -like 'token:*' })
     $kindOrder = @((Get-C4InvalidKind -Reasons @('token: x', 'user_sid: y')), (Get-C4InvalidKind -Reasons @('token: x')), (Get-C4InvalidKind -Reasons @('principal: x')), (Get-C4InvalidKind -Reasons @('schema: x')))
     Chk "records: an invalid record's class is by-principal before by-token-state before invalid ($($kindOrder -join ', ')), and the token rule fires on the very record the review typed into the wrong console" ((($kindOrder -join ',') -ceq 'by-principal,by-token-state,by-principal,invalid') -and ($tokOff.Count -ge 1)) 'record-validation'
@@ -2640,8 +2699,14 @@ function Invoke-C4SelfTest {
     }
     $c = & $prepared; $col = Invoke-C4Collect -Ctx $c
     Chk "collect: four valid records (F, E, S, A) give exit 0, a table row each, and a byte-identical copy of each in the out dir's case4-runs (exit $($col.Code))" (($col.Code -eq 0) -and (@($col.Valid).Count -eq 4) -and (@($col.Rows).Count -eq 4) -and (@($col.Copies | Where-Object { $_.status -eq 'written' }).Count -eq 4) -and (@(Get-C4UncopiedEvidence -Ctx $c).Count -eq 0))
+    $runsK = Join-C4Path $c.OutDir 'case4-runs'; $copyOwners = @(@($c.Fs.ListFiles($runsK, 'case4-*.json')) | ForEach-Object { $c.Fs.Owners[$c.Fs.Key($_.FullName)] })
+    Chk "collect: the copies folder and each of the four copies were given to Administrators as owner through the file seam, and the record names the folder's owner (owners: $(@(@($c.Fs.Owners[$c.Fs.Key($runsK)]) + $copyOwners) -join ', '))" (($c.Fs.Owners[$c.Fs.Key($runsK)] -eq $script:C4AdminsSid) -and ($copyOwners.Count -eq 4) -and (@($copyOwners | Where-Object { $_ -ne $script:C4AdminsSid }).Count -eq 0) -and ($col.CopiesFolderOwner -eq $script:C4AdminsSid)) 'copy-owner'
     $col2 = Invoke-C4Collect -Ctx $c
     Chk 'collect: run again, the copies read exists-same and nothing changes (exit 0)' (($col2.Code -eq 0) -and (@($col2.Copies | Where-Object { $_.status -eq 'exists-same' }).Count -eq 4))
+    $cNo = & $prepared
+    $cNo.Fs | Add-Member -MemberType ScriptMethod -Name SetOwnerAdmins -Value { param($p) [void]$this.Calls.Add("setowner $p"); if ([string]$p -match 'case4-runs') { throw 'stand-in: SetSecurityInfo refused' }; if (-not $this.Exists($p)) { throw "no file $p" }; $this.Owners[$this.Key($p)] = 'S-1-5-32-544'; $this.Writes++ } -Force
+    $script:C4Out.Clear(); $colNo = Invoke-C4Collect -Ctx $cNo
+    Chk "collect: when the copies' owner cannot be set the copies stay, each status says so, the four records are listed not copied and none is counted, the folder's owner reads as an error, the failures are printed in red and the exit is 4 (exit $($colNo.Code))" (($colNo.Code -eq 4) -and (@($colNo.Copies | Where-Object { $_.status -match '^written, owner not set' }).Count -eq 4) -and (@($colNo.Uncopied).Count -eq 4) -and (@($colNo.Valid).Count -eq 0) -and ([string]$colNo.CopiesFolderOwner -match '^error') -and (@($script:C4Out | Where-Object { $_ -match 'owner could not be set to Administrators' }).Count -eq 4) -and (@($cNo.Fs.ListFiles((Join-C4Path $cNo.OutDir 'case4-runs'), 'case4-*.json')).Count -eq 4)) 'copy-owner'
     $bad = & $recFor $c 'F' $ncoSid $true 6001 '0x00000000' ('DD' * 32); [void](Add-C4TestDrop -Ctx $c -Record $bad); $c.Fs.Seed((Join-C4Path $c.DropDir 'junk.txt'), [Text.Encoding]::ASCII.GetBytes('junk'))
     $col3 = Invoke-C4Collect -Ctx $c
     Chk "collect: a record naming another exe and a stray file are listed invalid with the reason and never counted (exit $($col3.Code))" (($col3.Code -eq 4) -and (@($col3.Valid).Count -eq 4) -and (@($col3.Invalid).Count -eq 2) -and (@($col3.Invalid | Where-Object { @($_.reasons) -match 'probe_exe_sha256' }).Count -eq 1)) 'record-validation'
@@ -2663,12 +2728,15 @@ function Invoke-C4SelfTest {
     $c = & $prepared; $colEx = Invoke-C4Collect -Ctx $c -ElevationRefusedNote 'Windows refused to elevate nco-probe'
     $c2 = & $prepared; foreach ($e in @($c2.Fs.ListFiles($c2.DropDir, 'case4-E-*.json'))) { [void]$c2.Fs.Files.Remove($c2.Fs.Key($e.FullName)) }; $colE0 = Invoke-C4Collect -Ctx $c2 -ElevationRefusedNote 'Windows refused to elevate nco-probe'
     $c3 = & $prepared; foreach ($e in @($c3.Fs.ListFiles($c3.DropDir, 'case4-E-*.json'))) { [void]$c3.Fs.Files.Remove($c3.Fs.Key($e.FullName)) }; [void](Add-C4TestDrop -Ctx $c3 -Record (New-C4TestRecord -Cond 'E' -UserSid $opSid -Expected $false -ExeSha $c3.Token.ProbeExeSha -ProcId 6009 -CsSha $c3.Token.ProbeCsSha -ProofSha (& $psOf $c3) -NcoSid $ncoSid -WrongPrincipal)); $colEw = Invoke-C4Collect -Ctx $c3 -ElevationRefusedNote 'Windows refused to elevate nco-probe'
-    Chk "collect: -ElevationRefused is counted as the E result when no E record shows the account's elevated token (exit $($colE0.Code); with a wrong_principal E refusal beside it, counted and the refusal listed, exit $($colEw.Code)), and NOT counted beside a valid E record under the account's elevated token (exit $($colEx.Code))" ($colE0.ElevationRefused.counted -and ($colE0.Code -eq 0) -and $colEw.ElevationRefused.counted -and ($colEw.Code -eq 4) -and ($colEx.ElevationRefused.counted -eq $false) -and ($colEx.Code -eq 4)) 'record-validation'
+    Chk "collect: -ElevationRefused is counted as the E result when no E record shows the token E is about (exit $($colE0.Code); with a wrong_principal E refusal beside it, counted and the refusal listed, exit $($colEw.Code)), and NOT counted beside a valid E record under the account's elevated token (exit $($colEx.Code))" ($colE0.ElevationRefused.counted -and ($colE0.Code -eq 0) -and $colEw.ElevationRefused.counted -and ($colEw.Code -eq 4) -and ($colEx.ElevationRefused.counted -eq $false) -and ($colEx.Code -eq 4)) 'record-validation'
     $eDrop = { param($cc, [hashtable]$sw) foreach ($e in @($cc.Fs.ListFiles($cc.DropDir, 'case4-E-*.json'))) { [void]$cc.Fs.Files.Remove($cc.Fs.Key($e.FullName)) }; [void](Add-C4TestDrop -Ctx $cc -Record (New-C4TestRecord -Cond 'E' -UserSid $ncoSid -Expected $true -ExeSha $cc.Token.ProbeExeSha -ProcId 6012 -CsSha $cc.Token.ProbeCsSha -ProofSha (& $psOf $cc) -NcoSid $ncoSid @sw)) }
     $ca = & $prepared; & $eDrop $ca @{ OpenFailed = $true }; $colOf = Invoke-C4Collect -Ctx $ca -ElevationRefusedNote 'Windows refused to elevate nco-probe'
     $cb = & $prepared; & $eDrop $cb @{ OpenThrew = $true }; $colOt = Invoke-C4Collect -Ctx $cb -ElevationRefusedNote 'Windows refused to elevate nco-probe'
     $cu = & $prepared; & $eDrop $cu @{ Elevation = 3 }; $colUn = Invoke-C4Collect -Ctx $cu -ElevationRefusedNote 'Windows refused to elevate nco-probe'
+    $c1 = & $prepared; & $eDrop $c1 @{ Elevation = 1 }; $colB1 = Invoke-C4Collect -Ctx $c1 -ElevationRefusedNote 'Windows refused to elevate nco-probe'
+    $c1d = & $prepared; & $eDrop $c1d @{ Elevation = 1; NcoDenyOnly = $true }; $colB1d = Invoke-C4Collect -Ctx $c1d -ElevationRefusedNote 'Windows refused to elevate nco-probe'
     Chk "collect, elevation_refused judged on the token: an E run by the account under its elevated token whose engine open failed or threw contradicts the note (not counted; exits $($colOf.Code), $($colOt.Code)); an E line run in the account's unelevated console (type 3, invalid by token state) does not (counted; exit $($colUn.Code) for the invalid record)" ((-not $colOf.ElevationRefused.counted) -and ($colOf.Code -eq 4) -and (-not $colOt.ElevationRefused.counted) -and ($colOt.Code -eq 4) -and $colUn.ElevationRefused.counted -and ($colUn.Code -eq 4) -and (@($colUn.Invalid | Where-Object { $_.kind -eq 'by-token-state' }).Count -eq 1)) 'record-validation'
+    Chk "collect, the batch-logon route: an E record by the account under an unsplit token (type 1) with the group enabled is valid, counted, and contradicts the note (not counted; exit $($colB1.Code)); the same token with the group deny-only is invalid by token state and does not contradict it (counted; exit $($colB1d.Code))" ((-not $colB1.ElevationRefused.counted) -and ($colB1.Code -eq 4) -and (@($colB1.Valid | Where-Object { $_.file -like 'case4-E-*' }).Count -eq 1) -and (@($colB1.Rows | Where-Object { $_.cond -ceq 'E' -and $_.elevation_type -match '^1\b' }).Count -eq 1) -and $colB1d.ElevationRefused.counted -and ($colB1d.Code -eq 4) -and (@($colB1d.Invalid | Where-Object { $_.kind -eq 'by-token-state' }).Count -eq 1)) 'record-validation'
     $c = & $prepared; [void](Add-C4TestDrop -Ctx $c -Record (New-C4TestRecord -Cond 'F' -UserSid $ncoSid -Expected $true -ExeSha $c.Token.ProbeExeSha -ProcId 6010 -CsSha $c.Token.ProbeCsSha -ProofSha (& $psOf $c) -NcoSid $ncoSid -CloseThrew)); $script:C4Out.Clear(); $colP = Invoke-C4Collect -Ctx $c
     Chk "collect: a valid record carrying the probe's STOP line (a close that threw) is counted, and its STOP line is printed and recorded (exit $($colP.Code))" ((@($colP.ProbeStops).Count -eq 1) -and (@($script:C4Out | Where-Object { $_ -match '^\s+PROBE STOP LINE: case4-F-' }).Count -eq 1) -and (@($colP.Valid).Count -eq 5)) 'record-validation'
     $c = & $prepared; [void](Add-C4TestDrop -Ctx $c -Record (New-C4TestRecord -Cond 'F' -UserSid $ncoSid -Expected $true -ExeSha $c.Token.ProbeExeSha -ProcId 6011 -CsSha $c.Token.ProbeCsSha -ProofSha (& $psOf $c) -NcoSid $ncoSid -DelRc '0x80070005' -DelPresent 'unreadable')); $script:C4Out.Clear(); $colQ = Invoke-C4Collect -Ctx $c
@@ -2718,6 +2786,12 @@ function Invoke-C4SelfTest {
     $pdReads = @('NetUser', 'Lookup', 'GroupName', 'NetLocalGroup', 'ProfileDir', 'PathExists', 'ProfileListEntry', 'ProfileFolders')
     $readOnly = (@($pdc.Acct.Calls | Where-Object { $_ -notin $pdReads }).Count -eq 0)
     Chk "partd: all gone gives 20 (exit $rcD), the record is written with the account's SID from the prepare record, and the only account calls were the eight reads ($(@($pdc.Acct.Calls) -join ', '))" (($rcD -eq 20) -and $pdRec -and ($pdRec.code -eq 20) -and ($pdRec.account_sid -eq $ncoSid) -and $readOnly -and (@($pdc.Acct.Calls | Select-Object -Unique).Count -eq 8)) 'partd-reads'
+    $pdOwned = @($pdc.Fs.ListFiles($pdc.OutDir, 'case4-partd-*.json') | ForEach-Object { $pdc.Fs.Owners[$pdc.Fs.Key($_.FullName)] })
+    Chk "partd: the record it wrote was given to Administrators as owner through the file seam (owners: $($pdOwned -join ', '))" (($pdOwned.Count -eq 1) -and ($pdOwned[0] -eq $script:C4AdminsSid)) 'record-owner'
+    $pdNoOwn = & $mk; & $seedPrep $pdNoOwn; $pdNoOwn.Acct.NcoSid = $null; $pdNoOwn.Acct.NetUserExit = 2; $pdNoOwn.Acct.NetUserText = 'NET HELPMSG 2221'; $pdNoOwn.Acct.GroupMemberNames = @(); $pdNoOwn.Acct.ProfileExists = $false
+    $pdNoOwn.Fs | Add-Member -MemberType ScriptMethod -Name SetOwnerAdmins -Value { param($p) throw 'stand-in: SetSecurityInfo refused' } -Force
+    $script:C4Out.Clear(); $rcNoOwn = Invoke-C4PartD -Ctx $pdNoOwn
+    Chk "partd: when the owner cannot be set the record stays on disk, the failure is printed in red and the mode still returns its reading (exit $rcNoOwn)" ((@($pdNoOwn.Fs.ListFiles($pdNoOwn.OutDir, 'case4-partd-*.json')).Count -eq 1) -and (@($script:C4Out | Where-Object { $_ -match 'owner could not be set to Administrators' }).Count -eq 1) -and ($rcNoOwn -eq 20)) 'record-owner'
     $pdBad = @(foreach ($k in @('account', 'lookup', 'member', 'profile', 'unreadable', 'profilelist', 'suffix-folder', 'folders-unreadable', 'no-sid')) {
         $x = & $mk; if ($k -ne 'no-sid') { & $seedPrep $x }; $x.Acct.NcoSid = $null; $x.Acct.NetUserExit = 2; $x.Acct.NetUserText = 'NET HELPMSG 2221'; $x.Acct.GroupMemberNames = @(); $x.Acct.ProfileExists = $false
         switch ($k) { 'account' { $x.Acct.NetUserExit = 0 } 'lookup' { $x.Acct.NcoSid = $ncoSid } 'member' { $x.Acct.GroupMemberNames = @('nco-probe') } 'profile' { $x.Acct.ProfileExists = $true } 'unreadable' { $x.Acct.NetLocalGroupExit = 5 }

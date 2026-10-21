@@ -30,6 +30,8 @@ docs/research/OFFTHESHELF_VS_BLARAI.md
 docs/reviews/1067-v5-evidence/
 docs/reviews/1765-sid-rewrite-log-2026-10-13.md
 docs/reviews/case4-sid-rewrite-log-2026-10-20.md
+docs/reviews/case4-sid-rewrite-log-2026-10-20-b.md
+docs/reviews/case4-sid-rewrite-log-2026-10-20-c.md
 docs/reviews/review-1764-case4-gate-2026-10-19.md
 docs/reviews/nep0005-srtcli-halfset-review-disposition-2026-10-13.md
 docs/reviews/trackb-arms23-safety-review-disposition-2026-10-11.md

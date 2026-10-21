@@ -1,0 +1,124 @@
+{
+  "kind": "nep5-case4-collect",
+  "at": "2026-10-20T10:28:24.8581812-04:00",
+  "code": 21,
+  "probe_stop_lines": [],
+  "probe_left_behind": [],
+  "prepare": {
+    "ok": true,
+    "name": "case4-prepare-20261020-092824.json",
+    "problem": ""
+  },
+  "valid": [
+    {
+      "file": "case4-E-20261020-133312-14960.json",
+      "sha256": "2a33507d12187c7d0ff5553792e956675a2992df9cde13cd27c117770a5d23ab",
+      "elevation_type": 1
+    },
+    {
+      "file": "case4-E-20261020-133710-25944.json",
+      "sha256": "4418e772838e5012385eff31818158c63af5a5f88c94c96fe989d279957c0f82",
+      "elevation_type": 1
+    },
+    {
+      "file": "case4-E-20261020-134229-11468.json",
+      "sha256": "76c8e43ed3cb36dc11db7d5ccbc082de77f46a3fa90a343a6ab7693f0e760346",
+      "elevation_type": 1
+    }
+  ],
+  "invalid": [],
+  "invalid_by_kind": {},
+  "wrong_account": [],
+  "e_elevated_as_account": [
+    "case4-E-20261020-133312-14960.json",
+    "case4-E-20261020-133710-25944.json",
+    "case4-E-20261020-134229-11468.json"
+  ],
+  "elevation_refused": {
+    "given": false,
+    "counted": false,
+    "note": null,
+    "contradicted_by": [],
+    "reason": "no note given"
+  },
+  "copies": [
+    {
+      "file": "case4-E-20261020-133312-14960.json",
+      "sha256": "2a33507d12187c7d0ff5553792e956675a2992df9cde13cd27c117770a5d23ab",
+      "status": "written"
+    },
+    {
+      "file": "case4-E-20261020-133710-25944.json",
+      "sha256": "4418e772838e5012385eff31818158c63af5a5f88c94c96fe989d279957c0f82",
+      "status": "written"
+    },
+    {
+      "file": "case4-E-20261020-134229-11468.json",
+      "sha256": "76c8e43ed3cb36dc11db7d5ccbc082de77f46a3fa90a343a6ab7693f0e760346",
+      "status": "written"
+    }
+  ],
+  "left_behind": [],
+  "foreign": [],
+  "residue": {
+    "readable": true,
+    "problems": [],
+    "provider_present": true,
+    "s2_present": true,
+    "enum_skipped": true,
+    "probe_key_present": false
+  },
+  "rows": [
+    {
+      "cond": "E",
+      "file": "case4-E-20261020-133312-14960.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-2251",
+      "elevation_type": "1 default",
+      "integrity": "medium_plus",
+      "linked_token": false,
+      "nco_group": "0x00000007 enabled",
+      "admins_group": "absent",
+      "add": "0x00000000 succeeded",
+      "delete": "0x00000000 succeeded",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "E",
+      "file": "case4-E-20261020-133710-25944.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-2251",
+      "elevation_type": "1 default",
+      "integrity": "medium_plus",
+      "linked_token": false,
+      "nco_group": "0x00000007 enabled",
+      "admins_group": "absent",
+      "add": "0x00000000 succeeded",
+      "delete": "0x00000000 succeeded",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    },
+    {
+      "cond": "E",
+      "file": "case4-E-20261020-134229-11468.json",
+      "user_sid": "S-1-5-21-1000000001-1000000002-1000000003-2251",
+      "elevation_type": "1 default",
+      "integrity": "medium_plus",
+      "linked_token": false,
+      "nco_group": "0x00000007 enabled",
+      "admins_group": "absent",
+      "add": "0x00000000 succeeded",
+      "delete": "0x00000000 succeeded",
+      "left_behind": false,
+      "open_failed": false,
+      "no_verdict": false,
+      "overall": "ok",
+      "operator_action": null
+    }
+  ]
+}

@@ -187,6 +187,17 @@ for the marker (timeout parameter, default 300 s), prints the output, deletes th
 asserts `Mandatory Label\Medium Mandatory Level` and `BUILTIN\Administrators` with `Group used for deny only`. Endpoint protection on this machine quarantines
 scripts that combine `runas` with token-enumeration commands: this helper must not contain the string `runas`.
 
+Amendment 2026-10-20 (the Task Scheduler route, after the first live run): the elevation request of RUN_SHEET step 4 offers a non-administrator only
+this machine's administrators, so the account's full token was not reachable that way (four refusals). The Lead Architect approved a second route the
+same morning: a scheduled task he creates in Task Scheduler, run as `nco-probe` whether logged on or not with highest privileges, its action the E
+line without `--wait`, the batch-logon right granted by hand in Local Security Policy (RUN_SHEET step 4b). A batch logon is never split: the record
+carries elevation type 1 with `S-1-5-32-556` enabled (attributes 0x7), integrity medium-plus, session 0. The E token rule therefore accepts type 2, or
+type 1 with the group ENABLED (`Test-C4NcoEnabled`); a deny-only group under either type is invalid by token state; the `elevation_refused` note is
+contradicted by any E record showing either token (`Test-C4ETokenShown`). F and E records also require BUILTIN\Administrators absent or deny-only
+(review round 4: a token with Administrators enabled answers condition A's question). The driver still touches no task, right or account: the task is
+created, run and deleted by hand, and the right removed by hand, in part C; `-PartD` is unchanged (account, group, profile), and the session reads the
+task list and an exported policy copy itself after part C, recording the result in `runs/AS_RUN.md`.
+
 ## Part 3: run sheet, records, claims (the author, after review)
 
 * `RUN_SHEET.md` beside this spec, with every line verbatim and real paths: (0) the matrix's fresh `-SelfTest -WriteProof`, `-DryRun`, `-Run -Phase taskcheck`,
@@ -203,7 +214,7 @@ scripts that combine `runas` with token-enumeration commands: this helper must n
   the fabricated stale-SID domain, which the `--dir` mode of the identifier scrub would wrongly rewrite: review finding P1-9), then
   `scrub_public_identifiers.py (in scripts/)` and its `--check` for host and user names.
 * Claim C27 in `docs/research/account-level-containment-evidence-2026-10-05.md`, PERFORMANCE_LOG entry + `docs/performance/nep5_case4_nco_<date>.json`,
-  journal fragment, disposition record for every review, the register entry proposed in the campaign's updates file.
+  journal fragment, disposition record for every review.
 
 ## Review and run order
 

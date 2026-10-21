@@ -79,6 +79,35 @@ Read the last lines of the window that opens, press a key, close both windows. R
 Why two steps: an elevation requested from your own console elevates YOU, and the probe's record would then name your account; the session marks such a
 run invalid and it is not counted.
 
+## 4b. You: condition E by a scheduled task (when step 4's prompt offers only administrators)
+
+Step 4's prompt refuses to elevate a non-administrator as itself: it lists only this machine's administrators and has no field for another name.
+Cancel it (the session records that), and use this route instead, approved 2026-10-20. It runs the probe under the account's full token: Windows does
+not split a batch logon, so the record reads elevation type 1 with the group enabled, and the session counts it as E.
+
+1. Windows key + R, type `secpol.msc`, Enter. **Local Policies** > **User Rights Assignment** > double-click **Log on as a batch job** >
+   **Add User or Group…** > type `nco-probe` > **Check Names** > OK > OK. Close the window.
+2. Windows key + R, type `taskschd.msc`, Enter. **Create Task…** (not the basic one). General tab: name `nco-probe`; **Change User or Group…** >
+   type `nco-probe` > Check Names > OK; tick **Run whether user is logged on or not** and **Run with highest privileges**. No trigger.
+3. Actions tab > **New…** > Start a program. Program/script:
+
+```
+C:\ProgramData\BlarAI\case4-pub\bin\ncoprobe.exe
+```
+
+   Add arguments:
+
+```
+run --cond E --live C:\ProgramData\BlarAI\case4-pub\bin\nco-probe-live.json --out C:\ProgramData\BlarAI\case4-pub\drop
+```
+
+   Leave "Start in" empty. OK, OK, and type the `nco-probe` password into the dialog Windows shows.
+4. Select the task, right-click, **Run**. Nothing opens on screen; each run writes its record into the drop folder. Run it three times about a
+   minute apart, then tell the session.
+5. Clean-up, with part C of your sheet (step 8): delete the task in Task Scheduler, and remove the `nco-probe` line from **Log on as a batch job**
+   in the policy window of item 1. The session checks both read-only after part C, by hand outside the driver (the task list and an exported copy
+   of the policy); the driver's part D check reads the account, the group and the profile only.
+
 ## 5. You: controls S and A, three times each
 
 S (your own account, normal console, not elevated): open `cmd` normally and type, three times:
@@ -110,7 +139,8 @@ pwsh -NoProfile -File C:\ProgramData\BlarAI\trackb-live\spike-nep5-matrix.ps1 -C
 
 ## 8. You: part C of your sheet
 
-Remove `nco-probe` from Network Configuration Operators, delete the account, delete its profile entry. Tell the session when done.
+Remove `nco-probe` from Network Configuration Operators, delete the account, delete its profile entry. If step 4b was used: delete the task and remove
+the batch-logon line (its item 5). Tell the session when done.
 
 ## 9. Session: part D checks (read-only)
 
